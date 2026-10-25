@@ -1,0 +1,19 @@
+extends CharacterBody3D
+## Godot's CharacterBody3D template: arrows/WASD move, Space jumps.
+
+@export var speed := 4.0
+@export var jump_velocity := 5.0
+const GRAVITY := 9.8
+
+
+func _physics_process(delta: float) -> void:
+	if not is_on_floor():
+		velocity.y -= GRAVITY * delta
+	if Input.is_action_just_pressed("ui_accept") and is_on_floor():
+		velocity.y = jump_velocity
+	velocity.x = Input.get_axis("ui_left", "ui_right") * speed
+	velocity.z = Input.get_axis("ui_up", "ui_down") * speed
+	move_and_slide()
+	if position.y < -10.0:
+		position = Vector3(0.0, 2.0, 4.0) # fell off: back to the start
+		velocity = Vector3.ZERO

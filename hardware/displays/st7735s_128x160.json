@@ -1,0 +1,22 @@
+{
+  "name": "ST7735S 1.8\" 128×160",
+  "controller": "ST7735S",
+  "panel": [
+    128,
+    160
+  ],
+  "memory": [
+    132,
+    162
+  ],
+  "offset": [
+    2,
+    1
+  ],
+  "invert": false,
+  "rgb_order": false,
+  "spi_hz": 27000000,
+  "spi_mode": 0,
+  "verified": false,
+  "notes": "The variants (green/red/black tab) change the offset and RGB order: adjust them if the image is shifted or the colours are swapped."
+}

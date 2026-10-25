@@ -1,0 +1,4861 @@
+{
+	"format": "jetscene",
+	"root": {
+		"children": [
+			{
+				"ambient_color": 8551318,
+				"background_color": 989223,
+				"background_mode": "Color",
+				"children": [],
+				"ground_bottom_color": 1053724,
+				"ground_horizon_color": 2765890,
+				"id": 2,
+				"name": "WorldEnvironment",
+				"sky_horizon_color": 4025000,
+				"sky_texture": "",
+				"sky_top_color": 662074,
+				"type": "WorldEnvironment"
+			},
+			{
+				"children": [],
+				"id": 3,
+				"light_color": 13494271,
+				"light_energy": 1.16,
+				"name": "KeyLight",
+				"position": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"rotation": [
+					-52.0,
+					-50.0,
+					0.0
+				],
+				"scale": [
+					1.0,
+					1.0,
+					1.0
+				],
+				"type": "DirectionalLight3D",
+				"visible": true
+			},
+			{
+				"children": [],
+				"current": true,
+				"far": 60.0,
+				"fov": 48.5,
+				"id": 4,
+				"name": "OrbitCamera",
+				"near": 0.96,
+				"position": [
+					9.406,
+					5.391,
+					-11.167
+				],
+				"rotation": [
+					-14.0,
+					139.89,
+					0.0
+				],
+				"scale": [
+					1.0,
+					1.0,
+					1.0
+				],
+				"script": "res://scripts/orbit.jet",
+				"script_properties": {},
+				"type": "Camera3D",
+				"visible": true
+			},
+			{
+				"children": [
+					{
+						"albedo_texture": "",
+						"alpha": 1.0,
+						"billboard": false,
+						"children": [],
+						"color": 1648698,
+						"cull_mode": "Disabled",
+						"diffuse": 1.0,
+						"draw_order": "Background",
+						"id": 5,
+						"mesh": "Plane",
+						"mesh_file": "",
+						"mesh_part": "",
+						"name": "Floor",
+						"perspective_correct": true,
+						"position": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"reflection": false,
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							23.0,
+							1.0,
+							23.0
+						],
+						"segments": 12,
+						"shading": "Unlit",
+						"shininess": 32,
+						"specular": 0.5,
+						"texture_filter": "Nearest",
+						"texture_repeat": true,
+						"type": "MeshInstance3D",
+						"uv_offset": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"uv_scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"visible": true
+					},
+					{
+						"children": [
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2299699,
+								"cull_mode": "Disabled",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 6,
+								"mesh": "Quad",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Wall1",
+								"perspective_correct": true,
+								"position": [
+									6.7175,
+									5.0,
+									-16.2175
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-22.5,
+									0.0
+								],
+								"scale": [
+									14.5419704298734,
+									10.0,
+									1.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 1317935,
+								"cull_mode": "Disabled",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 7,
+								"mesh": "Quad",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Wall2",
+								"perspective_correct": true,
+								"position": [
+									16.2175,
+									5.0,
+									-6.7175
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-67.5,
+									0.0
+								],
+								"scale": [
+									14.5419704298734,
+									10.0,
+									1.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2299699,
+								"cull_mode": "Disabled",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 8,
+								"mesh": "Quad",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Wall3",
+								"perspective_correct": true,
+								"position": [
+									16.2175,
+									5.0,
+									6.7175
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-112.5,
+									0.0
+								],
+								"scale": [
+									14.5419704298734,
+									10.0,
+									1.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 1317935,
+								"cull_mode": "Disabled",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 9,
+								"mesh": "Quad",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Wall4",
+								"perspective_correct": true,
+								"position": [
+									6.7175,
+									5.0,
+									16.2175
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-157.5,
+									0.0
+								],
+								"scale": [
+									14.5419704298734,
+									10.0,
+									1.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2299699,
+								"cull_mode": "Disabled",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 10,
+								"mesh": "Quad",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Wall5",
+								"perspective_correct": true,
+								"position": [
+									-6.7175,
+									5.0,
+									16.2175
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-202.5,
+									0.0
+								],
+								"scale": [
+									14.5419704298734,
+									10.0,
+									1.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 1317935,
+								"cull_mode": "Disabled",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 11,
+								"mesh": "Quad",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Wall6",
+								"perspective_correct": true,
+								"position": [
+									-16.2175,
+									5.0,
+									6.7175
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-247.5,
+									0.0
+								],
+								"scale": [
+									14.5419704298734,
+									10.0,
+									1.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2299699,
+								"cull_mode": "Disabled",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 12,
+								"mesh": "Quad",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Wall7",
+								"perspective_correct": true,
+								"position": [
+									-16.2175,
+									5.0,
+									-6.7175
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-292.5,
+									0.0
+								],
+								"scale": [
+									14.5419704298734,
+									10.0,
+									1.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 1317935,
+								"cull_mode": "Disabled",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 13,
+								"mesh": "Quad",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Wall8",
+								"perspective_correct": true,
+								"position": [
+									-6.7175,
+									5.0,
+									-16.2175
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-337.5,
+									0.0
+								],
+								"scale": [
+									14.5419704298734,
+									10.0,
+									1.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							}
+						],
+						"id": 14,
+						"name": "Walls",
+						"position": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"type": "Node3D",
+						"visible": true
+					},
+					{
+						"children": [
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 15,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineX1",
+								"perspective_correct": true,
+								"position": [
+									-17.6,
+									0.02,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.02,
+									1.0,
+									18.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 16,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineZ1",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									0.02,
+									17.6
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									18.0,
+									1.0,
+									0.02
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 17,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineX2",
+								"perspective_correct": true,
+								"position": [
+									-13.2,
+									0.02,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.02,
+									1.0,
+									18.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 18,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineZ2",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									0.02,
+									13.2
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									18.0,
+									1.0,
+									0.02
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 19,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineX3",
+								"perspective_correct": true,
+								"position": [
+									-8.8,
+									0.02,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.02,
+									1.0,
+									18.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 20,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineZ3",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									0.02,
+									8.8
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									18.0,
+									1.0,
+									0.02
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 21,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineX4",
+								"perspective_correct": true,
+								"position": [
+									-4.4,
+									0.02,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.02,
+									1.0,
+									18.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 22,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineZ4",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									0.02,
+									4.4
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									18.0,
+									1.0,
+									0.02
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 23,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineX5",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									0.02,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.02,
+									1.0,
+									18.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 24,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineZ5",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									0.02,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									18.0,
+									1.0,
+									0.02
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 25,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineX6",
+								"perspective_correct": true,
+								"position": [
+									4.4,
+									0.02,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.02,
+									1.0,
+									18.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 26,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineZ6",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									0.02,
+									-4.4
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									18.0,
+									1.0,
+									0.02
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 27,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineX7",
+								"perspective_correct": true,
+								"position": [
+									8.8,
+									0.02,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.02,
+									1.0,
+									18.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 28,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineZ7",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									0.02,
+									-8.8
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									18.0,
+									1.0,
+									0.02
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 29,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineX8",
+								"perspective_correct": true,
+								"position": [
+									13.2,
+									0.02,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.02,
+									1.0,
+									18.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 30,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineZ8",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									0.02,
+									-13.2
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									18.0,
+									1.0,
+									0.02
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 31,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineX9",
+								"perspective_correct": true,
+								"position": [
+									17.6,
+									0.02,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.02,
+									1.0,
+									18.0
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2969184,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 32,
+								"mesh": "Plane",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "LineZ9",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									0.02,
+									-17.6
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									18.0,
+									1.0,
+									0.02
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							}
+						],
+						"id": 33,
+						"name": "FloorGrid",
+						"position": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"type": "Node3D",
+						"visible": true
+					},
+					{
+						"albedo_texture": "",
+						"alpha": 1.0,
+						"billboard": false,
+						"children": [],
+						"color": 2767953,
+						"cull_mode": "Back",
+						"diffuse": 1.0,
+						"draw_order": "Background",
+						"id": 34,
+						"mesh": "Cylinder",
+						"mesh_file": "",
+						"mesh_part": "",
+						"name": "Platform",
+						"perspective_correct": true,
+						"position": [
+							0.0,
+							0.09,
+							0.0
+						],
+						"reflection": false,
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							14.4,
+							0.09,
+							14.4
+						],
+						"segments": 32,
+						"shading": "Unlit",
+						"shininess": 32,
+						"specular": 0.5,
+						"texture_filter": "Nearest",
+						"texture_repeat": true,
+						"type": "MeshInstance3D",
+						"uv_offset": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"uv_scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"visible": true
+					},
+					{
+						"children": [
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 35,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon1",
+								"perspective_correct": true,
+								"position": [
+									0.6758,
+									0.19,
+									-6.8618
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-5.625,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 36,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon2",
+								"perspective_correct": true,
+								"position": [
+									2.0015,
+									0.19,
+									-6.5981
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-16.875,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 37,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon3",
+								"perspective_correct": true,
+								"position": [
+									3.2503,
+									0.19,
+									-6.0808
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-28.125,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 38,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon4",
+								"perspective_correct": true,
+								"position": [
+									4.3741,
+									0.19,
+									-5.3299
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-39.375,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 39,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon5",
+								"perspective_correct": true,
+								"position": [
+									5.3299,
+									0.19,
+									-4.3741
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-50.625,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 40,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon6",
+								"perspective_correct": true,
+								"position": [
+									6.0808,
+									0.19,
+									-3.2503
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-61.875,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 41,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon7",
+								"perspective_correct": true,
+								"position": [
+									6.5981,
+									0.19,
+									-2.0015
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-73.125,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 42,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon8",
+								"perspective_correct": true,
+								"position": [
+									6.8618,
+									0.19,
+									-0.6758
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-84.375,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 43,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon9",
+								"perspective_correct": true,
+								"position": [
+									6.8618,
+									0.19,
+									0.6758
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-95.625,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 44,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon10",
+								"perspective_correct": true,
+								"position": [
+									6.5981,
+									0.19,
+									2.0015
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-106.875,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 45,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon11",
+								"perspective_correct": true,
+								"position": [
+									6.0808,
+									0.19,
+									3.2503
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-118.125,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 46,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon12",
+								"perspective_correct": true,
+								"position": [
+									5.3299,
+									0.19,
+									4.3741
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-129.375,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 47,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon13",
+								"perspective_correct": true,
+								"position": [
+									4.3741,
+									0.19,
+									5.3299
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-140.625,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 48,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon14",
+								"perspective_correct": true,
+								"position": [
+									3.2503,
+									0.19,
+									6.0808
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-151.875,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 49,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon15",
+								"perspective_correct": true,
+								"position": [
+									2.0015,
+									0.19,
+									6.5981
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-163.125,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 50,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon16",
+								"perspective_correct": true,
+								"position": [
+									0.6758,
+									0.19,
+									6.8618
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-174.375,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 51,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon17",
+								"perspective_correct": true,
+								"position": [
+									-0.6758,
+									0.19,
+									6.8618
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-185.625,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 52,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon18",
+								"perspective_correct": true,
+								"position": [
+									-2.0015,
+									0.19,
+									6.5981
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-196.875,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 53,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon19",
+								"perspective_correct": true,
+								"position": [
+									-3.2503,
+									0.19,
+									6.0808
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-208.125,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 54,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon20",
+								"perspective_correct": true,
+								"position": [
+									-4.3741,
+									0.19,
+									5.3299
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-219.375,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 55,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon21",
+								"perspective_correct": true,
+								"position": [
+									-5.3299,
+									0.19,
+									4.3741
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-230.625,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 56,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon22",
+								"perspective_correct": true,
+								"position": [
+									-6.0808,
+									0.19,
+									3.2503
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-241.875,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 57,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon23",
+								"perspective_correct": true,
+								"position": [
+									-6.5981,
+									0.19,
+									2.0015
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-253.125,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 58,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon24",
+								"perspective_correct": true,
+								"position": [
+									-6.8618,
+									0.19,
+									0.6758
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-264.375,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 59,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon25",
+								"perspective_correct": true,
+								"position": [
+									-6.8618,
+									0.19,
+									-0.6758
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-275.625,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 60,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon26",
+								"perspective_correct": true,
+								"position": [
+									-6.5981,
+									0.19,
+									-2.0015
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-286.875,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 61,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon27",
+								"perspective_correct": true,
+								"position": [
+									-6.0808,
+									0.19,
+									-3.2503
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-298.125,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 62,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon28",
+								"perspective_correct": true,
+								"position": [
+									-5.3299,
+									0.19,
+									-4.3741
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-309.375,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 63,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon29",
+								"perspective_correct": true,
+								"position": [
+									-4.3741,
+									0.19,
+									-5.3299
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-320.625,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 64,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon30",
+								"perspective_correct": true,
+								"position": [
+									-3.2503,
+									0.19,
+									-6.0808
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-331.875,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 65,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon31",
+								"perspective_correct": true,
+								"position": [
+									-2.0015,
+									0.19,
+									-6.5981
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-343.125,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 66,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Neon32",
+								"perspective_correct": true,
+								"position": [
+									-0.6758,
+									0.19,
+									-6.8618
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									-354.375,
+									0.0
+								],
+								"scale": [
+									1.37,
+									0.012,
+									0.09
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							}
+						],
+						"id": 67,
+						"name": "NeonRim",
+						"position": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"type": "Node3D",
+						"visible": true
+					},
+					{
+						"albedo_texture": "",
+						"alpha": 1.0,
+						"billboard": false,
+						"children": [],
+						"color": 1187117,
+						"cull_mode": "Back",
+						"diffuse": 1.0,
+						"draw_order": "Background",
+						"id": 68,
+						"mesh": "Plane",
+						"mesh_file": "",
+						"mesh_part": "",
+						"name": "Shadow",
+						"perspective_correct": true,
+						"position": [
+							0.0,
+							0.2,
+							0.0
+						],
+						"reflection": false,
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							1.8,
+							1.0,
+							4.65
+						],
+						"segments": 12,
+						"shading": "Unlit",
+						"shininess": 32,
+						"specular": 0.5,
+						"texture_filter": "Nearest",
+						"texture_repeat": true,
+						"type": "MeshInstance3D",
+						"uv_offset": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"uv_scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"visible": true
+					},
+					{
+						"children": [
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2504010,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 69,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Frame1",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									4.25,
+									-17.8
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.45,
+									8.5,
+									0.45
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 70,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Tube1",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									4.35,
+									-17.6576
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.13,
+									6.3,
+									0.13
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 10798552,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 71,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Panel1",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									8.55,
+									-15.308
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									2.2,
+									0.15,
+									1.2
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2504010,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 72,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Frame2",
+								"perspective_correct": true,
+								"position": [
+									12.5865,
+									4.25,
+									-12.5865
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.45,
+									8.5,
+									0.45
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 73,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Tube2",
+								"perspective_correct": true,
+								"position": [
+									12.4858,
+									4.35,
+									-12.4858
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.13,
+									6.3,
+									0.13
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 10798552,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 74,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Panel2",
+								"perspective_correct": true,
+								"position": [
+									10.8244,
+									8.55,
+									-10.8244
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									2.2,
+									0.15,
+									1.2
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2504010,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 75,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Frame3",
+								"perspective_correct": true,
+								"position": [
+									17.8,
+									4.25,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.45,
+									8.5,
+									0.45
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 76,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Tube3",
+								"perspective_correct": true,
+								"position": [
+									17.6576,
+									4.35,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.13,
+									6.3,
+									0.13
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 10798552,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 77,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Panel3",
+								"perspective_correct": true,
+								"position": [
+									15.308,
+									8.55,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									2.2,
+									0.15,
+									1.2
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2504010,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 78,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Frame4",
+								"perspective_correct": true,
+								"position": [
+									12.5865,
+									4.25,
+									12.5865
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.45,
+									8.5,
+									0.45
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 79,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Tube4",
+								"perspective_correct": true,
+								"position": [
+									12.4858,
+									4.35,
+									12.4858
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.13,
+									6.3,
+									0.13
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 10798552,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 80,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Panel4",
+								"perspective_correct": true,
+								"position": [
+									10.8244,
+									8.55,
+									10.8244
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									2.2,
+									0.15,
+									1.2
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2504010,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 81,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Frame5",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									4.25,
+									17.8
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.45,
+									8.5,
+									0.45
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 82,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Tube5",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									4.35,
+									17.6576
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.13,
+									6.3,
+									0.13
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 10798552,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 83,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Panel5",
+								"perspective_correct": true,
+								"position": [
+									0.0,
+									8.55,
+									15.308
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									2.2,
+									0.15,
+									1.2
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2504010,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 84,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Frame6",
+								"perspective_correct": true,
+								"position": [
+									-12.5865,
+									4.25,
+									12.5865
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.45,
+									8.5,
+									0.45
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 85,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Tube6",
+								"perspective_correct": true,
+								"position": [
+									-12.4858,
+									4.35,
+									12.4858
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.13,
+									6.3,
+									0.13
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 10798552,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 86,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Panel6",
+								"perspective_correct": true,
+								"position": [
+									-10.8244,
+									8.55,
+									10.8244
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									2.2,
+									0.15,
+									1.2
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2504010,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 87,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Frame7",
+								"perspective_correct": true,
+								"position": [
+									-17.8,
+									4.25,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.45,
+									8.5,
+									0.45
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 3332076,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 88,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Tube7",
+								"perspective_correct": true,
+								"position": [
+									-17.6576,
+									4.35,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.13,
+									6.3,
+									0.13
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 10798552,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 89,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Panel7",
+								"perspective_correct": true,
+								"position": [
+									-15.308,
+									8.55,
+									0.0
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									2.2,
+									0.15,
+									1.2
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 2504010,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 90,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Frame8",
+								"perspective_correct": true,
+								"position": [
+									-12.5865,
+									4.25,
+									-12.5865
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.45,
+									8.5,
+									0.45
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 15024828,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 91,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Tube8",
+								"perspective_correct": true,
+								"position": [
+									-12.4858,
+									4.35,
+									-12.4858
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									0.13,
+									6.3,
+									0.13
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							},
+							{
+								"albedo_texture": "",
+								"alpha": 1.0,
+								"billboard": false,
+								"children": [],
+								"color": 10798552,
+								"cull_mode": "Back",
+								"diffuse": 1.0,
+								"draw_order": "Background",
+								"id": 92,
+								"mesh": "Box",
+								"mesh_file": "",
+								"mesh_part": "",
+								"name": "Panel8",
+								"perspective_correct": true,
+								"position": [
+									-10.8244,
+									8.55,
+									-10.8244
+								],
+								"reflection": false,
+								"rotation": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									2.2,
+									0.15,
+									1.2
+								],
+								"segments": 12,
+								"shading": "Unlit",
+								"shininess": 32,
+								"specular": 0.5,
+								"texture_filter": "Nearest",
+								"texture_repeat": true,
+								"type": "MeshInstance3D",
+								"uv_offset": [
+									0.0,
+									0.0,
+									0.0
+								],
+								"uv_scale": [
+									1.0,
+									1.0,
+									1.0
+								],
+								"visible": true
+							}
+						],
+						"id": 93,
+						"name": "Ribs",
+						"position": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"type": "Node3D",
+						"visible": true
+					}
+				],
+				"id": 104,
+				"name": "Room",
+				"position": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"rotation": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"scale": [
+					1.0,
+					1.0,
+					1.0
+				],
+				"type": "Node3D",
+				"visible": true
+			},
+			{
+				"children": [
+					{
+						"albedo_texture": "res://car/outrun.png",
+						"alpha": 1.0,
+						"billboard": false,
+						"children": [],
+						"color": 16777215,
+						"cull_mode": "Back",
+						"diffuse": 0.65,
+						"draw_order": "Default",
+						"id": 94,
+						"mesh": "File",
+						"mesh_file": "res://car/Nascar Intel - Separate Windows.obj",
+						"mesh_part": "Nascar",
+						"name": "Nascar",
+						"perspective_correct": true,
+						"position": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"reflection": false,
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"segments": 12,
+						"shading": "Phong",
+						"shininess": 32,
+						"specular": 0.8,
+						"texture_filter": "Nearest",
+						"texture_repeat": true,
+						"type": "MeshInstance3D",
+						"uv_offset": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"uv_scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"visible": true
+					},
+					{
+						"albedo_texture": "res://textures/workshop_env.png",
+						"alpha": 1.0,
+						"billboard": false,
+						"children": [],
+						"color": 16777215,
+						"cull_mode": "Back",
+						"diffuse": 1.0,
+						"draw_order": "Default",
+						"id": 95,
+						"mesh": "File",
+						"mesh_file": "res://car/Nascar Intel - Separate Windows.obj",
+						"mesh_part": "Front_Window",
+						"name": "Front_Window",
+						"perspective_correct": true,
+						"position": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"reflection": true,
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"segments": 12,
+						"shading": "Unlit",
+						"shininess": 32,
+						"specular": 0.5,
+						"texture_filter": "Nearest",
+						"texture_repeat": true,
+						"type": "MeshInstance3D",
+						"uv_offset": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"uv_scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"visible": true
+					},
+					{
+						"albedo_texture": "res://textures/workshop_env.png",
+						"alpha": 1.0,
+						"billboard": false,
+						"children": [],
+						"color": 16777215,
+						"cull_mode": "Back",
+						"diffuse": 1.0,
+						"draw_order": "Default",
+						"id": 96,
+						"mesh": "File",
+						"mesh_file": "res://car/Nascar Intel - Separate Windows.obj",
+						"mesh_part": "Rear_Window",
+						"name": "Rear_Window",
+						"perspective_correct": true,
+						"position": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"reflection": true,
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"segments": 12,
+						"shading": "Unlit",
+						"shininess": 32,
+						"specular": 0.5,
+						"texture_filter": "Nearest",
+						"texture_repeat": true,
+						"type": "MeshInstance3D",
+						"uv_offset": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"uv_scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"visible": true
+					},
+					{
+						"albedo_texture": "res://car/outrun.png",
+						"alpha": 1.0,
+						"billboard": false,
+						"children": [],
+						"color": 16777215,
+						"cull_mode": "Back",
+						"diffuse": 1.0,
+						"draw_order": "Default",
+						"id": 97,
+						"mesh": "File",
+						"mesh_file": "res://car/Nascar Intel - Separate Windows.obj",
+						"mesh_part": "Nascar_wheel",
+						"name": "Nascar_wheel",
+						"perspective_correct": true,
+						"position": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"reflection": false,
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"segments": 12,
+						"shading": "Unlit",
+						"shininess": 32,
+						"specular": 0.5,
+						"texture_filter": "Nearest",
+						"texture_repeat": true,
+						"type": "MeshInstance3D",
+						"uv_offset": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"uv_scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"visible": true
+					},
+					{
+						"albedo_texture": "res://car/outrun.png",
+						"alpha": 1.0,
+						"billboard": false,
+						"children": [],
+						"color": 16777215,
+						"cull_mode": "Back",
+						"diffuse": 1.0,
+						"draw_order": "Default",
+						"id": 98,
+						"mesh": "File",
+						"mesh_file": "res://car/Nascar Intel - Separate Windows.obj",
+						"mesh_part": "Nascar_wheel_001",
+						"name": "Nascar_wheel_001",
+						"perspective_correct": true,
+						"position": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"reflection": false,
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"segments": 12,
+						"shading": "Unlit",
+						"shininess": 32,
+						"specular": 0.5,
+						"texture_filter": "Nearest",
+						"texture_repeat": true,
+						"type": "MeshInstance3D",
+						"uv_offset": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"uv_scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"visible": true
+					},
+					{
+						"albedo_texture": "res://car/outrun.png",
+						"alpha": 1.0,
+						"billboard": false,
+						"children": [],
+						"color": 16777215,
+						"cull_mode": "Back",
+						"diffuse": 1.0,
+						"draw_order": "Default",
+						"id": 99,
+						"mesh": "File",
+						"mesh_file": "res://car/Nascar Intel - Separate Windows.obj",
+						"mesh_part": "Nascar_wheel_002",
+						"name": "Nascar_wheel_002",
+						"perspective_correct": true,
+						"position": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"reflection": false,
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"segments": 12,
+						"shading": "Unlit",
+						"shininess": 32,
+						"specular": 0.5,
+						"texture_filter": "Nearest",
+						"texture_repeat": true,
+						"type": "MeshInstance3D",
+						"uv_offset": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"uv_scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"visible": true
+					},
+					{
+						"albedo_texture": "res://car/outrun.png",
+						"alpha": 1.0,
+						"billboard": false,
+						"children": [],
+						"color": 16777215,
+						"cull_mode": "Back",
+						"diffuse": 1.0,
+						"draw_order": "Default",
+						"id": 100,
+						"mesh": "File",
+						"mesh_file": "res://car/Nascar Intel - Separate Windows.obj",
+						"mesh_part": "Nascar_wheel_003",
+						"name": "Nascar_wheel_003",
+						"perspective_correct": true,
+						"position": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"reflection": false,
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"segments": 12,
+						"shading": "Unlit",
+						"shininess": 32,
+						"specular": 0.5,
+						"texture_filter": "Nearest",
+						"texture_repeat": true,
+						"type": "MeshInstance3D",
+						"uv_offset": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"uv_scale": [
+							1.0,
+							1.0,
+							1.0
+						],
+						"visible": true
+					}
+				],
+				"id": 101,
+				"name": "Car",
+				"position": [
+					0.0,
+					0.52,
+					0.0
+				],
+				"rotation": [
+					0.0,
+					180.0,
+					0.0
+				],
+				"scale": [
+					1.0,
+					1.0,
+					1.0
+				],
+				"type": "Node3D",
+				"visible": true
+			},
+			{
+				"alpha": 1.0,
+				"children": [],
+				"color": 14611967,
+				"id": 102,
+				"name": "Title",
+				"position": [
+					12.0,
+					10.0
+				],
+				"text": "NEON MOTORWORKS",
+				"text_scale": 2,
+				"type": "Label",
+				"visible": true
+			},
+			{
+				"alpha": 1.0,
+				"children": [],
+				"color": 9360877,
+				"id": 103,
+				"name": "Caption",
+				"position": [
+					12.0,
+					216.0
+				],
+				"text": "OBJ / PHONG PAINT / CHROME GLASS",
+				"text_scale": 1,
+				"type": "Label",
+				"visible": true
+			}
+		],
+		"id": 1,
+		"name": "Workshop",
+		"position": [
+			0.0,
+			0.0,
+			0.0
+		],
+		"rotation": [
+			0.0,
+			0.0,
+			0.0
+		],
+		"scale": [
+			1.0,
+			1.0,
+			1.0
+		],
+		"type": "Node3D",
+		"visible": true
+	},
+	"version": 2
+}

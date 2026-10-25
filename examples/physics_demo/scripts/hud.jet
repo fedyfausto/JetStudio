@@ -1,0 +1,26 @@
+extends Label
+## Coin counter.
+
+@export var total := 5
+var coins := 0
+var finished := 0.0
+
+
+func _ready() -> void:
+	text = "COINS 0/%d" % total
+
+
+func _process(delta: float) -> void:
+	if coins < total:
+		return
+	finished += delta
+	if finished > 2.0:
+		Game.wins += 1
+		get_tree().change_scene_to_file("res://win.jetscene")
+
+
+func add_coin() -> void:
+	coins += 1
+	text = "COINS %d/%d" % [coins, total]
+	if coins == total:
+		text += "  WELL DONE!"

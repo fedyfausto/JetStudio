@@ -1,0 +1,22 @@
+{
+  "name": "ST7796 3.5\"/4\" 320×480",
+  "controller": "ST7796",
+  "panel": [
+    320,
+    480
+  ],
+  "memory": [
+    320,
+    480
+  ],
+  "offset": [
+    0,
+    0
+  ],
+  "invert": true,
+  "rgb_order": false,
+  "spi_hz": 80000000,
+  "spi_mode": 1,
+  "verified": false,
+  "notes": "The display of the JetExamples demos (SPI 80 MHz, mode 1)."
+}

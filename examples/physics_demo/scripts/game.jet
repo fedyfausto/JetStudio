@@ -1,0 +1,4 @@
+extends Node
+## Autoload (Project Settings > Autoload), so it survives scene changes.
+
+var wins := 0

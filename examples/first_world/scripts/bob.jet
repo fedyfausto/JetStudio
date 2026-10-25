@@ -1,0 +1,21 @@
+extends MeshInstance3D
+
+@export var height := 0.35
+@export var frequency := 0.8
+@export var glow := Color(1.0, 0.85, 0.3)
+
+var time := 0.0
+var base_y := 0.0
+var base_color := Color.WHITE
+
+
+func _ready() -> void:
+	base_y = position.y
+	base_color = color
+
+
+func _process(delta: float) -> void:
+	time += delta
+	var wave := sin(time * TAU * frequency)
+	position.y = base_y + wave * height
+	color = base_color.lerp(glow, (wave + 1.0) * 0.5)

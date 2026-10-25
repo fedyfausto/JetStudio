@@ -1,0 +1,14 @@
+extends Node3D
+## The end screen: Space goes back to the level.
+
+@onready var coin = get_node("Coin")
+
+
+func _ready() -> void:
+	get_node("Wins").text = "Wins: %d" % Game.wins
+
+
+func _process(delta: float) -> void:
+	coin.rotate_y(2.0 * delta)
+	if Input.is_action_just_pressed("ui_accept"):
+		get_tree().change_scene_to_file("res://main.jetscene")

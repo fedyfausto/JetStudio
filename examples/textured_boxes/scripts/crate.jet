@@ -1,0 +1,23 @@
+extends MeshInstance3D
+
+## The four modes of CubeCoders' "textured boxes" demo, three seconds each:
+## affine or perspective-correct UVs, nearest or bilinear sampling.
+@export var spin_speed := 65.0
+@export var mode_seconds := 3.0
+
+const MODES := [["AFFINE", 0], ["PERSPECTIVE", 0], ["AFFINE", 1], ["PERSPECTIVE", 1]]
+
+var time := 0.0
+var mode := -1
+
+
+func _process(delta: float) -> void:
+	time += delta
+	rotation_degrees.y += spin_speed * delta
+	rotation_degrees.x = 18.0 * sin(time * 1.7)
+	var next := int(time / mode_seconds) % MODES.size()
+	if next != mode:
+		mode = next
+		perspective_correct = MODES[mode][0] == "PERSPECTIVE"
+		texture_filter = MODES[mode][1]
+		print("%s / %s" % [MODES[mode][0], "BILINEAR" if texture_filter == 1 else "NEAREST"])

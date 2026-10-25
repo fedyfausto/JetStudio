@@ -1,0 +1,102 @@
+{
+	"format": "jetscene",
+	"version": 2,
+	"root": {
+		"id": 1,
+		"name": "Win",
+		"type": "Node3D",
+		"script": "res://scripts/win.jet",
+		"script_properties": {},
+		"children": [
+			{
+				"id": 2,
+				"name": "WorldEnvironment",
+				"type": "WorldEnvironment",
+				"background_mode": "Gradient",
+				"sky_top_color": 1055290,
+				"sky_horizon_color": 3824282,
+				"ground_horizon_color": 3824282,
+				"ground_bottom_color": 1055290,
+				"ambient_color": 5595246,
+				"children": []
+			},
+			{
+				"id": 3,
+				"name": "Sun",
+				"type": "DirectionalLight3D",
+				"rotation": [
+					-40.0,
+					-30.0,
+					0.0
+				],
+				"light_energy": 1.2,
+				"children": []
+			},
+			{
+				"id": 4,
+				"name": "Camera3D",
+				"type": "Camera3D",
+				"position": [
+					0.0,
+					0.0,
+					4.0
+				],
+				"fov": 60.0,
+				"current": true,
+				"children": []
+			},
+			{
+				"id": 5,
+				"name": "Coin",
+				"type": "MeshInstance3D",
+				"mesh": "Torus",
+				"color": 16764992,
+				"rotation": [
+					90.0,
+					0.0,
+					0.0
+				],
+				"shading": "Phong",
+				"specular": 0.9,
+				"children": []
+			},
+			{
+				"id": 6,
+				"name": "Title",
+				"type": "Label",
+				"position": [
+					56.0,
+					30.0
+				],
+				"text": "WELL DONE!",
+				"color": 16777215,
+				"text_scale": 3,
+				"children": []
+			},
+			{
+				"id": 7,
+				"name": "Wins",
+				"type": "Label",
+				"position": [
+					124.0,
+					180.0
+				],
+				"text": "Wins: 0",
+				"color": 16764992,
+				"children": []
+			},
+			{
+				"id": 8,
+				"name": "Hint",
+				"type": "Label",
+				"position": [
+					92.0,
+					204.0
+				],
+				"text": "Space: play again",
+				"color": 13162728,
+				"children": []
+			}
+		]
+	}
+}

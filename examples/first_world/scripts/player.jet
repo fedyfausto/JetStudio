@@ -1,0 +1,24 @@
+extends MeshInstance3D
+
+## Arrow keys / WASD move the player, Space changes its colour.
+@export var speed := 2.5
+@export var limit := 3.5
+
+var moves := 0
+
+
+func _ready() -> void:
+	print("Player ready at ", position, " - use the arrow keys in the Game view")
+
+
+func _process(delta: float) -> void:
+	var direction := Vector3(Input.get_axis("ui_left", "ui_right"), 0.0, Input.get_axis("ui_up", "ui_down"))
+	if direction.length() > 0.0:
+		position += direction.normalized() * speed * delta
+		position.x = clamp(position.x, -limit, limit)
+		position.z = clamp(position.z, -limit, limit)
+		rotation_degrees.y += 360.0 * delta
+	if Input.is_action_just_pressed("ui_accept"):
+		moves += 1
+		color = Color(randf(), randf(), randf())
+		print("Colour changes: %d" % moves)

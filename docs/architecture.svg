@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820">
+<defs>
+<marker id="head-78d5bc" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#78d5bc"/></marker>
+<marker id="head-f0a45b" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f0a45b"/></marker>
+<marker id="head-7aa2f7" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7aa2f7"/></marker>
+<marker id="head-c792ea" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c792ea"/></marker>
+<marker id="head-f07c9a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f07c9a"/></marker>
+<marker id="head-8a93a6" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8a93a6"/></marker>
+<linearGradient id="glow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0a45b"/><stop offset="1" stop-color="#e0823a"/></linearGradient>
+</defs>
+<rect width="1200" height="820" rx="22" fill="#10141c"/>
+<g transform="translate(40 34)"><rect x="0" y="0" width="26" height="26" rx="4" transform="rotate(45 13 13)" fill="none" stroke="#78d5bc" stroke-width="3"/><rect x="7" y="7" width="12" height="12" rx="2" transform="rotate(45 13 13)" fill="#78d5bc"/></g>
+<text x="84" y="56" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" font-weight="800" fill="#e2e7f0" text-anchor="start" letter-spacing="3">JET STUDIO</text>
+<text x="292" y="56" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#8a93a6" text-anchor="start">architecture</text>
+<text x="1160" y="56" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8a93a6" text-anchor="end">one C++17 runtime · Jet renderer · everywhere</text>
+<rect x="40" y="90" width="520" height="300" rx="16" fill="#171d29" stroke="#2a3446" stroke-width="1.5"/>
+<rect x="60" y="88.5" width="480" height="3" rx="1.5" fill="#78d5bc"/>
+<text x="60" y="122" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#78d5bc" text-anchor="start" letter-spacing="1.6">EDITOR</text>
+<text x="540" y="122" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="end">Godot 4 template</text>
+<rect x="64" y="140" width="472" height="92" rx="10" fill="#78d5bc" fill-opacity="0.10" stroke="#78d5bc" stroke-opacity="0.55" stroke-width="1.2"/>
+<text x="78" y="164" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#e2e7f0" text-anchor="start">GDScript app</text>
+<text x="78" y="184" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">editor/scripts · docks, Inspector, 3D view,</text>
+<text x="78" y="201" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">script editor, Project Settings, Serial</text>
+<rect x="64" y="274" width="472" height="92" rx="10" fill="#78d5bc" fill-opacity="0.10" stroke="#78d5bc" stroke-opacity="0.55" stroke-width="1.2"/>
+<text x="78" y="298" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#e2e7f0" text-anchor="start">JetBridge  (GDExtension)</text>
+<text x="78" y="318" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">native/ · scene → Description, edit view,</text>
+<text x="78" y="335" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">Play, compile, export_pack()  ·  JetSerial</text>
+<path d="M300,236 L300,268" fill="none" stroke="#78d5bc" stroke-width="2.2" marker-end="url(#head-78d5bc)"/>
+<path d="M282,268 L282,238" fill="none" stroke="#78d5bc" stroke-width="2.2" marker-end="url(#head-78d5bc)"/>
+<rect x="640" y="90" width="520" height="300" rx="16" fill="#171d29" stroke="#2a3446" stroke-width="1.5"/>
+<rect x="660" y="88.5" width="480" height="3" rx="1.5" fill="#7aa2f7"/>
+<text x="660" y="122" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#7aa2f7" text-anchor="start" letter-spacing="1.6">RUNTIME/  (C++17, NO GODOT TYPES)</text>
+<rect x="664" y="140" width="228" height="104" rx="10" fill="#7aa2f7" fill-opacity="0.10" stroke="#7aa2f7" stroke-opacity="0.55" stroke-width="1.2"/>
+<text x="678" y="164" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#e2e7f0" text-anchor="start">Runtime</text>
+<text x="678" y="184" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">scenes · autoloads</text>
+<text x="678" y="201" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">physics · particles</text>
+<text x="678" y="218" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">ScriptHost (Godot API)</text>
+<rect x="908" y="140" width="228" height="104" rx="10" fill="#7aa2f7" fill-opacity="0.10" stroke="#7aa2f7" stroke-opacity="0.55" stroke-width="1.2"/>
+<text x="922" y="164" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#e2e7f0" text-anchor="start">JetScript</text>
+<text x="922" y="184" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">lexer · parser · compiler</text>
+<text x="922" y="201" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">→ bytecode → VM</text>
+<text x="922" y="218" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">(devices: VM only)</text>
+<rect x="664" y="260" width="228" height="106" rx="10" fill="#7aa2f7" fill-opacity="0.10" stroke="#7aa2f7" stroke-opacity="0.55" stroke-width="1.2"/>
+<text x="678" y="284" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#e2e7f0" text-anchor="start">Jet renderer</text>
+<text x="678" y="304" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">third_party/Jet</text>
+<text x="678" y="321" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">fixed-point raster</text>
+<text x="678" y="338" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">RGB565 framebuffer</text>
+<rect x="908" y="260" width="228" height="106" rx="10" fill="#7aa2f7" fill-opacity="0.10" stroke="#7aa2f7" stroke-opacity="0.55" stroke-width="1.2"/>
+<text x="922" y="284" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#e2e7f0" text-anchor="start">Package codec</text>
+<text x="922" y="304" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">encode_pack()</text>
+<text x="922" y="321" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">decode_pack()</text>
+<text x="922" y="338" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">OBJ / PNG import</text>
+<path d="M560,320 L634,320" fill="none" stroke="#78d5bc" stroke-width="2.2" marker-end="url(#head-78d5bc)"/>
+<rect x="531.4" y="286" width="131.2" height="21" rx="10.5" fill="#10141c" stroke="#78d5bc" stroke-opacity="0.6"/>
+<text x="597" y="301" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="600" fill="#78d5bc" text-anchor="middle">edit view · Play</text>
+<g transform="translate(520 446)"><path d="M0,18 C0,4 160,4 160,18 L160,74 C160,88 0,88 0,74 Z" fill="url(#glow)"/><ellipse cx="80" cy="18" rx="80" ry="13" fill="#f6c08a"/></g>
+<text x="600" y="512" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="20" font-weight="800" fill="#10141c" text-anchor="middle">.jetpack</text>
+<text x="600" y="556" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="middle" fill="#8a93a6" text-anchor="start">scenes · autoloads · bytecode · textures · meshes · Input Map</text>
+<path d="M1022,390 L1022,420 L690,480" fill="none" stroke="#f0a45b" stroke-width="2.2" marker-end="url(#head-f0a45b)"/>
+<rect x="805.2" y="426" width="109.60000000000001" height="21" rx="10.5" fill="#10141c" stroke="#f0a45b" stroke-opacity="0.6"/>
+<text x="860" y="441" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="600" fill="#f0a45b" text-anchor="middle">export_pack()</text>
+<rect x="40" y="600" width="340" height="190" rx="16" fill="#171d29" stroke="#2a3446" stroke-width="1.5"/>
+<rect x="60" y="598.5" width="300" height="3" rx="1.5" fill="#c792ea"/>
+<text x="60" y="632" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#c792ea" text-anchor="start" letter-spacing="1.6">TOOLS/</text>
+<text x="360" y="632" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="end">python</text>
+<rect x="64" y="650" width="292" height="58" rx="10" fill="#c792ea" fill-opacity="0.10" stroke="#c792ea" stroke-opacity="0.55" stroke-width="1.2"/>
+<text x="78" y="674" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#e2e7f0" text-anchor="start">tasks.py</text>
+<text x="78" y="694" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">package + headers → firmware build</text>
+<rect x="64" y="718" width="292" height="58" rx="10" fill="#c792ea" fill-opacity="0.10" stroke="#c792ea" stroke-opacity="0.55" stroke-width="1.2"/>
+<text x="78" y="742" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#e2e7f0" text-anchor="start">hardware.py</text>
+<text x="78" y="762" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">boards &amp; displays → generated headers</text>
+<path d="M520,490 L300,490 L300,594" fill="none" stroke="#f0a45b" stroke-width="2.2" marker-end="url(#head-f0a45b)"/>
+<path d="M180,390 L180,594" fill="none" stroke="#c792ea" stroke-width="2.2" marker-end="url(#head-c792ea)"/>
+<rect x="125.19999999999999" y="478" width="109.60000000000001" height="21" rx="10.5" fill="#10141c" stroke="#c792ea" stroke-opacity="0.6"/>
+<text x="180" y="493" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="600" fill="#c792ea" text-anchor="middle">Build / Flash</text>
+<rect x="440" y="600" width="720" height="190" rx="16" fill="#171d29" stroke="#2a3446" stroke-width="1.5"/>
+<rect x="460" y="598.5" width="680" height="3" rx="1.5" fill="#f07c9a"/>
+<text x="460" y="632" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#f07c9a" text-anchor="start" letter-spacing="1.6">TARGETS</text>
+<text x="548" y="632" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">VM-only runtime  ·  serial log → Serial panel</text>
+<rect x="464" y="650" width="214" height="126" rx="10" fill="#f07c9a" fill-opacity="0.10" stroke="#f07c9a" stroke-opacity="0.55" stroke-width="1.2"/>
+<text x="478" y="674" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#e2e7f0" text-anchor="start">ESP32-S3 firmware</text>
+<text x="478" y="694" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">ESP-IDF · 2 cores</text>
+<text x="478" y="711" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">half-width fields</text>
+<text x="478" y="728" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">DMA scanout · PSRAM</text>
+<rect x="694" y="650" width="214" height="126" rx="10" fill="#f07c9a" fill-opacity="0.10" stroke="#f07c9a" stroke-opacity="0.55" stroke-width="1.2"/>
+<text x="708" y="674" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#e2e7f0" text-anchor="start">STM32 F4/F7</text>
+<text x="708" y="694" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">Arduino core</text>
+<text x="708" y="711" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">single core</text>
+<text x="708" y="728" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">LovyanGFX SPI</text>
+<rect x="924" y="650" width="212" height="126" rx="10" fill="#f07c9a" fill-opacity="0.10" stroke="#f07c9a" stroke-opacity="0.55" stroke-width="1.2"/>
+<text x="938" y="674" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#e2e7f0" text-anchor="start">Desktop player</text>
+<text x="938" y="694" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">jet_player (SDL2)</text>
+<text x="938" y="711" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">jet_player_device</text>
+<text x="938" y="728" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">= device emulator</text>
+<path d="M356,690 L458,690" fill="none" stroke="#c792ea" stroke-width="2.2" marker-end="url(#head-c792ea)"/>
+<path d="M420,690 L420,806 L801,806 L801,782" fill="none" stroke="#c792ea" stroke-width="2.2" marker-end="url(#head-c792ea)"/>
+<path d="M682,505 L1030,505 L1030,644" fill="none" stroke="#f0a45b" stroke-width="2.2" marker-end="url(#head-f0a45b)"/>
+<rect x="866.8" y="491" width="66.4" height="21" rx="10.5" fill="#10141c" stroke="#f0a45b" stroke-opacity="0.6"/>
+<text x="900" y="506" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="600" fill="#f0a45b" text-anchor="middle">players</text>
+</svg>

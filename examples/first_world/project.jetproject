@@ -1,0 +1,5 @@
+{
+	"main_scene": "res://main.jetscene",
+	"name": "First world",
+	"target": "nano"
+}

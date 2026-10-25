@@ -1,0 +1,10 @@
+extends Camera3D
+## Follows the player from behind and above.
+
+@export var offset := Vector3(0.0, 5.0, 8.0)
+@onready var target = get_node("../Player")
+
+
+func _process(delta: float) -> void:
+	position = position.lerp(target.position + offset, min(1.0, 4.0 * delta))
+	look_at(target.position + Vector3(0.0, 1.0, 0.0))

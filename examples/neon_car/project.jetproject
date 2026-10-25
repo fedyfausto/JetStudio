@@ -1,0 +1,21 @@
+{
+	"hardware": {
+		"board": "nano_esp32",
+		"display": "ili9341_240x320",
+		"orientation": "landscape",
+		"pins": {
+			"backlight": -1.0,
+			"cs": 21.0,
+			"dc": 9.0,
+			"mosi": 38.0,
+			"reset": 18.0,
+			"sck": 48.0
+		},
+		"spi_hz": 40000000
+	},
+	"input_pins": {},
+	"main_scene": "res://main.jetscene",
+	"name": "Neon car",
+	"profile": "debug",
+	"target": "nano"
+}

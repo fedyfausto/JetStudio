@@ -1,0 +1,1499 @@
+{
+ "icons": {
+  "default_arrow_down": {
+   "file": "default_arrow_down.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_arrow_left": {
+   "file": "default_arrow_left.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_arrow_right": {
+   "file": "default_arrow_right.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_bookmark": {
+   "file": "default_bookmark.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_breakpoint": {
+   "file": "default_breakpoint.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_clear": {
+   "file": "default_clear.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_close": {
+   "file": "default_close.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_favorite": {
+   "file": "default_favorite.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_file": {
+   "file": "default_file.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_file_mode_list": {
+   "file": "default_file_mode_list.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_file_mode_thumbnail": {
+   "file": "default_file_mode_thumbnail.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_file_thumbnail": {
+   "file": "default_file_thumbnail.png",
+   "size": [
+    64,
+    64
+   ]
+  },
+  "default_folder": {
+   "file": "default_folder.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_folder_create": {
+   "file": "default_folder_create.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_folder_thumbnail": {
+   "file": "default_folder_thumbnail.png",
+   "size": [
+    64,
+    64
+   ]
+  },
+  "default_folder_up": {
+   "file": "default_folder_up.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_graph_port": {
+   "file": "default_graph_port.png",
+   "size": [
+    10,
+    10
+   ]
+  },
+  "default_h_dragger": {
+   "file": "default_h_dragger.png",
+   "size": [
+    30,
+    60
+   ]
+  },
+  "default_hslider_tick": {
+   "file": "default_hslider_tick.png",
+   "size": [
+    4,
+    8
+   ]
+  },
+  "default_load": {
+   "file": "default_load.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_mini_checkerboard": {
+   "file": "default_mini_checkerboard.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_move_down": {
+   "file": "default_move_down.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_move_up": {
+   "file": "default_move_up.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_region_folded": {
+   "file": "default_region_folded.png",
+   "size": [
+    12,
+    12
+   ]
+  },
+  "default_region_unfolded": {
+   "file": "default_region_unfolded.png",
+   "size": [
+    12,
+    12
+   ]
+  },
+  "default_reload": {
+   "file": "default_reload.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_resizer_se": {
+   "file": "default_resizer_se.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_save": {
+   "file": "default_save.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_scroll_hint_horizontal": {
+   "file": "default_scroll_hint_horizontal.png",
+   "size": [
+    24,
+    32
+   ]
+  },
+  "default_scroll_hint_vertical": {
+   "file": "default_scroll_hint_vertical.png",
+   "size": [
+    32,
+    24
+   ]
+  },
+  "default_slider_grabber_disabled": {
+   "file": "default_slider_grabber_disabled.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_sort": {
+   "file": "default_sort.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_text_edit_ellipsis": {
+   "file": "default_text_edit_ellipsis.png",
+   "size": [
+    14,
+    8
+   ]
+  },
+  "default_text_edit_space": {
+   "file": "default_text_edit_space.png",
+   "size": [
+    8,
+    8
+   ]
+  },
+  "default_text_edit_tab": {
+   "file": "default_text_edit_tab.png",
+   "size": [
+    8,
+    8
+   ]
+  },
+  "default_toggle_filename_filter": {
+   "file": "default_toggle_filename_filter.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_v_dragger": {
+   "file": "default_v_dragger.png",
+   "size": [
+    60,
+    30
+   ]
+  },
+  "default_visibility_visible": {
+   "file": "default_visibility_visible.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "default_vslider_tick": {
+   "file": "default_vslider_tick.png",
+   "size": [
+    8,
+    4
+   ]
+  },
+  "ActionCopy": {
+   "file": "ActionCopy.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "Add": {
+   "file": "Add.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "ArrowLeft": {
+   "file": "ArrowLeft.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "ArrowRight": {
+   "file": "ArrowRight.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "ColorPick": {
+   "file": "ColorPick.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "ColorPickerBarArrow": {
+   "file": "ColorPickerBarArrow.png",
+   "size": [
+    16,
+    20
+   ]
+  },
+  "GridLayout": {
+   "file": "GridLayout.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GridMinimap": {
+   "file": "GridMinimap.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GridToggle": {
+   "file": "GridToggle.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiArrowUp": {
+   "file": "GuiArrowUp.png",
+   "size": [
+    12,
+    12
+   ]
+  },
+  "GuiChecked": {
+   "file": "GuiChecked.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiCheckedDisabled": {
+   "file": "GuiCheckedDisabled.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiClose": {
+   "file": "GuiClose.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiDropdown": {
+   "file": "GuiDropdown.png",
+   "size": [
+    14,
+    14
+   ]
+  },
+  "GuiHsplitter": {
+   "file": "GuiHsplitter.png",
+   "size": [
+    2,
+    64
+   ]
+  },
+  "GuiIndeterminate": {
+   "file": "GuiIndeterminate.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiIndeterminateDisabled": {
+   "file": "GuiIndeterminateDisabled.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiMiniCheckerboard": {
+   "file": "GuiMiniCheckerboard.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiOptionArrow": {
+   "file": "GuiOptionArrow.png",
+   "size": [
+    12,
+    12
+   ]
+  },
+  "GuiRadioChecked": {
+   "file": "GuiRadioChecked.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiRadioCheckedDisabled": {
+   "file": "GuiRadioCheckedDisabled.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiRadioUnchecked": {
+   "file": "GuiRadioUnchecked.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiRadioUncheckedDisabled": {
+   "file": "GuiRadioUncheckedDisabled.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiResizerTopLeft": {
+   "file": "GuiResizerTopLeft.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiScrollArrowLeft": {
+   "file": "GuiScrollArrowLeft.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiScrollArrowLeftHl": {
+   "file": "GuiScrollArrowLeftHl.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiScrollArrowRight": {
+   "file": "GuiScrollArrowRight.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiScrollArrowRightHl": {
+   "file": "GuiScrollArrowRightHl.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiSliderGrabber": {
+   "file": "GuiSliderGrabber.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiSliderGrabberHl": {
+   "file": "GuiSliderGrabberHl.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiSpace": {
+   "file": "GuiSpace.png",
+   "size": [
+    8,
+    8
+   ]
+  },
+  "GuiSpinboxDown": {
+   "file": "GuiSpinboxDown.png",
+   "size": [
+    16,
+    8
+   ]
+  },
+  "GuiSpinboxUp": {
+   "file": "GuiSpinboxUp.png",
+   "size": [
+    16,
+    8
+   ]
+  },
+  "GuiTab": {
+   "file": "GuiTab.png",
+   "size": [
+    8,
+    8
+   ]
+  },
+  "GuiTabDropMark": {
+   "file": "GuiTabDropMark.png",
+   "size": [
+    16,
+    32
+   ]
+  },
+  "GuiTabMenu": {
+   "file": "GuiTabMenu.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiTabMenuHl": {
+   "file": "GuiTabMenuHl.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiToggleOff": {
+   "file": "GuiToggleOff.png",
+   "size": [
+    38,
+    16
+   ]
+  },
+  "GuiToggleOffDisabled": {
+   "file": "GuiToggleOffDisabled.png",
+   "size": [
+    38,
+    16
+   ]
+  },
+  "GuiToggleOffDisabledMirrored": {
+   "file": "GuiToggleOffDisabledMirrored.png",
+   "size": [
+    38,
+    16
+   ]
+  },
+  "GuiToggleOffMirrored": {
+   "file": "GuiToggleOffMirrored.png",
+   "size": [
+    38,
+    16
+   ]
+  },
+  "GuiToggleOn": {
+   "file": "GuiToggleOn.png",
+   "size": [
+    38,
+    16
+   ]
+  },
+  "GuiToggleOnDisabled": {
+   "file": "GuiToggleOnDisabled.png",
+   "size": [
+    38,
+    16
+   ]
+  },
+  "GuiToggleOnDisabledMirrored": {
+   "file": "GuiToggleOnDisabledMirrored.png",
+   "size": [
+    38,
+    16
+   ]
+  },
+  "GuiToggleOnMirrored": {
+   "file": "GuiToggleOnMirrored.png",
+   "size": [
+    38,
+    16
+   ]
+  },
+  "GuiTreeArrowDown": {
+   "file": "GuiTreeArrowDown.png",
+   "size": [
+    12,
+    12
+   ]
+  },
+  "GuiTreeArrowLeft": {
+   "file": "GuiTreeArrowLeft.png",
+   "size": [
+    12,
+    12
+   ]
+  },
+  "GuiTreeArrowRight": {
+   "file": "GuiTreeArrowRight.png",
+   "size": [
+    12,
+    12
+   ]
+  },
+  "GuiTreeUpdown": {
+   "file": "GuiTreeUpdown.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiUnchecked": {
+   "file": "GuiUnchecked.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiUncheckedDisabled": {
+   "file": "GuiUncheckedDisabled.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "GuiVsplitter": {
+   "file": "GuiVsplitter.png",
+   "size": [
+    64,
+    2
+   ]
+  },
+  "OverbrightIndicator": {
+   "file": "OverbrightIndicator.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "PickerCursor": {
+   "file": "PickerCursor.png",
+   "size": [
+    12,
+    12
+   ]
+  },
+  "PickerCursorBg": {
+   "file": "PickerCursorBg.png",
+   "size": [
+    12,
+    12
+   ]
+  },
+  "PickerShapeCircle": {
+   "file": "PickerShapeCircle.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "PickerShapeRectangle": {
+   "file": "PickerShapeRectangle.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "PickerShapeRectangleWheel": {
+   "file": "PickerShapeRectangleWheel.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "Reload": {
+   "file": "Reload.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "Script": {
+   "file": "Script.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "Search": {
+   "file": "Search.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "SnapGrid": {
+   "file": "SnapGrid.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "ZoomLess": {
+   "file": "ZoomLess.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "ZoomMore": {
+   "file": "ZoomMore.png",
+   "size": [
+    16,
+    16
+   ]
+  },
+  "ZoomReset": {
+   "file": "ZoomReset.png",
+   "size": [
+    16,
+    16
+   ]
+  }
+ },
+ "items": [
+  [
+   "add_preset",
+   "ColorPicker",
+   "Add"
+  ],
+  [
+   "arrow",
+   "OptionButton",
+   "GuiOptionArrow"
+  ],
+  [
+   "arrow",
+   "Tree",
+   "GuiTreeArrowDown"
+  ],
+  [
+   "arrow_collapsed",
+   "Tree",
+   "GuiTreeArrowRight"
+  ],
+  [
+   "arrow_collapsed_mirrored",
+   "Tree",
+   "GuiTreeArrowLeft"
+  ],
+  [
+   "back_folder",
+   "FileDialog",
+   "default_arrow_left"
+  ],
+  [
+   "bar_arrow",
+   "ColorPicker",
+   "ColorPickerBarArrow"
+  ],
+  [
+   "bg",
+   "ColorPickerButton",
+   "GuiMiniCheckerboard"
+  ],
+  [
+   "bookmark",
+   "CodeEdit",
+   "default_bookmark"
+  ],
+  [
+   "breakpoint",
+   "CodeEdit",
+   "default_breakpoint"
+  ],
+  [
+   "can_fold",
+   "CodeEdit",
+   "default_arrow_down"
+  ],
+  [
+   "can_fold_code_region",
+   "CodeEdit",
+   "default_region_unfolded"
+  ],
+  [
+   "checked",
+   "CheckBox",
+   "GuiChecked"
+  ],
+  [
+   "checked",
+   "CheckButton",
+   "GuiToggleOn"
+  ],
+  [
+   "checked",
+   "PopupMenu",
+   "GuiChecked"
+  ],
+  [
+   "checked",
+   "Tree",
+   "GuiChecked"
+  ],
+  [
+   "checked_disabled",
+   "CheckBox",
+   "GuiCheckedDisabled"
+  ],
+  [
+   "checked_disabled",
+   "CheckButton",
+   "GuiToggleOnDisabled"
+  ],
+  [
+   "checked_disabled",
+   "PopupMenu",
+   "GuiCheckedDisabled"
+  ],
+  [
+   "checked_disabled",
+   "Tree",
+   "GuiCheckedDisabled"
+  ],
+  [
+   "checked_disabled_mirrored",
+   "CheckButton",
+   "GuiToggleOnDisabledMirrored"
+  ],
+  [
+   "checked_mirrored",
+   "CheckButton",
+   "GuiToggleOnMirrored"
+  ],
+  [
+   "clear",
+   "FileDialog",
+   "default_clear"
+  ],
+  [
+   "clear",
+   "LineEdit",
+   "GuiClose"
+  ],
+  [
+   "close",
+   "Icons",
+   "default_close"
+  ],
+  [
+   "close",
+   "TabBar",
+   "GuiClose"
+  ],
+  [
+   "close",
+   "Window",
+   "GuiClose"
+  ],
+  [
+   "close_pressed",
+   "Window",
+   "GuiClose"
+  ],
+  [
+   "color_copy",
+   "ColorPicker",
+   "ActionCopy"
+  ],
+  [
+   "color_script",
+   "ColorPicker",
+   "Script"
+  ],
+  [
+   "completion_color_bg",
+   "CodeEdit",
+   "default_mini_checkerboard"
+  ],
+  [
+   "create_folder",
+   "FileDialog",
+   "default_folder_create"
+  ],
+  [
+   "decrement",
+   "TabBar",
+   "GuiScrollArrowLeft"
+  ],
+  [
+   "decrement",
+   "TabContainer",
+   "GuiScrollArrowLeft"
+  ],
+  [
+   "decrement_highlight",
+   "TabBar",
+   "GuiScrollArrowLeftHl"
+  ],
+  [
+   "decrement_highlight",
+   "TabContainer",
+   "GuiScrollArrowLeftHl"
+  ],
+  [
+   "down",
+   "SpinBox",
+   "GuiSpinboxDown"
+  ],
+  [
+   "down_disabled",
+   "SpinBox",
+   "GuiSpinboxDown"
+  ],
+  [
+   "down_hover",
+   "SpinBox",
+   "GuiSpinboxDown"
+  ],
+  [
+   "down_pressed",
+   "SpinBox",
+   "GuiSpinboxDown"
+  ],
+  [
+   "drop_mark",
+   "TabBar",
+   "GuiTabDropMark"
+  ],
+  [
+   "drop_mark",
+   "TabContainer",
+   "GuiTabDropMark"
+  ],
+  [
+   "executing_line",
+   "CodeEdit",
+   "default_arrow_right"
+  ],
+  [
+   "expanded_arrow",
+   "ColorPicker",
+   "GuiTreeArrowDown"
+  ],
+  [
+   "expanded_arrow",
+   "FoldableContainer",
+   "GuiTreeArrowDown"
+  ],
+  [
+   "expanded_arrow_mirrored",
+   "FoldableContainer",
+   "GuiArrowUp"
+  ],
+  [
+   "favorite",
+   "FileDialog",
+   "default_favorite"
+  ],
+  [
+   "favorite_down",
+   "FileDialog",
+   "default_move_down"
+  ],
+  [
+   "favorite_up",
+   "FileDialog",
+   "default_move_up"
+  ],
+  [
+   "file",
+   "FileDialog",
+   "default_file"
+  ],
+  [
+   "file_thumbnail",
+   "FileDialog",
+   "default_file_thumbnail"
+  ],
+  [
+   "folded",
+   "CodeEdit",
+   "default_arrow_right"
+  ],
+  [
+   "folded_arrow",
+   "ColorPicker",
+   "GuiTreeArrowRight"
+  ],
+  [
+   "folded_arrow",
+   "FoldableContainer",
+   "GuiTreeArrowRight"
+  ],
+  [
+   "folded_arrow_mirrored",
+   "FoldableContainer",
+   "GuiTreeArrowLeft"
+  ],
+  [
+   "folded_code_region",
+   "CodeEdit",
+   "default_region_folded"
+  ],
+  [
+   "folded_eol_icon",
+   "CodeEdit",
+   "default_text_edit_ellipsis"
+  ],
+  [
+   "folder",
+   "FileDialog",
+   "default_folder"
+  ],
+  [
+   "folder_thumbnail",
+   "FileDialog",
+   "default_folder_thumbnail"
+  ],
+  [
+   "forward_folder",
+   "FileDialog",
+   "default_arrow_right"
+  ],
+  [
+   "grabber",
+   "HSlider",
+   "GuiSliderGrabber"
+  ],
+  [
+   "grabber",
+   "HSplitContainer",
+   "GuiHsplitter"
+  ],
+  [
+   "grabber",
+   "VSlider",
+   "GuiSliderGrabber"
+  ],
+  [
+   "grabber",
+   "VSplitContainer",
+   "GuiVsplitter"
+  ],
+  [
+   "grabber_disabled",
+   "HSlider",
+   "default_slider_grabber_disabled"
+  ],
+  [
+   "grabber_disabled",
+   "VSlider",
+   "default_slider_grabber_disabled"
+  ],
+  [
+   "grabber_highlight",
+   "HSlider",
+   "GuiSliderGrabberHl"
+  ],
+  [
+   "grabber_highlight",
+   "VSlider",
+   "GuiSliderGrabberHl"
+  ],
+  [
+   "grid_toggle",
+   "GraphEdit",
+   "GridToggle"
+  ],
+  [
+   "h_grabber",
+   "SplitContainer",
+   "GuiHsplitter"
+  ],
+  [
+   "h_touch_dragger",
+   "SplitContainer",
+   "default_h_dragger"
+  ],
+  [
+   "increment",
+   "TabBar",
+   "GuiScrollArrowRight"
+  ],
+  [
+   "increment",
+   "TabContainer",
+   "GuiScrollArrowRight"
+  ],
+  [
+   "increment_highlight",
+   "TabBar",
+   "GuiScrollArrowRightHl"
+  ],
+  [
+   "increment_highlight",
+   "TabContainer",
+   "GuiScrollArrowRightHl"
+  ],
+  [
+   "indeterminate",
+   "PopupMenu",
+   "GuiIndeterminate"
+  ],
+  [
+   "indeterminate",
+   "Tree",
+   "GuiIndeterminate"
+  ],
+  [
+   "indeterminate_disabled",
+   "PopupMenu",
+   "GuiIndeterminateDisabled"
+  ],
+  [
+   "indeterminate_disabled",
+   "Tree",
+   "GuiIndeterminateDisabled"
+  ],
+  [
+   "layout",
+   "GraphEdit",
+   "GridLayout"
+  ],
+  [
+   "list_mode",
+   "FileDialog",
+   "default_file_mode_list"
+  ],
+  [
+   "load",
+   "FileDialog",
+   "default_load"
+  ],
+  [
+   "menu",
+   "TabContainer",
+   "GuiTabMenu"
+  ],
+  [
+   "menu_highlight",
+   "TabContainer",
+   "GuiTabMenuHl"
+  ],
+  [
+   "menu_option",
+   "ColorPicker",
+   "GuiTabMenuHl"
+  ],
+  [
+   "minimap_toggle",
+   "GraphEdit",
+   "GridMinimap"
+  ],
+  [
+   "overbright_indicator",
+   "ColorPicker",
+   "OverbrightIndicator"
+  ],
+  [
+   "overbright_indicator",
+   "ColorPresetButton",
+   "OverbrightIndicator"
+  ],
+  [
+   "parent_folder",
+   "FileDialog",
+   "default_folder_up"
+  ],
+  [
+   "picker_cursor",
+   "ColorPicker",
+   "PickerCursor"
+  ],
+  [
+   "picker_cursor_bg",
+   "ColorPicker",
+   "PickerCursorBg"
+  ],
+  [
+   "port",
+   "GraphNode",
+   "default_graph_port"
+  ],
+  [
+   "preset_bg",
+   "ColorPresetButton",
+   "GuiMiniCheckerboard"
+  ],
+  [
+   "radio_checked",
+   "CheckBox",
+   "GuiRadioChecked"
+  ],
+  [
+   "radio_checked",
+   "PopupMenu",
+   "GuiRadioChecked"
+  ],
+  [
+   "radio_checked_disabled",
+   "CheckBox",
+   "GuiRadioCheckedDisabled"
+  ],
+  [
+   "radio_checked_disabled",
+   "PopupMenu",
+   "GuiRadioCheckedDisabled"
+  ],
+  [
+   "radio_unchecked",
+   "CheckBox",
+   "GuiRadioUnchecked"
+  ],
+  [
+   "radio_unchecked",
+   "PopupMenu",
+   "GuiRadioUnchecked"
+  ],
+  [
+   "radio_unchecked_disabled",
+   "CheckBox",
+   "GuiRadioUncheckedDisabled"
+  ],
+  [
+   "radio_unchecked_disabled",
+   "PopupMenu",
+   "GuiRadioUncheckedDisabled"
+  ],
+  [
+   "reload",
+   "FileDialog",
+   "default_reload"
+  ],
+  [
+   "resizer",
+   "GraphEditMinimap",
+   "GuiResizerTopLeft"
+  ],
+  [
+   "resizer",
+   "GraphFrame",
+   "default_resizer_se"
+  ],
+  [
+   "resizer",
+   "GraphNode",
+   "default_resizer_se"
+  ],
+  [
+   "sample_bg",
+   "ColorPicker",
+   "GuiMiniCheckerboard"
+  ],
+  [
+   "sample_revert",
+   "ColorPicker",
+   "Reload"
+  ],
+  [
+   "save",
+   "FileDialog",
+   "default_save"
+  ],
+  [
+   "screen_picker",
+   "ColorPicker",
+   "ColorPick"
+  ],
+  [
+   "scroll_hint",
+   "ItemList",
+   "default_scroll_hint_vertical"
+  ],
+  [
+   "scroll_hint",
+   "Tree",
+   "default_scroll_hint_vertical"
+  ],
+  [
+   "scroll_hint_horizontal",
+   "ScrollContainer",
+   "default_scroll_hint_horizontal"
+  ],
+  [
+   "scroll_hint_vertical",
+   "ScrollContainer",
+   "default_scroll_hint_vertical"
+  ],
+  [
+   "search",
+   "PopupMenu",
+   "Search"
+  ],
+  [
+   "select_arrow",
+   "Tree",
+   "GuiDropdown"
+  ],
+  [
+   "shape_circle",
+   "ColorPicker",
+   "PickerShapeCircle"
+  ],
+  [
+   "shape_rect",
+   "ColorPicker",
+   "PickerShapeRectangle"
+  ],
+  [
+   "shape_rect_wheel",
+   "ColorPicker",
+   "PickerShapeRectangleWheel"
+  ],
+  [
+   "snapping_toggle",
+   "GraphEdit",
+   "SnapGrid"
+  ],
+  [
+   "sort",
+   "FileDialog",
+   "default_sort"
+  ],
+  [
+   "space",
+   "CodeEdit",
+   "default_text_edit_space"
+  ],
+  [
+   "space",
+   "TextEdit",
+   "GuiSpace"
+  ],
+  [
+   "submenu",
+   "PopupMenu",
+   "ArrowRight"
+  ],
+  [
+   "submenu_mirrored",
+   "PopupMenu",
+   "ArrowLeft"
+  ],
+  [
+   "tab",
+   "CodeEdit",
+   "default_text_edit_tab"
+  ],
+  [
+   "tab",
+   "TextEdit",
+   "GuiTab"
+  ],
+  [
+   "thumbnail_mode",
+   "FileDialog",
+   "default_file_mode_thumbnail"
+  ],
+  [
+   "tick",
+   "HSlider",
+   "default_hslider_tick"
+  ],
+  [
+   "tick",
+   "VSlider",
+   "default_vslider_tick"
+  ],
+  [
+   "toggle_filename_filter",
+   "FileDialog",
+   "default_toggle_filename_filter"
+  ],
+  [
+   "toggle_hidden",
+   "FileDialog",
+   "default_visibility_visible"
+  ],
+  [
+   "touch_dragger",
+   "HSplitContainer",
+   "default_h_dragger"
+  ],
+  [
+   "touch_dragger",
+   "VSplitContainer",
+   "default_v_dragger"
+  ],
+  [
+   "unchecked",
+   "CheckBox",
+   "GuiUnchecked"
+  ],
+  [
+   "unchecked",
+   "CheckButton",
+   "GuiToggleOff"
+  ],
+  [
+   "unchecked",
+   "PopupMenu",
+   "GuiUnchecked"
+  ],
+  [
+   "unchecked",
+   "Tree",
+   "GuiUnchecked"
+  ],
+  [
+   "unchecked_disabled",
+   "CheckBox",
+   "GuiUncheckedDisabled"
+  ],
+  [
+   "unchecked_disabled",
+   "CheckButton",
+   "GuiToggleOffDisabled"
+  ],
+  [
+   "unchecked_disabled",
+   "PopupMenu",
+   "GuiUncheckedDisabled"
+  ],
+  [
+   "unchecked_disabled",
+   "Tree",
+   "GuiUncheckedDisabled"
+  ],
+  [
+   "unchecked_disabled_mirrored",
+   "CheckButton",
+   "GuiToggleOffDisabledMirrored"
+  ],
+  [
+   "unchecked_mirrored",
+   "CheckButton",
+   "GuiToggleOffMirrored"
+  ],
+  [
+   "up",
+   "SpinBox",
+   "GuiSpinboxUp"
+  ],
+  [
+   "up_disabled",
+   "SpinBox",
+   "GuiSpinboxUp"
+  ],
+  [
+   "up_hover",
+   "SpinBox",
+   "GuiSpinboxUp"
+  ],
+  [
+   "up_pressed",
+   "SpinBox",
+   "GuiSpinboxUp"
+  ],
+  [
+   "updown",
+   "Tree",
+   "GuiTreeUpdown"
+  ],
+  [
+   "v_grabber",
+   "SplitContainer",
+   "GuiVsplitter"
+  ],
+  [
+   "v_touch_dragger",
+   "SplitContainer",
+   "default_v_dragger"
+  ],
+  [
+   "zoom_in",
+   "GraphEdit",
+   "ZoomMore"
+  ],
+  [
+   "zoom_out",
+   "GraphEdit",
+   "ZoomLess"
+  ],
+  [
+   "zoom_reset",
+   "GraphEdit",
+   "ZoomReset"
+  ]
+ ]
+}

@@ -1,0 +1,126 @@
+{
+  "name": "ST Nucleo-F722ZE",
+  "short": "Nucleo F722ZE",
+  "platform": "stm32",
+  "chip": "stm32f722ze",
+  "platformio_board": "nucleo_f722ze",
+  "cpu": "Cortex-M7 216 MHz",
+  "ram": "256 KB",
+  "flash": "512 KB",
+  "spi": {
+    "port": "SPI1",
+    "sck": [
+      5,
+      19
+    ],
+    "mosi": [
+      7,
+      21
+    ]
+  },
+  "pins": [
+    [
+      "D2 · PF15",
+      95
+    ],
+    [
+      "D3 · PE13",
+      77
+    ],
+    [
+      "D4 · PF14",
+      94
+    ],
+    [
+      "D5 · PE11",
+      75
+    ],
+    [
+      "D6 · PE9",
+      73
+    ],
+    [
+      "D7 · PF13",
+      93
+    ],
+    [
+      "D8 · PF12",
+      92
+    ],
+    [
+      "D9 · PD15",
+      63
+    ],
+    [
+      "D10 · PD14",
+      62
+    ],
+    [
+      "D11 · PA7",
+      7
+    ],
+    [
+      "D13 · PA5",
+      5
+    ],
+    [
+      "D14 · PB9",
+      25
+    ],
+    [
+      "D15 · PB8",
+      24
+    ],
+    [
+      "D22 · PB5",
+      21
+    ],
+    [
+      "D23 · PB3",
+      19
+    ],
+    [
+      "D24 · PA4",
+      4
+    ],
+    [
+      "D25 · PB4",
+      20
+    ],
+    [
+      "A0 · PA3",
+      3
+    ],
+    [
+      "A1 · PC0",
+      32
+    ],
+    [
+      "A2 · PC3",
+      35
+    ],
+    [
+      "A3 · PF3",
+      83
+    ],
+    [
+      "A4 · PF5",
+      85
+    ],
+    [
+      "A5 · PF10",
+      90
+    ]
+  ],
+  "display_pins": {
+    "sck": 5,
+    "mosi": 7,
+    "cs": 62,
+    "dc": 63,
+    "reset": 92,
+    "backlight": -1
+  },
+  "upload": "stlink",
+  "verified": false,
+  "notes": "Display on SPI1: SCK D13 (PA5) or D23 (PB3), MOSI D11 (PA7) or D22 (PB5). 256 KB of RAM: medium-sized scenes. Flash and log through the ST-LINK USB port."
+}

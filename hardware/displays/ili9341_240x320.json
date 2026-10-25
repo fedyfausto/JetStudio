@@ -1,0 +1,22 @@
+{
+  "name": "ILI9341 2.4\"/2.8\" 240×320",
+  "controller": "ILI9341",
+  "panel": [
+    240,
+    320
+  ],
+  "memory": [
+    240,
+    320
+  ],
+  "offset": [
+    0,
+    0
+  ],
+  "invert": false,
+  "rgb_order": false,
+  "spi_hz": 40000000,
+  "spi_mode": 0,
+  "verified": true,
+  "notes": "The display of the reference Nano (board_3d)."
+}

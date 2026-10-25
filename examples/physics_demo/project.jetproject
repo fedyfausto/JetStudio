@@ -1,0 +1,11 @@
+{
+	"main_scene": "res://main.jetscene",
+	"name": "Physics demo",
+	"target": "desktop",
+	"autoload": [
+		{
+			"name": "Game",
+			"path": "res://scripts/game.jet"
+		}
+	]
+}

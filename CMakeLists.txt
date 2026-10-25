@@ -1,0 +1,92 @@
+cmake_minimum_required(VERSION 3.22)
+project(JetStudio VERSION 0.1.0 LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+option(JET_STUDIO_EXTENSION "Build the Godot UI bridge" ON)
+option(JET_STUDIO_RUNNER "Build the SDL desktop player" ON)
+
+include(cmake/JetSources.cmake)
+add_library(jet_renderer STATIC ${JET_SOURCES})
+target_include_directories(jet_renderer PUBLIC runtime/config third_party/Jet/src)
+# JetScript compiler + VM: portable, no exceptions/RTTI (same flags as ESP-IDF).
+file(GLOB JET_SCRIPT_SOURCES CONFIGURE_DEPENDS runtime/script/*.cpp)
+add_library(jet_script STATIC ${JET_SCRIPT_SOURCES})
+target_include_directories(jet_script PUBLIC runtime/script)
+target_compile_options(jet_script PRIVATE -Wall -Wextra -Wpedantic -fno-exceptions -fno-rtti)
+# VM only, as on the device: scripts arrive compiled inside .jetpack files.
+set(JET_SCRIPT_VM_SOURCES ${JET_SCRIPT_SOURCES})
+list(FILTER JET_SCRIPT_VM_SOURCES EXCLUDE REGEX "js_(lexer|parser|compiler)\\.cpp$")
+add_library(jet_script_vm STATIC ${JET_SCRIPT_VM_SOURCES})
+target_include_directories(jet_script_vm PUBLIC runtime/script)
+target_compile_definitions(jet_script_vm PUBLIC JETSCRIPT_NO_COMPILER)
+target_compile_options(jet_script_vm PRIVATE -Wall -Wextra -Wpedantic -fno-exceptions -fno-rtti)
+set(JET_RUNTIME_SOURCES runtime/runtime.cpp runtime/physics.cpp runtime/particles.cpp runtime/script_host.cpp runtime/pack.cpp runtime/texture.cpp runtime/obj_import.cpp)
+add_library(jet_runtime STATIC ${JET_RUNTIME_SOURCES})
+target_include_directories(jet_runtime PUBLIC runtime)
+target_link_libraries(jet_runtime PUBLIC jet_renderer jet_script)
+add_library(jet_runtime_vm STATIC ${JET_RUNTIME_SOURCES})
+target_include_directories(jet_runtime_vm PUBLIC runtime)
+target_link_libraries(jet_runtime_vm PUBLIC jet_renderer jet_script_vm)
+# The device Jet config (firmware/config) built for the PC, for the device emulator and tests.
+add_library(jet_renderer_device STATIC ${JET_SOURCES})
+target_include_directories(jet_renderer_device PUBLIC firmware/config third_party/Jet/src)
+add_library(jet_runtime_device_vm STATIC ${JET_RUNTIME_SOURCES})
+target_include_directories(jet_runtime_device_vm PUBLIC runtime)
+target_link_libraries(jet_runtime_device_vm PUBLIC jet_renderer_device jet_script_vm)
+target_compile_options(jet_runtime PRIVATE -Wall -Wextra -Wpedantic)
+
+if(JET_STUDIO_EXTENSION)
+  set(GODOTCPP_API_VERSION "4.8" CACHE STRING "Godot API used by the bridge")
+  set(GODOTCPP_BUILD_PROFILE "${CMAKE_SOURCE_DIR}/native/build_profile.json" CACHE FILEPATH "")
+  add_subdirectory(third_party/godot-cpp EXCLUDE_FROM_ALL)
+  add_library(jet_bridge SHARED native/jet_bridge.cpp native/jet_serial.cpp native/serial_port.cpp native/register_types.cpp)
+  target_link_libraries(jet_bridge PRIVATE jet_runtime godot::cpp)
+  set_target_properties(jet_bridge PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/editor/bin"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/editor/bin")
+endif()
+
+if(JET_STUDIO_RUNNER)
+  find_package(SDL2 REQUIRED)
+  add_executable(jet_player desktop/main.cpp)
+  # VM only like the firmware, it just runs exported packages.
+  target_link_libraries(jet_player PRIVATE jet_runtime_vm SDL2::SDL2)
+  # Nano ESP32 emulator: the same player with the firmware's rendering profile.
+  add_executable(jet_player_device desktop/main.cpp)
+  target_link_libraries(jet_player_device PRIVATE jet_runtime_device_vm SDL2::SDL2)
+endif()
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(runtime_tests tests/runtime_tests.cpp)
+  target_link_libraries(runtime_tests PRIVATE jet_runtime)
+  add_test(NAME runtime COMMAND runtime_tests ${CMAKE_BINARY_DIR}/sample.jetpack)
+  set_tests_properties(runtime PROPERTIES FIXTURES_SETUP sample_pack)
+  if(JET_STUDIO_RUNNER)
+    # The VM-only player runs the package written by the runtime test.
+    add_test(NAME player COMMAND jet_player ${CMAKE_BINARY_DIR}/sample.jetpack --frames=5)
+    set_tests_properties(player PROPERTIES FIXTURES_REQUIRED sample_pack ENVIRONMENT SDL_VIDEODRIVER=dummy
+      PASS_REGULAR_EXPRESSION "sample ready")
+    add_test(NAME player_device COMMAND jet_player_device ${CMAKE_BINARY_DIR}/sample.jetpack --frames=5
+      --screenshot=${CMAKE_BINARY_DIR}/sample_device.bmp)
+    set_tests_properties(player_device PROPERTIES FIXTURES_REQUIRED sample_pack ENVIRONMENT SDL_VIDEODRIVER=dummy
+      PASS_REGULAR_EXPRESSION "sample ready")
+  endif()
+  add_executable(script_tests tests/script_tests.cpp)
+  target_link_libraries(script_tests PRIVATE jet_script)
+  add_test(NAME script COMMAND script_tests)
+  # Device Jet config plus the compiler, so tests can build scenes from source and still hit the firmware's render path.
+  add_library(jet_runtime_device STATIC ${JET_RUNTIME_SOURCES})
+  target_include_directories(jet_runtime_device PUBLIC runtime)
+  target_link_libraries(jet_runtime_device PUBLIC jet_renderer_device jet_script)
+  add_executable(device_tests tests/device_tests.cpp)
+  target_link_libraries(device_tests PRIVATE jet_runtime_device)
+  add_test(NAME device COMMAND device_tests)
+  if(UNIX)
+    # Serial monitor port, exercised through a pseudo-terminal.
+    add_executable(serial_tests tests/serial_tests.cpp native/serial_port.cpp)
+    target_include_directories(serial_tests PRIVATE native)
+    add_test(NAME serial COMMAND serial_tests)
+  endif()
+endif()

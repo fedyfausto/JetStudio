@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="300" viewBox="0 0 820 300">
+  <defs>
+    <linearGradient id="core" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a6f3dd"/>
+      <stop offset="1" stop-color="#3a9c85"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(40 60)">
+    <path d="M90 6 L174 90 L90 174 L6 90 Z" fill="none" stroke="#78d5bc" stroke-width="12" stroke-linejoin="round"/>
+    <path d="M90 50 L130 90 L90 130 L50 90 Z" fill="url(#core)"/>
+  </g>
+  <text x="250" y="160" font-family="Ubuntu, DejaVu Sans, sans-serif" font-weight="bold" font-size="76" letter-spacing="8" fill="#e3e9f2">JET STUDIO</text>
+  <text x="254" y="204" font-family="Ubuntu, DejaVu Sans, sans-serif" font-size="22" letter-spacing="2" fill="#8995a7">embedded 3D game engine · ESP32</text>
+  <rect x="254" y="226" width="96" height="4" rx="2" fill="#78d5bc"/>
+</svg>

@@ -1,0 +1,22 @@
+{
+  "name": "ST7789 2\" 240×320",
+  "controller": "ST7789",
+  "panel": [
+    240,
+    320
+  ],
+  "memory": [
+    240,
+    320
+  ],
+  "offset": [
+    0,
+    0
+  ],
+  "invert": true,
+  "rgb_order": false,
+  "spi_hz": 40000000,
+  "spi_mode": 0,
+  "verified": false,
+  "notes": ""
+}

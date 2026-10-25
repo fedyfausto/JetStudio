@@ -1,0 +1,4 @@
+crate.png: "[2D] Wooden Box" by Cpt_Flash, CC0 1.0 (public domain).
+Source: https://opengameart.org/content/2d-wooden-box
+Downscaled from 512x512 to 128x128 with a box filter, as in CubeCoders' JetExamples
+esp32-textured-boxes (MIT): https://github.com/CubeCoders/JetExamples

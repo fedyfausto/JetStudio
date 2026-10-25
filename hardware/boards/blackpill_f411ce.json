@@ -1,0 +1,143 @@
+{
+  "name": "WeAct Black Pill F411CE",
+  "short": "Black Pill F411",
+  "platform": "stm32",
+  "chip": "stm32f411ce",
+  "platformio_board": "blackpill_f411ce",
+  "cpu": "Cortex-M4 100 MHz",
+  "ram": "128 KB",
+  "flash": "512 KB",
+  "spi": {
+    "port": "SPI1",
+    "sck": [
+      5,
+      19
+    ],
+    "mosi": [
+      7,
+      21
+    ]
+  },
+  "pins": [
+    [
+      "PA0",
+      0
+    ],
+    [
+      "PA1",
+      1
+    ],
+    [
+      "PA2",
+      2
+    ],
+    [
+      "PA3",
+      3
+    ],
+    [
+      "PA4",
+      4
+    ],
+    [
+      "PA5",
+      5
+    ],
+    [
+      "PA7",
+      7
+    ],
+    [
+      "PA8",
+      8
+    ],
+    [
+      "PA9",
+      9
+    ],
+    [
+      "PA10",
+      10
+    ],
+    [
+      "PA15",
+      15
+    ],
+    [
+      "PB0",
+      16
+    ],
+    [
+      "PB1",
+      17
+    ],
+    [
+      "PB2",
+      18
+    ],
+    [
+      "PB3",
+      19
+    ],
+    [
+      "PB5",
+      21
+    ],
+    [
+      "PB6",
+      22
+    ],
+    [
+      "PB7",
+      23
+    ],
+    [
+      "PB8",
+      24
+    ],
+    [
+      "PB9",
+      25
+    ],
+    [
+      "PB10",
+      26
+    ],
+    [
+      "PB12",
+      28
+    ],
+    [
+      "PB13",
+      29
+    ],
+    [
+      "PB14",
+      30
+    ],
+    [
+      "PB15",
+      31
+    ],
+    [
+      "PC14",
+      46
+    ],
+    [
+      "PC15",
+      47
+    ]
+  ],
+  "display_pins": {
+    "sck": 5,
+    "mosi": 7,
+    "cs": 4,
+    "dc": 16,
+    "reset": 17,
+    "backlight": -1
+  },
+  "upload": "stlink",
+  "usb_serial": true,
+  "verified": false,
+  "notes": "128 KB of RAM: small scenes and small displays only (e.g. ST7735S 160×128). Log over USB-C (CDC), flash with an ST-LINK over SWD."
+}

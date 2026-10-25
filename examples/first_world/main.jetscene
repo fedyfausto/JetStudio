@@ -1,0 +1,256 @@
+{
+	"format": "jetscene",
+	"version": 2,
+	"root": {
+		"id": 1,
+		"name": "World",
+		"type": "Node3D",
+		"position": [
+			0.0,
+			0.0,
+			0.0
+		],
+		"rotation": [
+			0.0,
+			0.0,
+			0.0
+		],
+		"scale": [
+			1.0,
+			1.0,
+			1.0
+		],
+		"visible": true,
+		"children": [
+			{
+				"id": 2,
+				"name": "WorldEnvironment",
+				"type": "WorldEnvironment",
+				"background_color": 1449000,
+				"ambient_color": 5134446,
+				"children": [],
+				"background_mode": "Panorama",
+				"sky_texture": "res://textures/dusk_sky.png",
+				"sky_top_color": 658982,
+				"sky_horizon_color": 3024988,
+				"ground_horizon_color": 1973808,
+				"ground_bottom_color": 1184798
+			},
+			{
+				"id": 3,
+				"name": "Sun",
+				"type": "DirectionalLight3D",
+				"position": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"rotation": [
+					-50.0,
+					-35.0,
+					0.0
+				],
+				"scale": [
+					1.0,
+					1.0,
+					1.0
+				],
+				"visible": true,
+				"light_color": 16777215,
+				"light_energy": 1.0,
+				"children": []
+			},
+			{
+				"id": 4,
+				"name": "Camera3D",
+				"type": "Camera3D",
+				"position": [
+					0.0,
+					3.2,
+					6.5
+				],
+				"rotation": [
+					-24.0,
+					0.0,
+					0.0
+				],
+				"scale": [
+					1.0,
+					1.0,
+					1.0
+				],
+				"visible": true,
+				"fov": 75.0,
+				"near": 0.05,
+				"far": 100.0,
+				"current": true,
+				"children": []
+			},
+			{
+				"id": 5,
+				"name": "Ground",
+				"type": "MeshInstance3D",
+				"position": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"rotation": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"scale": [
+					4.0,
+					1.0,
+					4.0
+				],
+				"visible": true,
+				"mesh": "Plane",
+				"segments": 12,
+				"color": 3424851,
+				"shading": "Gouraud",
+				"children": []
+			},
+			{
+				"id": 6,
+				"name": "Cube",
+				"type": "MeshInstance3D",
+				"position": [
+					0.0,
+					0.5,
+					0.0
+				],
+				"rotation": [
+					0.0,
+					25.0,
+					0.0
+				],
+				"scale": [
+					1.0,
+					1.0,
+					1.0
+				],
+				"visible": true,
+				"mesh": "Box",
+				"segments": 12,
+				"color": 15770715,
+				"shading": "Gouraud",
+				"script": "res://scripts/spin.jet",
+				"script_properties": {
+					"speed": 30.0
+				},
+				"children": []
+			},
+			{
+				"id": 7,
+				"name": "Orbit",
+				"type": "Node3D",
+				"position": [
+					0.0,
+					0.5,
+					0.0
+				],
+				"rotation": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"scale": [
+					1.0,
+					1.0,
+					1.0
+				],
+				"visible": true,
+				"script": "res://scripts/spin.jet",
+				"script_properties": {
+					"speed": -60.0
+				},
+				"children": [
+					{
+						"id": 8,
+						"name": "Moon",
+						"type": "MeshInstance3D",
+						"position": [
+							2.0,
+							0.0,
+							0.0
+						],
+						"rotation": [
+							0.0,
+							0.0,
+							0.0
+						],
+						"scale": [
+							0.5,
+							0.5,
+							0.5
+						],
+						"visible": true,
+						"mesh": "Sphere",
+						"segments": 10,
+						"color": 7978161,
+						"shading": "Gouraud",
+						"children": []
+					}
+				]
+			},
+			{
+				"id": 9,
+				"name": "Player",
+				"type": "MeshInstance3D",
+				"position": [
+					-2.2,
+					0.4,
+					1.2
+				],
+				"rotation": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"scale": [
+					0.4,
+					0.4,
+					0.4
+				],
+				"visible": true,
+				"mesh": "Capsule",
+				"segments": 10,
+				"color": 9221615,
+				"shading": "Gouraud",
+				"script": "res://scripts/player.jet",
+				"script_properties": {},
+				"children": []
+			},
+			{
+				"id": 10,
+				"name": "Beacon",
+				"type": "MeshInstance3D",
+				"position": [
+					2.4,
+					0.6,
+					-1.6
+				],
+				"rotation": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"scale": [
+					0.6,
+					0.6,
+					0.6
+				],
+				"visible": true,
+				"mesh": "Pyramid",
+				"segments": 12,
+				"color": 15043984,
+				"shading": "Gouraud",
+				"script": "res://scripts/bob.jet",
+				"script_properties": {},
+				"children": []
+			}
+		]
+	}
+}

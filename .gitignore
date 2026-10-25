@@ -1,0 +1,22 @@
+build/
+third_party/
+editor/.godot/
+editor/bin/*
+!editor/bin/.gitkeep
+.tools/
+.cache/
+exports/
+firmware/.pio/
+firmware_stm32/.pio/
+firmware/components/LovyanGFX/
+firmware/sdkconfig.*
+!firmware/sdkconfig.defaults
+!firmware/sdkconfig.release
+__pycache__/
+*.pyc
+.jetstudio/
+build-script/
+# Unlicensed demo assets copied locally by tools/neon_car.py --import-car
+examples/neon_car/car/
+.working/
+dist/

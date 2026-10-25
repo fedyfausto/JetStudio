@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.16)
+# sdkconfig defaults in order: shared, the board's flash/PSRAM (boards/<JET_BOARD>.defaults), then release.
+set(defaults "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
+if(JET_BOARD)
+  list(APPEND defaults "${CMAKE_CURRENT_LIST_DIR}/boards/${JET_BOARD}.defaults")
+endif()
+if(JET_RELEASE)
+  list(APPEND defaults "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.release")
+endif()
+set(SDKCONFIG_DEFAULTS "${defaults}")
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+project(jet_studio_game)

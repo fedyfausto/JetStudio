@@ -1,0 +1,5 @@
+{
+	"name": "Textured boxes",
+	"main_scene": "res://main.jetscene",
+	"target": "desktop"
+}

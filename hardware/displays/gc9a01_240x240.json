@@ -1,0 +1,22 @@
+{
+  "name": "GC9A01 1.28\" round 240×240",
+  "controller": "GC9A01",
+  "panel": [
+    240,
+    240
+  ],
+  "memory": [
+    240,
+    240
+  ],
+  "offset": [
+    0,
+    0
+  ],
+  "invert": true,
+  "rgb_order": false,
+  "spi_hz": 40000000,
+  "spi_mode": 0,
+  "verified": false,
+  "notes": "Round screen: the corners of the image are not visible."
+}

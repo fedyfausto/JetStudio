@@ -1,0 +1,18 @@
+extends Area3D
+## Spins, and disappears when the player touches it.
+
+@onready var hud = get_node("/root/World/HUD")
+@onready var sparks = get_node("/root/World/PickupSparks")
+
+
+func _process(delta: float) -> void:
+	rotate_y(3.0 * delta)
+
+
+func _on_body_entered(body) -> void:
+	if body.name == "Player":
+		hud.add_coin()
+		# The sparks live outside the coin so they survive queue_free().
+		sparks.global_position = global_position
+		sparks.restart()
+		queue_free()

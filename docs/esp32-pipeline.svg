@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520">
+<defs><marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#e2e7f0"/></marker></defs>
+<rect width="1200" height="520" rx="22" fill="#10141c"/>
+<text x="40" y="56" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" font-weight="800" fill="#e2e7f0" text-anchor="start">ESP32-S3 frame pipeline</text>
+<text x="1160" y="56" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8a93a6" text-anchor="end">neon_car on the Nano: ~16 ms per field, ~62 fields/s</text>
+<rect x="40" y="150" width="1120" height="44" rx="10" fill="#171d29" stroke="#2a3446"/>
+<circle cx="60" cy="172.0" r="5" fill="#78d5bc"/>
+<text x="76" y="170" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">core 1</text>
+<text x="76" y="186" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="14" font-weight="600" fill="#e2e7f0" text-anchor="start">jet_game</text>
+<rect x="40" y="210" width="1120" height="44" rx="10" fill="#171d29" stroke="#2a3446"/>
+<circle cx="60" cy="232.0" r="5" fill="#7aa2f7"/>
+<text x="76" y="230" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">core 0</text>
+<text x="76" y="246" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="14" font-weight="600" fill="#e2e7f0" text-anchor="start">jet_raster</text>
+<rect x="40" y="270" width="1120" height="44" rx="10" fill="#171d29" stroke="#2a3446"/>
+<circle cx="60" cy="292.0" r="5" fill="#f0a45b"/>
+<text x="76" y="290" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">core 0</text>
+<text x="76" y="306" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="14" font-weight="600" fill="#e2e7f0" text-anchor="start">jet_present</text>
+<rect x="40" y="330" width="1120" height="44" rx="10" fill="#171d29" stroke="#2a3446"/>
+<circle cx="60" cy="352.0" r="5" fill="#f07c9a"/>
+<text x="76" y="350" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="12" font-weight="400" fill="#8a93a6" text-anchor="start">GDMA</text>
+<text x="76" y="366" font-family="'JetBrains Mono', Consolas, 'DejaVu Sans Mono', monospace" font-size="14" font-weight="600" fill="#e2e7f0" text-anchor="start">SPI → display</text>
+<line x1="250.0" y1="124" x2="250.0" y2="382" stroke="#2a3446" stroke-width="2" stroke-dasharray="4 6"/>
+<line x1="698.0" y1="124" x2="698.0" y2="382" stroke="#2a3446" stroke-width="2" stroke-dasharray="4 6"/>
+<line x1="1146.0" y1="124" x2="1146.0" y2="382" stroke="#2a3446" stroke-width="2" stroke-dasharray="4 6"/>
+<text x="474.0" y="136" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#8a93a6" text-anchor="middle">frame N · field odd rows</text>
+<text x="922.0" y="136" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#8a93a6" text-anchor="middle">frame N+1 · field even rows</text>
+<rect x="251.0" y="150" width="65.2" height="44" rx="8" fill="#78d5bc" fill-opacity="0.9"/>
+<text x="283.6" y="177.0" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10141c" text-anchor="middle">update</text>
+<rect x="318.2" y="150" width="224.79999999999998" height="44" rx="8" fill="#7aa2f7" fill-opacity="0.9"/>
+<text x="430.59999999999997" y="177.0" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10141c" text-anchor="middle">frame setup · upper band</text>
+<rect x="340.6" y="210" width="202.4" height="44" rx="8" fill="#7aa2f7" fill-opacity="0.9"/>
+<text x="441.8" y="237.0" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10141c" text-anchor="middle">lower band (adaptive split)</text>
+<rect x="545.0" y="150" width="40.0" height="44" rx="8" fill="#8a93a6" fill-opacity="0.35"/>
+<text x="565.0" y="177.0" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#e2e7f0" text-anchor="middle">join</text>
+<rect x="259.4" y="270" width="437.59999999999997" height="44" rx="8" fill="#f0a45b" fill-opacity="0.85"/>
+<text x="478.19999999999993" y="297.0" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10141c" text-anchor="middle">rows of field N-1: ×2 columns, byte swap, HUD</text>
+<rect x="265.0" y="330" width="432.0" height="44" rx="8" fill="#f07c9a" fill-opacity="0.85"/>
+<text x="481.0" y="357.0" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10141c" text-anchor="middle">field N-1 → panel (SPI 40 MHz)</text>
+<rect x="699.0" y="150" width="65.19999999999996" height="44" rx="8" fill="#78d5bc" fill-opacity="0.9"/>
+<text x="731.6" y="177.0" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10141c" text-anchor="middle">update</text>
+<rect x="766.1999999999999" y="150" width="224.80000000000004" height="44" rx="8" fill="#7aa2f7" fill-opacity="0.9"/>
+<text x="878.5999999999999" y="177.0" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10141c" text-anchor="middle">frame setup · upper band</text>
+<rect x="788.6" y="210" width="202.40000000000003" height="44" rx="8" fill="#7aa2f7" fill-opacity="0.9"/>
+<text x="889.8000000000001" y="237.0" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10141c" text-anchor="middle">lower band (adaptive split)</text>
+<rect x="993.0" y="150" width="40.0" height="44" rx="8" fill="#8a93a6" fill-opacity="0.35"/>
+<text x="1013.0" y="177.0" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#e2e7f0" text-anchor="middle">join</text>
+<rect x="707.4000000000001" y="270" width="437.59999999999997" height="44" rx="8" fill="#f0a45b" fill-opacity="0.85"/>
+<text x="926.2" y="297.0" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10141c" text-anchor="middle">rows of field N: ×2 columns, byte swap, HUD</text>
+<rect x="713.0" y="330" width="432.0" height="44" rx="8" fill="#f07c9a" fill-opacity="0.85"/>
+<text x="929.0" y="357.0" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10141c" text-anchor="middle">field N → panel (SPI 40 MHz)</text>
+<path d="M586.0,194 C586.0,250 706.4000000000001,240 706.4000000000001,268" fill="none" stroke="#e2e7f0" stroke-width="2" marker-end="url(#head)"/>
+<text x="578.0" y="237" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#e2e7f0" text-anchor="end">hand-off</text>
+<rect x="40" y="412" width="12" height="12" rx="3" fill="#78d5bc"/>
+<text x="62" y="423" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8a93a6" text-anchor="start">update(): fixed 60 Hz physics, _process, scene changes, transforms</text>
+<rect x="40" y="434" width="12" height="12" rx="3" fill="#7aa2f7"/>
+<text x="62" y="445" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8a93a6" text-anchor="start">Jet rasterizes half-width interlaced fields, no z-buffer (depth-sorted triangles)</text>
+<rect x="40" y="456" width="12" height="12" rx="3" fill="#f0a45b"/>
+<text x="62" y="467" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8a93a6" text-anchor="start">two field buffers in internal DMA RAM: one is drawn while the other is sent</text>
+<rect x="40" y="478" width="12" height="12" rx="3" fill="#f07c9a"/>
+<text x="62" y="489" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8a93a6" text-anchor="start">the GDMA queue streams rows; 2D nodes are composited per row at full resolution</text>
+</svg>

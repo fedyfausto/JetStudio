@@ -1,0 +1,108 @@
+{
+  "name": "Arduino Nano ESP32",
+  "short": "Nano ESP32",
+  "chip": "esp32s3",
+  "platformio_board": "arduino_nano_esp32",
+  "flash": "16 MB",
+  "psram": "8 MB octal",
+  "sdkconfig": [
+    "CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y",
+    "CONFIG_ESPTOOLPY_FLASHMODE_QIO=y",
+    "CONFIG_ESPTOOLPY_FLASHFREQ_80M=y",
+    "CONFIG_SPIRAM=y",
+    "CONFIG_SPIRAM_MODE_OCT=y",
+    "CONFIG_SPIRAM_SPEED_80M=y"
+  ],
+  "pins": [
+    [
+      "D2",
+      5
+    ],
+    [
+      "D3",
+      6
+    ],
+    [
+      "D4",
+      7
+    ],
+    [
+      "D5",
+      8
+    ],
+    [
+      "D6",
+      9
+    ],
+    [
+      "D7",
+      10
+    ],
+    [
+      "D8",
+      17
+    ],
+    [
+      "D9",
+      18
+    ],
+    [
+      "D10",
+      21
+    ],
+    [
+      "D11",
+      38
+    ],
+    [
+      "D12",
+      47
+    ],
+    [
+      "D13",
+      48
+    ],
+    [
+      "A0",
+      1
+    ],
+    [
+      "A1",
+      2
+    ],
+    [
+      "A2",
+      3
+    ],
+    [
+      "A3",
+      4
+    ],
+    [
+      "A4",
+      11
+    ],
+    [
+      "A5",
+      12
+    ],
+    [
+      "A6",
+      13
+    ],
+    [
+      "A7",
+      14
+    ]
+  ],
+  "display_pins": {
+    "sck": 48,
+    "mosi": 38,
+    "cs": 21,
+    "dc": 9,
+    "reset": 18,
+    "backlight": -1
+  },
+  "verified": true,
+  "notes": "Native USB. The first flash from the Arduino bootloader needs ROM mode (B1 to GND, RST)."
+}

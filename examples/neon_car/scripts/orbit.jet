@@ -1,0 +1,14 @@
+extends Camera3D
+## Orbit camera of the "Neon Motorworks" demo: one turn every 20 s, radius and height slowly breathing.
+
+@export var period := 20.0
+@export var target := Vector3(0.0, 1.75, 0.0)
+var time := 0.0
+
+
+func _process(delta: float) -> void:
+	time = fmod(time + delta, 3600.0)
+	var angle := 0.7 + time * TAU / period
+	var radius := 14.6 + 0.8 * sin(time * TAU / 40.0)
+	position = Vector3(radius * sin(angle), 4.8 + 0.6 * sin(angle * 2.0), -radius * cos(angle))
+	look_at(target)

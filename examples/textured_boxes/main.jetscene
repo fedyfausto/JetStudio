@@ -1,0 +1,67 @@
+{
+	"format": "jetscene",
+	"version": 2,
+	"root": {
+		"id": 1,
+		"name": "World",
+		"type": "Node3D",
+		"children": [
+			{
+				"id": 2,
+				"name": "WorldEnvironment",
+				"type": "WorldEnvironment",
+				"children": [],
+				"background_mode": "Gradient",
+				"sky_top_color": 728120,
+				"sky_horizon_color": 2973590,
+				"ground_horizon_color": 2973590,
+				"ground_bottom_color": 2313600,
+				"ambient_color": 5661562
+			},
+			{
+				"id": 3,
+				"name": "Sun",
+				"type": "DirectionalLight3D",
+				"children": [],
+				"rotation": [
+					-35.0,
+					-40.0,
+					0.0
+				],
+				"light_energy": 1.0
+			},
+			{
+				"id": 4,
+				"name": "Camera3D",
+				"type": "Camera3D",
+				"children": [],
+				"position": [
+					0.0,
+					0.0,
+					4.4
+				],
+				"fov": 50.0,
+				"current": true
+			},
+			{
+				"id": 5,
+				"name": "Crate",
+				"type": "MeshInstance3D",
+				"children": [],
+				"mesh": "Box",
+				"scale": [
+					2.0,
+					2.0,
+					2.0
+				],
+				"color": 16777215,
+				"shading": "Flat",
+				"albedo_texture": "res://textures/crate.png",
+				"texture_filter": "Nearest",
+				"perspective_correct": false,
+				"script": "res://scripts/crate.jet",
+				"script_properties": {}
+			}
+		]
+	}
+}

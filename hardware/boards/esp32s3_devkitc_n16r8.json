@@ -1,0 +1,140 @@
+{
+  "name": "ESP32-S3-DevKitC-1 N16R8",
+  "short": "S3 N16R8",
+  "chip": "esp32s3",
+  "platformio_board": "esp32-s3-devkitc-1",
+  "flash": "16 MB",
+  "psram": "8 MB octal",
+  "sdkconfig": [
+    "CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y",
+    "CONFIG_ESPTOOLPY_FLASHMODE_QIO=y",
+    "CONFIG_ESPTOOLPY_FLASHFREQ_80M=y",
+    "CONFIG_SPIRAM=y",
+    "CONFIG_SPIRAM_MODE_OCT=y",
+    "CONFIG_SPIRAM_SPEED_80M=y"
+  ],
+  "pins": [
+    [
+      "GPIO1",
+      1
+    ],
+    [
+      "GPIO2",
+      2
+    ],
+    [
+      "GPIO3",
+      3
+    ],
+    [
+      "GPIO4",
+      4
+    ],
+    [
+      "GPIO5",
+      5
+    ],
+    [
+      "GPIO6",
+      6
+    ],
+    [
+      "GPIO7",
+      7
+    ],
+    [
+      "GPIO8",
+      8
+    ],
+    [
+      "GPIO9",
+      9
+    ],
+    [
+      "GPIO10",
+      10
+    ],
+    [
+      "GPIO11",
+      11
+    ],
+    [
+      "GPIO12",
+      12
+    ],
+    [
+      "GPIO13",
+      13
+    ],
+    [
+      "GPIO14",
+      14
+    ],
+    [
+      "GPIO15",
+      15
+    ],
+    [
+      "GPIO16",
+      16
+    ],
+    [
+      "GPIO17",
+      17
+    ],
+    [
+      "GPIO18",
+      18
+    ],
+    [
+      "GPIO21",
+      21
+    ],
+    [
+      "GPIO38",
+      38
+    ],
+    [
+      "GPIO39",
+      39
+    ],
+    [
+      "GPIO40",
+      40
+    ],
+    [
+      "GPIO41",
+      41
+    ],
+    [
+      "GPIO42",
+      42
+    ],
+    [
+      "GPIO45",
+      45
+    ],
+    [
+      "GPIO46",
+      46
+    ],
+    [
+      "GPIO47",
+      47
+    ],
+    [
+      "GPIO48",
+      48
+    ]
+  ],
+  "display_pins": {
+    "sck": 46,
+    "mosi": 3,
+    "cs": 17,
+    "dc": 8,
+    "reset": 18,
+    "backlight": 9
+  },
+  "verified": false,
+  "notes": "Connect the native USB port (\"USB\"), not the UART one. Display pins as in the JetExamples demos."
+}

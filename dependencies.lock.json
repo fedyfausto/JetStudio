@@ -1,0 +1,22 @@
+{
+  "godot": {
+    "url": "https://github.com/godotengine/godot.git",
+    "revision": "6765a18ca8a954af8434cd599337f3e7fc1328d0"
+  },
+  "godot-cpp": {
+    "url": "https://github.com/godotengine/godot-cpp.git",
+    "revision": "cedbd9e71b24eb2898b28867c5faf6114da9e5e2"
+  },
+  "Jet": {
+    "url": "https://github.com/CubeCoders/Jet.git",
+    "revision": "c56dfc0c012ba7a09a6e49b4123340ec24981441"
+  },
+  "LovyanGFX": {
+    "url": "https://github.com/CubeCoders/LovyanGFX.git",
+    "revision": "2aa581eb396a5f28c599102b8df7bc2f1ffe5cc5"
+  },
+  "JetExamples": {
+    "url": "https://github.com/CubeCoders/JetExamples.git",
+    "revision": "57b05a240f5bcaa02a18d62a1206ce7053dc09dc"
+  }
+}
