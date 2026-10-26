@@ -1,4 +1,4 @@
-# Jet Studio - prototype 0.2
+# Jet Studio - prototype 0.2.1
 
 A **Godot**-style 3D desktop editor, built with Godot's UI, with an **independent C++17** game
 runtime, the **Jet** renderer and the **JetScript** scripting language (GDScript syntax). The
