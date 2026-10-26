@@ -89,6 +89,7 @@ var save_dialog: FileDialog
 var export_dialog: FileDialog
 var error_dialog: AcceptDialog
 var confirm_dialog: ConfirmationDialog
+var compress_dialog: ConfirmationDialog
 var quit_dialog: ConfirmationDialog
 var close_dialog: ConfirmationDialog
 var delete_dialog: ConfirmationDialog
@@ -644,6 +645,15 @@ func _build_dialogs() -> void:
 	confirm_dialog = ConfirmationDialog.new()
 	confirm_dialog.cancel_button_text = "Cancel"
 	add_child(confirm_dialog)
+	compress_dialog = ConfirmationDialog.new()
+	compress_dialog.title = "Compress Textures"
+	compress_dialog.confirmed.connect(_apply_compression)
+	compress_dialog.canceled.connect(func():
+		# Declined after an import: don't ask again for these files.
+		if not _after_compression.is_valid():
+			for path in _compression: _kept_textures[path] = true
+		_compression = {})
+	add_child(compress_dialog)
 	quit_dialog = ConfirmationDialog.new()
 	quit_dialog.cancel_button_text = "Cancel"
 	quit_dialog.title = "Unsaved Changes"
@@ -1135,6 +1145,14 @@ func _scene_sources(doc: Dictionary) -> Dictionary:
 var _image_cache := {} # absolute path -> {stamp, image, palette}
 var _model_cache := {} # res path -> {obj_stamp, obj, mtl_file, mtl_stamp, mtl, options, info_stamp, info}
 var _import_cache := {} # res path -> {mtime, settings}
+const PACK_LIMIT := 1024 * 1024 # the largest package the firmware build embeds (tools/tasks.py)
+const HEAVY_TEXTURE := 96 * 1024 # above this, adding a texture offers to compress it
+const BOARD_TEXTURE_SIDE := 256
+const BOARD_TRIANGLES := 3000 # above this, adding a model warns about the frame rate on the board
+var _pack_textures := [] # textures of the last exported package
+var _kept_textures := {} # textures the user chose to keep as they are, this session
+var _compression := {} # res path -> import settings waiting for the user's answer
+var _after_compression := Callable()
 
 func _import_file(path: String) -> String:
 	return project.to_abs(path) + ".import"
@@ -1168,17 +1186,139 @@ func _texture_image(path: String) -> Image:
 	var stamp := "%d:%s" % [FileAccess.get_modified_time(file), JSON.stringify(settings)]
 	var cached: Dictionary = _image_cache.get(file, {})
 	if cached.get("stamp", "") != stamp:
-		var image := Image.load_from_file(file)
-		if image == null or image.is_empty(): return null
-		if settings.flip_v: image.flip_y()
-		var limit := int(settings.max_size) if str(settings.max_size).is_valid_int() else 0
-		var size := image.get_size()
-		if limit > 0 and maxi(size.x, size.y) > limit:
-			var k := float(limit) / maxi(size.x, size.y)
-			image.resize(maxi(1, roundi(size.x * k)), maxi(1, roundi(size.y * k)), Image.INTERPOLATE_LANCZOS)
+		var image := _imported_image(file, settings)
+		if image == null: return null
 		cached = {"stamp": stamp, "image": image, "palette": settings.palette}
 		_image_cache[file] = cached
 	return cached.image
+
+func _imported_image(file: String, settings: Dictionary) -> Image:
+	var image := Image.load_from_file(file)
+	if image == null or image.is_empty(): return null
+	if settings.flip_v: image.flip_y()
+	var limit := int(settings.max_size) if str(settings.max_size).is_valid_int() else 0
+	var size := image.get_size()
+	if limit > 0 and maxi(size.x, size.y) > limit:
+		var k := float(limit) / maxi(size.x, size.y)
+		image.resize(maxi(1, roundi(size.x * k)), maxi(1, roundi(size.y * k)), Image.INTERPOLATE_LANCZOS)
+	return image
+
+# ------------------------------------------------------------------ texture budget for the board
+
+## {size, bytes, indexed, colors} of a PNG imported with these settings.
+func _texture_cost(path: String, settings: Dictionary) -> Dictionary:
+	var image := _texture_image(path) if settings == _import_settings(path) else _imported_image(project.to_abs(path), settings)
+	if image == null or bridge == null: return {}
+	var info: Dictionary = bridge.texture_info(image, settings.palette)
+	if not info.is_empty(): info.size = image.get_size()
+	return info
+
+func _texture_text(cost: Dictionary) -> String:
+	return "%d×%d, %s, %s" % [cost.size.x, cost.size.y, ("%d colors" % cost.colors) if cost.indexed else "RGB565",
+		String.humanize_size(int(cost.bytes))]
+
+## What suits the board when a texture is added: at most 256 px and 256 colors (unless RGB565 was chosen on purpose).
+func _board_texture(settings: Dictionary, cost: Dictionary) -> Dictionary:
+	var out := settings.duplicate()
+	if maxi(cost.size.x, cost.size.y) > BOARD_TEXTURE_SIDE: out.max_size = str(BOARD_TEXTURE_SIDE)
+	if not cost.indexed and settings.palette != "RGB565": out.palette = "Quantize"
+	return out
+
+## One step smaller: 256 colors first, then the next Max Size below the current side. Empty when it can't shrink.
+func _smaller_texture(settings: Dictionary, cost: Dictionary) -> Dictionary:
+	var out := settings.duplicate()
+	if not cost.indexed:
+		out.palette = "Quantize"
+		return out
+	for step in ["1024", "512", "256", "128", "64", "32"]:
+		if int(step) < maxi(cost.size.x, cost.size.y):
+			out.max_size = step
+			return out
+	return {}
+
+## After a model or an image is added: offers to compress the textures that are heavy for the board.
+func _offer_compression(paths: Array) -> void:
+	var plan := {}
+	var lines := []
+	for path in paths:
+		if plan.has(path) or _kept_textures.has(path): continue
+		var settings := _import_settings(path)
+		var cost := _texture_cost(path, settings)
+		if cost.is_empty() or int(cost.bytes) <= HEAVY_TEXTURE: continue
+		var lighter := _board_texture(settings, cost)
+		var after := _texture_cost(path, lighter)
+		if after.is_empty() or int(after.bytes) >= int(cost.bytes): continue
+		plan[path] = lighter
+		lines.append("• %s: %s → %s" % [path.get_file(), _texture_text(cost), _texture_text(after)])
+	if plan.is_empty(): return
+	_ask_compression(plan, "These textures are heavy for the board:\n%s\n\nCompress them? Only the import settings change, the PNG files stay as they are." % "\n".join(lines),
+		"Compress", "Keep Original", Callable())
+
+## The import settings that bring the package under the board's limit, shrinking the largest texture first.
+func _pack_plan(pack_size: int) -> Dictionary:
+	var entries := {}
+	for path in _pack_textures:
+		var settings := _import_settings(path)
+		var cost := _texture_cost(path, settings)
+		if not cost.is_empty(): entries[path] = {"settings": settings, "cost": cost, "before": cost, "done": false}
+	var size := pack_size
+	while size > PACK_LIMIT:
+		var largest := ""
+		for path in entries:
+			if not entries[path].done and (largest.is_empty() or int(entries[path].cost.bytes) > int(entries[largest].cost.bytes)):
+				largest = path
+		if largest.is_empty(): break
+		var entry: Dictionary = entries[largest]
+		var smaller := _smaller_texture(entry.settings, entry.cost)
+		var cost := _texture_cost(largest, smaller) if not smaller.is_empty() else {}
+		if cost.is_empty() or int(cost.bytes) >= int(entry.cost.bytes):
+			entry.done = true
+			continue
+		size -= int(entry.cost.bytes) - int(cost.bytes)
+		entry.settings = smaller
+		entry.cost = cost
+	var plan := {}
+	for path in entries:
+		if entries[path].settings != _import_settings(path): plan[path] = entries[path]
+	return {"size": size, "plan": plan}
+
+## Stops a board build whose package is over the limit, offering the compression that makes it fit.
+func _fits_board(pack_path: String, action: String) -> bool:
+	var size := FileAccess.get_file_as_bytes(pack_path).size()
+	if size <= PACK_LIMIT: return true
+	var result := _pack_plan(size)
+	var limit := String.humanize_size(PACK_LIMIT)
+	if result.plan.is_empty() or result.size > PACK_LIMIT:
+		_fail("The game takes %s, the board holds %s.\nEven with smaller textures it would take %s: use fewer or simpler models (fewer triangles and parts)." % [
+			String.humanize_size(size), limit, String.humanize_size(result.size)])
+		return false
+	var settings := {}
+	var lines := []
+	for path in result.plan:
+		var entry: Dictionary = result.plan[path]
+		settings[path] = entry.settings
+		lines.append("• %s: %s → %s" % [path.get_file(), _texture_text(entry.before), _texture_text(entry.cost)])
+	_ask_compression(settings, "The game takes %s, the board holds %s.\nCompressing these textures brings it to %s:\n%s\n\nOnly the import settings change, the PNG files stay as they are." % [
+		String.humanize_size(size), limit, String.humanize_size(result.size), "\n".join(lines)],
+		"Compress and %s" % action.capitalize(), "Cancel", func(): _start_task(action))
+	return false
+
+func _ask_compression(plan: Dictionary, text: String, ok: String, cancel: String, then: Callable) -> void:
+	_compression = plan
+	_after_compression = then
+	compress_dialog.dialog_text = text
+	compress_dialog.ok_button_text = ok
+	compress_dialog.cancel_button_text = cancel
+	compress_dialog.popup_centered()
+
+func _apply_compression() -> void:
+	for path in _compression:
+		if not _save_import(path, _compression[path]): return
+		_log("Compressed for the board: %s (%s)" % [path, _texture_text(_texture_cost(path, _compression[path]))], Style.ACCENT)
+	_compression = {}
+	_upload()
+	_refresh_all()
+	if _after_compression.is_valid(): _after_compression.call()
 
 func _texture_size(path: String) -> Vector2i:
 	var image := _texture_image(path)
@@ -1276,12 +1416,16 @@ func _file_selected(path: String) -> void:
 	if Document.import_kind(path).is_empty() or not FileAccess.file_exists(project.to_abs(path)): return
 	inspector.edit_import(path, _import_settings(path), _import_summary(path))
 
-func _import_applied(path: String, settings: Dictionary) -> void:
+func _save_import(path: String, settings: Dictionary) -> bool:
 	var error := Project.write_text(_import_file(path), JSON.stringify({"importer": Document.import_kind(path), "params": settings}, "\t") + "\n")
 	if not error.is_empty():
 		_fail(error)
-		return
+		return false
 	_import_cache[path] = {"mtime": _file_stamp(_import_file(path)), "settings": settings}
+	return true
+
+func _import_applied(path: String, settings: Dictionary) -> void:
+	if not _save_import(path, settings): return
 	_log("Reimported: " + path, Style.ACCENT)
 	_upload()
 	_refresh_all()
@@ -1616,6 +1760,7 @@ func _file_dropped(id: int, path: String) -> void:
 		_:
 			_status("Drag images onto a MeshInstance3D or a WorldEnvironment.")
 	_select(id)
+	if str(node.type) in ["MeshInstance3D", "WorldEnvironment", "TextureRect"]: _offer_compression([path])
 
 ## A Node3D with one MeshInstance3D per OBJ part and the MTL materials, like Godot's imported scenes.
 func _instantiate_model(parent_id: int, path: String, at: Variant = null) -> void:
@@ -1666,6 +1811,16 @@ func _instantiate_model(parent_id: int, path: String, at: Variant = null) -> voi
 	_status("Model %s: %d parts under %s." % [path.get_file(), info.parts.size(), parent.name])
 	for texture in notes:
 		_log("Material texture \"%s\" not found (it needs a PNG next to the MTL file): assign it in the Inspector." % texture, Style.WARNING)
+
+	var triangles := 0
+	for part in info.parts: triangles += int(part.triangles)
+	if triangles > BOARD_TRIANGLES:
+		_log("%s has %d triangles: on the board each one costs frame time, so simplify it in the 3D modelling program if the game slows down." % [
+			path.get_file(), triangles], Style.WARNING)
+	var textures := []
+	for mesh in Document.children(group):
+		if not str(mesh.get("albedo_texture", "")).is_empty(): textures.append(str(mesh.albedo_texture))
+	_offer_compression(textures)
 
 func _attach_script(id: int, path: String) -> void:
 	if playing: return
@@ -1970,6 +2125,7 @@ func _scene_pack(path: String) -> PackedByteArray:
 		bottom_tabs.current_tab = 1
 		return PackedByteArray()
 	var assets := _all_assets(doc, others)
+	_pack_textures = assets.textures.keys()
 	if splash: assets.textures[BOOT_SPLASH_LOGO] = {"image": _boot_splash_logo(), "palette": "Auto"}
 	bridge.set_scenes(start, others)
 	var error: String = bridge.load_scene(doc, sources, assets)
@@ -2023,6 +2179,7 @@ func _start_task(action: String) -> void:
 	if not _export_to(_job_prefix + ".jetpack"): return
 	_job_offset = 0
 	var target := "device" if target_select.selected > 0 else "desktop"
+	if target == "device" and not _fits_board(_job_prefix + ".jetpack", action): return
 	var profile := _profile()
 	# The uploader needs the USB port; the Serial monitor gets it back after the flash.
 	if action == "flash": _serial_was_open = serial_monitor.suspend()
@@ -2447,6 +2604,31 @@ func _run_smoke() -> void:
 	_check(_export_to(model_pack) and FileAccess.get_file_as_bytes(model_pack).size() > bytes.size() + 1024, "export ships models and textures")
 	_change("", true, func(): Document.children(Document.find(_root_node(), int(group.id)))[1].mesh_part = "Nope")
 	_check(not _missing_assets(_tab().doc).is_empty(), "missing model parts block the export")
+	_undo()
+	# Texture budget for the board
+	var tile := Image.create(32, 32, false, Image.FORMAT_RGB8)
+	for y in 32:
+		for x in 32: tile.set_pixel(x, y, Color(x / 31.0, y / 31.0, ((x * y) % 32) / 31.0))
+	tile.resize(512, 512, Image.INTERPOLATE_NEAREST)
+	tile.save_png(project.to_abs("res://models/heavy.png"))
+	_file_dropped(int(lid.id), "res://models/heavy.png")
+	_check(compress_dialog.visible and _compression.has("res://models/heavy.png"), "a heavy texture offers compression for the board")
+	compress_dialog.hide()
+	_apply_compression()
+	var light := _texture_cost("res://models/heavy.png", _import_settings("res://models/heavy.png"))
+	_check(light.get("size") == Vector2i(256, 256) and light.get("indexed", false), "compression imports it at 256 px with 256 colors")
+	tile.resize(1024, 1024, Image.INTERPOLATE_NEAREST)
+	tile.save_png(project.to_abs("res://models/huge.png"))
+	_kept_textures["res://models/huge.png"] = true
+	_file_dropped(int(lid.id), "res://models/huge.png")
+	var big_pack := _root_dir().path_join(".cache/tests/smoke_big.jetpack")
+	_check(_export_to(big_pack) and not _fits_board(big_pack, "build") and compress_dialog.visible and _compression.has("res://models/huge.png"),
+		"a package over 1 MiB stops the board build and offers compression")
+	compress_dialog.hide()
+	_after_compression = Callable()
+	_apply_compression()
+	_check(_export_to(big_pack) and _fits_board(big_pack, "build"), "after compression the package fits the board")
+	_undo()
 	_undo()
 	# Hardware
 	_check(Hardware.boards.has("nano_esp32") and Hardware.displays.has("st7796_320x480"), "hardware profiles are loaded")

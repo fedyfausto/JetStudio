@@ -7,6 +7,11 @@ firmware.
 
 ![The real editor with the Jet framebuffer](docs/editor-preview.png)
 
+## Video Demo
+
+
+[![Video Demo on Youtube](http://img.youtube.com/vi/Qyh9KQlXAAA/0.jpg)](http://www.youtube.com/watch?v=Qyh9KQlXAAA)
+
 ## Running
 
 ```sh
@@ -22,6 +27,8 @@ interface is drawn at the screen's real resolution (under XWayland it would be u
 blurry). `JET_STUDIO_DISPLAY=x11 ./jet-studio run` forces X11. When launched from the terminal
 of a snap app (e.g. VS Code), the launcher removes the snap's GTK/GLib variables, which would
 otherwise make the Wayland driver terminate. The interface scale is changed from the `Editor` menu.
+
+
 
 ## Layout (like Godot)
 
@@ -131,6 +138,13 @@ material), with color, texture, transparency and shininess taken from the MTL fi
 Godot instantiates an imported scene. Import: scale (file units → meters), Mirror X, Flip Faces
 (models exported inside out), Flip V. The meshes end up in the `.jetpack`; at most 65535
 vertices per part and 262144 per scene.
+
+The editor keeps an eye on the board's budget. A model or image that brings in a texture over
+96 KiB triggers an offer to import it at 256 px with 256 colors. A model with more than 3000 triangles
+gets a warning in the Output, since every triangle costs frame time on the board. Before Build or
+Flash on the board, a package over 1 MiB (the firmware's limit) stops with the list of textures
+to shrink, largest first: 256 colors, then half the size. One button compresses them and starts
+again. Only the import settings change, never the PNG files.
 
 ### Materials, textures and sky
 
