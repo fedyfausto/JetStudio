@@ -175,9 +175,9 @@ bool start(LGFX* target, int screen_width, int screen_height) {
     xSemaphoreGive(idle);
     return true;
 }
-} // namespace present
+} // namespace
 
-// Buttons wire the pin to GND and use the internal pull-up; bit i of the mask is action i.
+// Buttons wire the pin to GND and use the internal pull-up
 void configure_buttons() {
     for (int pin : input_pins) {
         if (pin < 0) continue;
@@ -196,7 +196,7 @@ uint32_t read_buttons() {
     return mask;
 }
 
-// Errors carry "res://file.jet:line: " so the editor's Serial monitor can link them to the script.
+
 void print_log(jetstudio::Runtime& runtime) {
     for (const auto& line : runtime.take_log()) {
         if (!SerialLog) continue;

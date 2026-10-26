@@ -1213,6 +1213,32 @@ int main(int argc, char** argv) {
         check(!r.load(bad, error) && !r.load(spaced, error), "duplicate or invalid action names are rejected");
     }
 
+    // A press counts once per physics tick sequence and once per frame, whatever the frame rate.
+    {
+        Description d = base;
+        d.scripts.push_back({"res://press.jet", "extends Node3D\nfunc _physics_process(delta):\n"
+                             "\tif Input.is_action_just_pressed(\"ui_accept\"):\n\t\tposition.x += 1.0\n"
+                             "func _process(delta):\n\tif Input.is_action_just_pressed(\"ui_accept\"):\n\t\tposition.y += 1.0\n"});
+        d.nodes[3].script = 0;
+        Runtime r;
+        std::vector<ScriptDiagnostic> diagnostics;
+        NodeDesc cube;
+        r.load(d, error);
+        r.start(diagnostics);
+        r.set_input(UiAccept);
+        r.update(0.034f); // two ticks in one frame
+        r.node_state(d.nodes[3].id, cube);
+        const float y = d.nodes[3].position.y;
+        check(cube.position.x == 1 && cube.position.y == y + 1, "a press seen by two ticks of the same frame counts once");
+        r.set_input(0);
+        r.update(0.02f);
+        r.set_input(UiAccept);
+        r.update(0.005f); // no tick in this frame
+        r.update(0.01f);
+        r.node_state(d.nodes[3].id, cube);
+        check(cube.position.x == 2 && cube.position.y == y + 2, "a press in a frame without ticks reaches the next tick");
+    }
+
     // queue_free removes the node (and its children) at the end of the frame.
     {
         Description d = base, without = base;

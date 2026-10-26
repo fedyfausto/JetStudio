@@ -507,6 +507,7 @@ void Runtime::update_areas() {
 // Scripts' _physics_process (where move_and_slide runs) comes first, then rigid bodies and areas.
 void Runtime::physics_tick(float dt) {
     physics_delta_ = dt;
+    in_physics_ = true;
     if (has_physics_) {
         // After a step the children of moved bodies have stale world transforms.
         if (transforms_stale_) update_transforms(false);
@@ -530,6 +531,8 @@ void Runtime::physics_tick(float dt) {
         }
     }
     physics_->valid = false;
+    physics_previous_input_ = input_;
+    in_physics_ = false;
 }
 
 } // namespace jetstudio

@@ -465,7 +465,8 @@ Status ScriptHost::call_method(ObjectId id, int m, const Value* args, int count,
         };
         uint32_t a = 0, b = 0;
         if (!bit(0, a) || (m == GetAxis && !bit(1, b))) return Status::Error;
-        const uint32_t now = runtime_->input_, before = runtime_->previous_input_;
+        const uint32_t now = runtime_->input_;
+        const uint32_t before = runtime_->in_physics_ ? runtime_->physics_previous_input_ : runtime_->previous_input_;
         switch (m) {
         case IsActionPressed: result = Value((now & a) != 0); break;
         case IsActionJustPressed: result = Value((now & a) && !(before & a)); break;

@@ -283,7 +283,9 @@ bool validate(const Description& d, std::string& error) {
         return true;
     };
     if (!check_nodes(d.nodes)) return false;
+
     if (d.autoloads.size() > MaxAutoloads) return fail("At most 16 autoloads.");
+
     for (size_t i = 0; i < d.autoloads.size(); ++i) {
         const auto& a = d.autoloads[i];
         bool ok = !a.name.empty() && a.name.size() <= 64 && !std::isdigit(uint8_t(a.name[0])) && a.name != "Input"
@@ -292,6 +294,7 @@ bool validate(const Description& d, std::string& error) {
         for (size_t j = 0; j < i; ++j) ok = ok && d.autoloads[j].name != a.name;
         if (!ok) return fail("Invalid autoload: \"" + a.name + "\" (a unique name of letters, digits and _, and a script).");
     }
+
     if (d.scenes.size() > MaxScenes) return fail("At most 64 scenes per project.");
     for (size_t i = 0; i < d.scenes.size(); ++i) {
         const auto& scene = d.scenes[i];
@@ -312,7 +315,7 @@ Runtime::Runtime() : color_(size_t(DefaultWidth / BufferColumnStep) * (DefaultHe
     scene_(color_.data(), Z_BUFFERING ? depth_.data() : nullptr, DefaultWidth, DefaultHeight),
     physics_(std::make_unique<physics::World>()),
     host_(std::make_unique<ScriptHost>(this)), vm_(std::make_unique<jetscript::VM>(*host_)) {
-    // Interlaced fields: each render() fills the rows of one parity (next_field()).
+    
     scene_.getRenderer()->interlacedMode = FIELD_BUFFERS != 0;
     scene_.setCamera(&camera_);
     scene_.setDirectionalLight(&sun_);
@@ -759,7 +762,7 @@ bool Runtime::start(std::vector<ScriptDiagnostic>& errors) {
     compiled_ = std::move(compiled);
     playing_ = true;
     editor_view_ = false;
-    input_ = previous_input_ = 0;
+    input_ = previous_input_ = physics_previous_input_ = 0;
     start_autoloads();
     enter_scene();
     return true;

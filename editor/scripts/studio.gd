@@ -2115,7 +2115,6 @@ func _job_finished(ok: bool) -> void:
 
 # ------------------------------------------------------------------ shortcuts and quit
 
-# Keep the game's keys away from the editor's controls while playing.
 func _input(event: InputEvent) -> void:
 	if _is_game_key(event): get_viewport().set_input_as_handled()
 

@@ -1,11 +1,91 @@
 {
-	"main_scene": "res://main.jetscene",
-	"name": "Physics demo",
-	"target": "desktop",
 	"autoload": [
 		{
 			"name": "Game",
 			"path": "res://scripts/game.jet"
 		}
-	]
+	],
+	"boot_splash": true,
+	"hardware": {
+		"board": "nano_esp32",
+		"display": "ili9341_240x320",
+		"orientation": "landscape",
+		"pins": {
+			"backlight": -1.0,
+			"cs": 21.0,
+			"dc": 9.0,
+			"mosi": 38.0,
+			"reset": 12.0,
+			"sck": 48.0
+		},
+		"spi_hz": 40000000.0
+	},
+	"input_map": [
+		{
+			"keys": [
+				"Left",
+				"A"
+			],
+			"name": "ui_left",
+			"pin": -1.0
+		},
+		{
+			"keys": [
+				"Right",
+				"D"
+			],
+			"name": "ui_right",
+			"pin": -1.0
+		},
+		{
+			"keys": [
+				"Up",
+				"W"
+			],
+			"name": "ui_up",
+			"pin": -1.0
+		},
+		{
+			"keys": [
+				"Down",
+				"S"
+			],
+			"name": "ui_down",
+			"pin": -1.0
+		},
+		{
+			"keys": [
+				"Space",
+				"Enter"
+			],
+			"name": "ui_accept",
+			"pin": -1.0
+		},
+		{
+			"keys": [
+				"Escape",
+				"Backspace"
+			],
+			"name": "ui_cancel",
+			"pin": -1.0
+		},
+		{
+			"keys": [
+				"X"
+			],
+			"name": "change_action",
+			"pin": 18.0
+		},
+		{
+			"keys": [
+				"Z"
+			],
+			"name": "run_action",
+			"pin": 10.0
+		}
+	],
+	"main_scene": "res://main.jetscene",
+	"name": "Physics demo",
+	"profile": "debug",
+	"target": "device"
 }

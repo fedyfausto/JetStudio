@@ -401,7 +401,9 @@ private:
     bool playing_ = false, editor_view_ = true;
     Vec3 editor_position_{4, 3, 6}, editor_rotation_{-0.4f, 0.6f, 0};
     float editor_fov_ = 70;
-    uint32_t input_ = 0, previous_input_ = 0;
+    // "Just pressed" is true for one frame in _process and for one tick in _physics_process, as in Godot.
+    uint32_t input_ = 0, previous_input_ = 0, physics_previous_input_ = 0;
+    bool in_physics_ = false;
     bool pending_free_ = false;
     std::vector<LogLine> log_;
     std::unique_ptr<ScriptHost> host_;

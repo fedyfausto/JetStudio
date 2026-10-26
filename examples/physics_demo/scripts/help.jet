@@ -1,0 +1,16 @@
+extends Label
+
+
+
+func update_action(action):
+	match action:
+		0:
+			text = "Change Action: btn2  Action: jump"
+		1:
+			text = "Change Action: btn2  Action: right"
+		2:
+			text = "Change Action: btn2  Action: up"
+		3:
+			text = "Change Action: btn2  Action: left"
+		4:
+			text = "Change Action: btn2  Action: down"

@@ -2180,7 +2180,7 @@
 				],
 				"spread": 10.0,
 				"type": "CPUParticles3D",
-				"visible": true
+				"visible": false
 			},
 			{
 				"albedo_texture": "",
@@ -2426,7 +2426,9 @@
 					8.0,
 					220.0
 				],
-				"text": "Arrows/WASD: move  Space: jump",
+				"script": "res://scripts/help.jet",
+				"script_properties": {},
+				"text": "Change Action: btn2  Action: jump",
 				"text_scale": 1,
 				"type": "Label",
 				"visible": true

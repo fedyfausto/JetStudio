@@ -40,7 +40,7 @@ uint32_t keyboard_actions(const std::vector<std::vector<SDL_Scancode>>& actions)
 }
 
 #if FIELD_BUFFERS
-// The firmware's field pipeline on the PC (see firmware/src/main.cpp).
+
 struct DeviceScreen {
     std::array<std::vector<uint16_t>, 2> fields;
     std::vector<uint16_t> screen;

@@ -3,17 +3,46 @@ extends CharacterBody3D
 
 @export var speed := 4.0
 @export var jump_velocity := 5.0
+
+@onready var help =  get_node("/root/World/Help")
+
 const GRAVITY := 9.8
+var current_action:int = 0
 
 
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
-	if Input.is_action_just_pressed("ui_accept") and is_on_floor():
+
+	if Input.is_action_just_pressed("change_action"):
+		current_action = current_action + 1
+		if current_action > 4:
+			current_action = 0
+		print("Cambio con ", current_action)
+		
+		update_action()
+	
+	if Input.is_action_just_pressed("run_action") and current_action == 0 and is_on_floor():
 		velocity.y = jump_velocity
-	velocity.x = Input.get_axis("ui_left", "ui_right") * speed
-	velocity.z = Input.get_axis("ui_up", "ui_down") * speed
+	
+	if Input.is_action_pressed("run_action") and current_action == 1:
+		velocity.x = 1 * speed
+	elif Input.is_action_pressed("run_action") and current_action == 2:
+		velocity.z = -1 * speed
+	elif Input.is_action_pressed("run_action") and current_action == 3:
+		velocity.x = -1 * speed
+	elif Input.is_action_pressed("run_action") and current_action == 4:
+		velocity.z = 1 * speed
+	else:
+		velocity.x = 0
+		velocity.z = 0
+	#velocity.x = Input.get_axis("ui_left", "ui_right") * speed
+	#velocity.z = Input.get_axis("ui_up", "ui_down") * speed
 	move_and_slide()
 	if position.y < -10.0:
 		position = Vector3(0.0, 2.0, 4.0) # fell off: back to the start
 		velocity = Vector3.ZERO
+
+
+func update_action():
+	help.update_action(current_action)
