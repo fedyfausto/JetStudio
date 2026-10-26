@@ -16,7 +16,7 @@ const SerialMonitor := preload("res://scripts/serial_monitor.gd")
 const ProjectSettingsDialog := preload("res://scripts/project_settings_dialog.gd")
 const Hardware := preload("res://scripts/hardware.gd")
 const Actions := preload("res://scripts/input_map.gd")
-const VERSION := "0.2"
+const VERSION := "0.2.1"
 const SETTINGS := "user://editor.cfg"
 
 enum Screen { VIEW_3D, SCRIPT, GAME }
