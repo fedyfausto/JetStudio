@@ -5,11 +5,13 @@ import json
 import os
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 GODOT = ROOT / "third_party/godot/bin/godot.linuxbsd.template_debug.x86_64"
+RELEASE_GODOT = ROOT / "third_party/godot/bin/godot.linuxbsd.template_release.x86_64"
 LOCK = ROOT / "dependencies.lock.json"
 
 
@@ -117,6 +119,18 @@ def skip_in_release(folder, names):
             or (name.startswith("sdkconfig.") and name not in ("sdkconfig.defaults", "sdkconfig.release"))]
 
 
+def embed_pack(executable, pck):
+    """Appends a .pck the way Godot's exporter embeds it: padding, package, its size and the GDPC magic."""
+    data = pck.read_bytes()
+    with open(executable, "r+b") as f:
+        f.seek(0, os.SEEK_END)
+        f.write(b"\0" * (-f.tell() % 8))
+        start = f.tell()
+        f.write(data)
+        f.write(b"\0" * (-(f.tell() + 12) % 8))
+        f.write(struct.pack("<Q", f.tell() - start) + b"GDPC")
+
+
 def release(jobs):
     """Portable folder and tarball in dist/, laid out like the repo so the editor and tasks.py find everything."""
     build_godot(jobs, "template_release")
@@ -129,7 +143,7 @@ def release(jobs):
     out.mkdir(parents=True)
 
     # No neon_car: its car model and livery are not ours to redistribute.
-    for path in ["LICENSE", "README.md", "docs", "editor", "hardware", "runtime", "cmake/JetSources.cmake", "firmware", "firmware_stm32",
+    for path in ["LICENSE", "README.md", "docs", "hardware", "runtime", "cmake/JetSources.cmake", "firmware", "firmware_stm32",
                  "tools/tasks.py", "tools/hardware.py", "third_party/Jet/src", "third_party/Jet/LICENSE",
                  "examples/first_world", "examples/physics_demo", "examples/textured_boxes"]:
         source, target = ROOT / path, out / path
@@ -138,17 +152,23 @@ def release(jobs):
             shutil.copytree(source, target, ignore=skip_in_release)
         else:
             shutil.copy2(source, target)
-    (out / "editor/.godot").mkdir()
-    (out / "editor/.godot/global_script_class_cache.cfg").write_text("list=[]\n")
-
+    # The editor travels inside the executable; Godot finds the bridge library next to it.
     (out / "bin").mkdir()
-    shutil.copy2(ROOT / "third_party/godot/bin/godot.linuxbsd.template_release.x86_64", out / "bin/jet-studio.x86_64")
+    executable = out / "bin/jet-studio.x86_64"
+    shutil.copy2(RELEASE_GODOT, executable)
+    run(["strip", executable])
+    prepare_desktop()
+    pck = out / "editor.pck"
+    run([RELEASE_GODOT, "--headless", "--path", ROOT / "editor", "--script", ROOT / "tools/pack_editor.gd", "--", pck])
+    embed_pack(executable, pck)
+    pck.unlink()
+    shutil.copy2(ROOT / "editor/bin/libjet_bridge.so", out / "bin/libjet_bridge.so")
+    run(["strip", "--strip-unneeded", out / "bin/libjet_bridge.so"])
     shutil.copy2(ROOT / "tools/launcher.sh", out / "jet-studio")
     (out / "build").mkdir()
     for player in ["jet_player", "jet_player_device"]:
         shutil.copy2(ROOT / "build" / player, out / "build" / player)
         run(["strip", out / "build" / player])
-    run(["strip", "--strip-unneeded", out / "editor/bin/libjet_bridge.so"])
 
     licenses = out / "licenses"
     licenses.mkdir()

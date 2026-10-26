@@ -23,4 +23,4 @@ if [ "$display" = auto ]; then
     if [ -n "${WAYLAND_DISPLAY:-}" ]; then display=wayland; else display=x11; fi
 fi
 
-exec "$here/bin/jet-studio.x86_64" --path "$here/editor" --display-driver "$display" "$@"
+exec "$here/bin/jet-studio.x86_64" --display-driver "$display" "$@"

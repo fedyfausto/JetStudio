@@ -153,8 +153,11 @@ func _apply_scale(value: float) -> void:
 		elif scale <= 1.0 and dpi >= 144: scale = 1.5
 	get_window().content_scale_factor = clampf(scale, 0.75, 3.0)
 
+## The folder with tools/, firmware/ and examples/: the repo, or a release whose bin/ holds the executable with the editor inside.
 func _root_dir() -> String:
-	return ProjectSettings.globalize_path("res://").trim_suffix("/").get_base_dir()
+	var editor := ProjectSettings.globalize_path("res://")
+	if editor.is_absolute_path(): return editor.trim_suffix("/").get_base_dir()
+	return OS.get_executable_path().get_base_dir().get_base_dir()
 
 func _example_folder() -> String:
 	return _root_dir().path_join("examples/first_world")
@@ -395,6 +398,7 @@ func _build_ui() -> void:
 	screens.add_child(viewport)
 	script_editor = ScriptEditor.new()
 	script_editor.project = project
+	script_editor.docs = _root_dir().path_join("docs")
 	screens.add_child(script_editor)
 	var game := VBoxContainer.new()
 	screens.add_child(game)
@@ -1088,7 +1092,7 @@ func _process(delta: float) -> void:
 """ % main
 
 func _boot_splash_logo() -> Image:
-	return Image.load_from_file(ProjectSettings.globalize_path("res://assets/emblem.png"))
+	return Image.load_from_file("res://assets/emblem.png")
 
 # The project's other scenes, so change_scene_to_file() finds them in Play and in the package.
 func _other_scenes(except: String) -> Dictionary:

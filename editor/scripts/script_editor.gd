@@ -34,6 +34,7 @@ const TEMPLATE := "extends %s\n\n\n# Called when the node enters the scene tree 
 
 var bridge: Object
 var project
+var docs := "" # Jet Studio's docs folder
 var class_db := [] # from the bridge
 var _scripts := {} # path -> {code, saved, info, error_line}
 var _order := []
@@ -395,7 +396,7 @@ func _on_file_menu(id: int) -> void:
 		1: save()
 		2: save_all()
 		3: close_script(_current)
-		4: OS.shell_open(ProjectSettings.globalize_path("res://").path_join("../docs/jetscript.md").simplify_path())
+		4: OS.shell_open(docs.path_join("jetscript.md"))
 
 func _on_search_menu(id: int) -> void:
 	match id:

@@ -437,8 +437,10 @@ diagrams) needs only Python.
 
 It builds the optimized Godot template (another 10-20 minutes the first time), the runtime and the
 players, runs the C++ tests, then writes `dist/jet-studio-<version>-linux-x86_64/` and its `.tar.gz`.
-The package needs no compiler. Extract it in a writable folder, since firmware builds go inside it,
-and start `./jet-studio` from there. The target machine needs `python3` for the build tasks and
+The package needs no compiler. Extract it in a writable folder, since firmware builds go inside it.
+The editor is embedded in `bin/jet-studio.x86_64` (Godot's `.pck` appended to the executable, with
+the bridge library next to it), so you can start that file directly or use `./jet-studio`, which
+also cleans the environment of snap terminals such as VS Code's. The target machine needs `python3` for the build tasks and
 `libsdl2-2.0-0` for the PC player and the device emulator, plus PlatformIO (step 2) for the boards.
 The `neon_car` example is left out because its car model can't be redistributed.
 
