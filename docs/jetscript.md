@@ -217,6 +217,9 @@ The engine classes form this hierarchy. Properties use Godot names.
   `is_visible_in_tree()`.
 - **MeshInstance3D** (extends Node3D): `color`, `alpha`, `uv_offset`, `uv_scale`
   (Vector3, x and y used), `perspective_correct`, `texture_filter` (0 nearest, 1 linear).
+- **Sprite3D** (extends Node3D): `frame`, `hframes`, `vframes`, `flip_h`, `flip_v`, `pixel_size`,
+  `modulate`. One frame of its texture's sprite sheet (left to right, then top to bottom) as a quad,
+  unlit and double-sided; setting `frame` animates it. Billboard is set in the Inspector.
 - **Camera3D** (extends Node3D): `fov`, `near`, `far`, `current`, `make_current()`.
 - **DirectionalLight3D** (extends Node3D): `light_color`, `light_energy`.
 - **WorldEnvironment** (extends Node): `background_color`, `ambient_color`.
@@ -244,7 +247,8 @@ The engine classes form this hierarchy. Properties use Godot names.
   space: moving the node does not move the ones already emitted.
 - **Control** (extends Node; 2D nodes drawn over the 3D scene, in screen pixels
   of the display, 320×240 unless the project hardware sets another resolution): `position` and `size` (Vector3, x and y used;
-  position is relative to a parent Control), `visible`, `alpha`, `show()`, `hide()`.
+  position is relative to a parent Control), `visible`, `alpha`, `show()`, `hide()`. A plain Control draws
+  nothing: it groups other 2D nodes (a HUD), which are hidden with it and inherit its `alpha`.
 - **Label** (extends Control): `text`, `color`. Built-in 7×15 bitmap font
   (ASCII and Latin-1 accented letters), `\n` starts a new line.
 - **TextureRect** (extends Control): `color` (modulate).

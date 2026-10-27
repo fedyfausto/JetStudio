@@ -14,6 +14,14 @@ Int real_to_int(double x) {
     return Int(x);
 }
 
+Int real_to_int(Real x) {
+    if (x > -2147483648.0f && x < 2147483648.0f) return Int(int32_t(x));
+    if (x != x) return 0;
+    if (x >= 9223372036854775808.0f) return INT64_MAX;
+    if (x <= -9223372036854775808.0f) return INT64_MIN;
+    return Int(x);
+}
+
 static void append_u64(std::string& out, uint64_t u) {
     char buf[24];
     int n = 0;
@@ -187,10 +195,10 @@ bool convert_to(Type t, Value& v) {
     switch (t) {
     case Type::Nil: return true; // Variant
     case Type::Int:
-        if (s == Type::Float) { Heap::set_int(v, real_to_int(double(Heap::f(v)))); return true; }
+        if (s == Type::Float) { Heap::set_int(v, real_to_int(Heap::f(v))); return true; }
         return false;
     case Type::Float:
-        if (s == Type::Int) { Heap::set_float(v, Real(Heap::i(v))); return true; }
+        if (s == Type::Int) { Heap::set_float(v, int_to_real(Heap::i(v))); return true; }
         return false;
     case Type::Object: return s == Type::Nil;
     default: return false;
@@ -224,8 +232,10 @@ bool values_equal_budget(const Value& a, const Value& b, int depth, int& budget)
     if (--budget < 0) return false;
     Type ta = a.type(), tb = b.type();
     if (ta != tb) {
-        if (is_num(ta) && is_num(tb)) return num(a) == num(b);
-        return false;
+        if (!is_num(ta) || !is_num(tb)) return false;
+        Real x = 0, y = 0;
+        if (exact_real(a, x) && exact_real(b, y)) return x == y;
+        return num(a) == num(b);
     }
     switch (ta) {
     case Type::Nil: return true;
@@ -329,11 +339,14 @@ static bool int_op(BinOp op, Int a, Int b, Value& out, std::string& err) {
     case BinOp::Mul: out = Value(Int(uint64_t(a) * uint64_t(b))); return true;
     case BinOp::Div:
         if (b == 0) { err = "Division by zero error in operator '/'."; return false; }
-        out = Value((a == INT64_MIN && b == -1) ? a : a / b);
+        // b == -1 stays on 64 bits: INT32_MIN / -1 overflows int32.
+        if (fits32(a) && fits32(b) && b != -1) out = Value(Int(int32_t(a) / int32_t(b)));
+        else out = Value((a == INT64_MIN && b == -1) ? a : a / b);
         return true;
     case BinOp::Mod:
         if (b == 0) { err = "Modulo by zero error in operator '%'."; return false; }
-        out = Value(b == -1 ? Int(0) : a % b);
+        if (b == -1) out = Value(Int(0));
+        else out = Value(fits32(a) && fits32(b) ? Int(int32_t(a) % int32_t(b)) : a % b);
         return true;
     case BinOp::Pow:
         if (b >= 0) out = Value(ipow(a, b));
@@ -446,6 +459,16 @@ bool binary_op(BinOp op, const Value& a, const Value& b, Value& out, std::string
             }
             out = std::move(r);
             return true;
+        }
+        Real fx = 0, fy = 0;
+        if (exact_real(a, fx) && exact_real(b, fy)) {
+            switch (op) {
+            case BinOp::Lt: out = Value(fx < fy); return true;
+            case BinOp::Le: out = Value(fx <= fy); return true;
+            case BinOp::Gt: out = Value(fx > fy); return true;
+            case BinOp::Ge: out = Value(fx >= fy); return true;
+            default: break;
+            }
         }
         switch (op) {
         case BinOp::Lt: out = Value(num(a) < num(b)); return true;

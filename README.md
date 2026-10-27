@@ -1,4 +1,4 @@
-# Jet Studio - prototype 0.2.1
+# Jet Studio - prototype 0.3.0
 
 A **Godot**-style 3D desktop editor, built with Godot's UI, with an **independent C++17** game
 runtime, the **Jet** renderer and the **JetScript** scripting language (GDScript syntax). The
@@ -10,7 +10,9 @@ firmware.
 ## Video Demo
 
 
-[![Video Demo on Youtube](http://img.youtube.com/vi/Qyh9KQlXAAA/0.jpg)](http://www.youtube.com/watch?v=Qyh9KQlXAAA)
+[![Physics Demo](http://img.youtube.com/vi/Qyh9KQlXAAA/0.jpg)](http://www.youtube.com/watch?v=Qyh9KQlXAAA) [![JetRun Demo](http://img.youtube.com/vi/o8o237eqnMw/0.jpg)](http://www.youtube.com/watch?v=o8o237eqnMw) 
+
+
 
 ## Running
 
@@ -56,9 +58,11 @@ otherwise make the Wayland driver terminate. The interface scale is changed from
 | `Node` | organization, global logic |
 | `Node3D` | transform (position, rotation in degrees YXZ, scale); children inherit it |
 | `MeshInstance3D` | Box, Sphere, Plane, Pyramid, Cylinder, Capsule, Quad, Torus primitives (Godot's default sizes) or a part of an OBJ model (`File`), and material (see below) |
+| `Sprite3D` | a PNG, or one frame of a sprite sheet (`hframes`, `vframes`, `frame`), as a quad in the world: unlit, double-sided, optional billboard, `flip_h`/`flip_v`, `pixel_size`, `modulate` |
 | `Camera3D` | vertical FOV, near/far, `current` |
 | `DirectionalLight3D` | color and energy; lights along its own −Z |
 | `WorldEnvironment` | background (color, sky/ground gradient, panorama) and ambient light |
+| `Control` | groups 2D nodes (a HUD): children sit relative to it and are hidden and faded with it |
 | `Label` | 2D text over the scene, the runtime's 7×15 bitmap font (Latin with accents), integer scale |
 | `TextureRect` | 2D PNG image, integer scale or free size, transparent key color |
 | `ColorRect` | solid or semi-transparent rectangle (fades, bars, panels) |
@@ -170,7 +174,9 @@ again. Only the import settings change, never the PNG files.
 - **From scripts**: `color`, `alpha`, `uv_offset`, `uv_scale`, `perspective_correct`,
   `texture_filter` of the MeshInstance3D.
 
-Examples: `examples/textured_boxes` (JetExamples' "textured boxes" demo, with the CC0 crate),
+Examples: `examples/jetrun` (an OutRun-style race: an endless road of recycled segments with curves
+and hills, `Sprite3D` palms and rival cars, the player's car turning through sprite-sheet frames, a start gate with lights,
+two buttons to steer, one script per node: game, track, player, traffic, camera, HUD; about 60 fps on the Nano), `examples/textured_boxes` (JetExamples' "textured boxes" demo, with the CC0 crate),
 `examples/first_world` (panoramic sunset sky) and `examples/neon_car` (the "Neon Motorworks"
 demo: neon workshop, OBJ car with Phong paint and chrome windows, script-driven orbiting camera,
 2D titles). The demo's car has no license and is not in the repository:
@@ -316,7 +322,7 @@ firmware configuration (`generated_board.hpp` and the board's PlatformIO environ
 | ESP32-S3-DevKitC-1 N16R8 | 16 MB flash, 8 MB octal PSRAM |
 | ESP32-S3-DevKitC-1 N8R2 | 8 MB flash, 2 MB quad PSRAM |
 | ST Nucleo-F767ZI | STM32F767, Cortex-M7 216 MHz, 512 KB RAM, 2 MB flash |
-| ST Nucleo-F746ZG | STM32F746, Cortex-M7 216 MHz, 320 KB RAM, 1 MB flash |
+| ST Nucleo-F746ZG | STM32F746, Cortex-M7 216 MHz, 320 KB RAM, 1 MB flash. **Tested** (ILI9341, software SPI on D12) |
 | ST Nucleo-F722ZE | STM32F722, Cortex-M7 216 MHz, 256 KB RAM, 512 KB flash |
 | WeAct Black Pill F411CE | STM32F411, Cortex-M4 100 MHz, 128 KB RAM, 512 KB flash: small scenes only |
 
@@ -327,12 +333,17 @@ profile (half-width interlaced fields, no z-buffer): the emulator applies to the
 It runs on a single core: every frame it updates the scene, draws a field and sends it to the
 display; flashing goes through the ST-LINK (the Nucleo's USB), and the Debug serial log comes
 from the ST-LINK virtual port (Black Pill: USB-C) into the Serial panel. Pins are the board's
-(e.g. `D13 · PA5`); SCK and MOSI must be SPI1 pins (the editor disables the others). On the
-Nucleo F746ZG/F767ZI, D11 (PA7) is connected to the Ethernet: MOSI goes on D22 (PB5).
-Memory: the RAM is the internal RAM (no PSRAM). `examples/physics_demo` (63 nodes) uses about
-360 KB while the game runs (measured on the Nano): it fits in the F767ZI; the 128–320 KB boards need smaller scenes.
+(e.g. `D13 · PA5`). SCK and MOSI on SPI1 pins use the SPI peripheral (marked `SPI1` in the
+editor). Any other pin works through software SPI, which reaches about the same speed because
+the rows are sent without DMA anyway: LovyanGFX's STM32 DMA hangs on the F7, since its SPI1
+interrupt has no handler and the DMA can't read DTCM. On the Nucleo F746ZG/F767ZI, D11 (PA7)
+is connected to the Ethernet, so MOSI goes on D22 (PB5), or on D12 through software SPI.
+Memory: the RAM is the internal RAM (no PSRAM). The firmware keeps only the scene being played
+in RAM, and identical meshes share one copy. Verified on a Nucleo-F746ZG: `examples/textured_boxes`
+runs at ~30 ms per frame, 24 of them spent sending fields at ~27 MHz. `examples/physics_demo` doesn't
+fit in its 320 KB yet, because Jet's triangle queue runs out of memory when it grows.
 The firmware takes ~425 KB of flash (Jet, runtime, VM and LovyanGFX): on the 512 KB boards
-~90 KB remain for the scene. The STM32 boards have not been tested yet: all combinations compile.
+~90 KB remain for the scene.
 
 | Display (`hardware/displays`, SPI RGB565) | Landscape resolution |
 | --- | --- |
@@ -343,7 +354,7 @@ The firmware takes ~425 KB of flash (Jet, runtime, VM and LovyanGFX): on the 512
 | ST7735S 1.8" | 160×128 |
 | Custom | controller (ILI9341, ST7789, ST7796, GC9A01, ST7735S), panel, offset, colors |
 
-All combinations compile; only Nano ESP32 + ILI9341 has been tested on hardware. ESP32-P4
+All combinations compile; Nano ESP32 + ILI9341 and Nucleo-F746ZG + ILI9341 have been tested on hardware. ESP32-P4
 boards (supported by Jet) are not available yet: the PlatformIO espressif32 7.0.1 builder
 used by Jet Studio does not know them. The ILI9488 is excluded: over SPI it only accepts 18-bit
 colors. New boards or displays are added with a JSON file in `hardware/`.
@@ -370,7 +381,7 @@ package and the project have the same actions.
   (save them to update the file).
 - `.jet`: JetScript script.
 - `*.import`: import settings of a PNG or OBJ (JSON, next to the file).
-- `.jetpack`: binary package version 13 (resolution, Input Map, every scene of the project with its 3D and 2D nodes, autoloads, materials, converted textures, imported meshes, script bytecode, exported values)
+- `.jetpack`: binary package version 14 (resolution, Input Map, every scene of the project with its 3D and 2D nodes, autoloads, materials, converted textures, imported meshes, script bytecode, exported values)
   read by the runtime. The bytecode has a version, an instruction-set fingerprint and a CRC; on
   load every operand and jump is verified. A package must be re-exported when the JetScript version changes.
 
@@ -458,7 +469,7 @@ reopening and export, the 2D nodes (dragging, picking, text), a RigidBody3D fall
 StaticBody3D, and OBJ/MTL import with import settings. The C++ tests also cover OBJ import,
 quantization, Quad/Torus, reflections, the 2D overlay, Draw Order, physics (rest, bounce, stacks,
 character on the floor, walls and slopes, moving platforms, crate pushing, areas, layers,
-disabled shapes), particles, the Input Map, scene changes, autoloads and the v13 package; `device`
+disabled shapes), particles, the Input Map, scene changes, autoloads, Sprite3D and the v14 package; `device`
 builds the runtime and Jet with the device configuration and checks fields, the row-by-row HUD
 and bands without z-buffer; `serial` tests the serial port on a pseudo-terminal. They also pass
 with AddressSanitizer/UBSan.

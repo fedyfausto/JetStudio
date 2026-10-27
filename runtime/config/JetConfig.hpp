@@ -2,7 +2,7 @@
 // One rendering profile for both the PC preview and Nano ESP32 firmware.
 // Full RGB565 output, no interlacing; optimize only after hardware measurements.
 #define JET32_WORLD_SCALE 4
-#define JET_MESH_INSTANCING 0
+#define JET_MESH_INSTANCING 1
 #define RENDER_TILE_BUFFER 0
 #define TILE_WIDTH 16
 #define TILE_HEIGHT 16

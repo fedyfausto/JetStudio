@@ -2,25 +2,26 @@ extends RefCounted
 ## .jetscene v2: a tree of node dicts with Godot's classes and conventions (metres, Y up, -Z forward, degrees, YXZ).
 
 const VERSION := 2
-const TYPES := ["Node", "Node3D", "MeshInstance3D", "Camera3D", "DirectionalLight3D", "WorldEnvironment",
-	"Label", "TextureRect", "ColorRect", "StaticBody3D", "CharacterBody3D", "RigidBody3D", "Area3D", "CollisionShape3D",
+const TYPES := ["Node", "Node3D", "MeshInstance3D", "Sprite3D", "Camera3D", "DirectionalLight3D", "WorldEnvironment",
+	"Control", "Label", "TextureRect", "ColorRect", "StaticBody3D", "CharacterBody3D", "RigidBody3D", "Area3D", "CollisionShape3D",
 	"CPUParticles3D"]
 const BASE := {"Node": "", "Node3D": "Node", "MeshInstance3D": "Node3D", "Camera3D": "Node3D",
 	"DirectionalLight3D": "Node3D", "WorldEnvironment": "Node", "Control": "Node", "Label": "Control",
 	"TextureRect": "Control", "ColorRect": "Control", "CollisionObject3D": "Node3D", "PhysicsBody3D": "CollisionObject3D",
 	"StaticBody3D": "PhysicsBody3D", "CharacterBody3D": "PhysicsBody3D", "RigidBody3D": "PhysicsBody3D",
-	"Area3D": "CollisionObject3D", "CollisionShape3D": "Node3D", "CPUParticles3D": "Node3D"}
+	"Area3D": "CollisionObject3D", "CollisionShape3D": "Node3D", "CPUParticles3D": "Node3D", "Sprite3D": "Node3D"}
 ## Base classes shown in the class tree but not instantiable.
-const ABSTRACT := ["Control", "CollisionObject3D", "PhysicsBody3D"]
+const ABSTRACT := ["CollisionObject3D", "PhysicsBody3D"]
 const BODIES := ["StaticBody3D", "CharacterBody3D", "RigidBody3D", "Area3D"]
 const DESCRIPTIONS := {
 	"Node": "Base node. Useful to organize the scene or for global logic scripts.",
 	"Node3D": "3D object with a transform (position, rotation, scale). Base of all 3D nodes.",
 	"MeshInstance3D": "Shows a primitive mesh drawn by the Jet renderer.",
+	"Sprite3D": "A PNG or one frame of a sprite sheet in the 3D world (trees, characters, cars). With Billboard it always faces the camera.",
 	"Camera3D": "The game's point of view. The 'current' camera is used in Play and on the device.",
 	"DirectionalLight3D": "Directional light (sun). Shines along its own -Z axis.",
 	"WorldEnvironment": "Background color and ambient light of the scene.",
-	"Control": "Base of the 2D nodes drawn over the 3D scene, in screen pixels (320×240).",
+	"Control": "Base of the 2D nodes drawn over the 3D scene, in screen pixels (320×240). On its own it groups a HUD: children are placed relative to it, hidden and faded with it.",
 	"Label": "Text in the runtime's bitmap font (titles, scores, HUD). Can be changed from scripts.",
 	"TextureRect": "PNG image drawn over the scene, with integer scaling and transparency.",
 	"ColorRect": "Solid or semi-transparent color rectangle (fades, bars, panels).",
@@ -259,6 +260,24 @@ const PROPERTIES := {
 		{"key": "color", "label": "Font Color", "type": "color", "default": 0xffffff},
 		{"key": "text_scale", "label": "Scale", "type": "int", "default": 1, "min": 1, "max": 8, "suffix": "×",
 			"tooltip": "Integer scaling of the characters (1 = 7×15 pixels)."},
+	],
+	"Sprite3D": [
+		{"key": "texture", "type": "texture", "default": "", "group": "Sprite",
+			"tooltip": "PNG image or sprite sheet. Transparent pixels are not drawn."},
+		{"key": "pixel_size", "label": "Pixel Size", "type": "float", "default": 0.01, "min": 0.0001, "max": 100.0, "step": 0.001, "suffix": "m",
+			"group": "Sprite", "tooltip": "Size of one texel: at 0.01 a 64 px frame is 0.64 m wide."},
+		{"key": "modulate", "type": "color", "default": 0xffffff, "group": "Sprite", "tooltip": "Color that multiplies the texture."},
+		{"key": "alpha", "label": "Opacity", "type": "float", "default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01, "group": "Sprite"},
+		{"key": "flip_h", "label": "Flip H", "type": "bool", "default": false, "group": "Sprite"},
+		{"key": "flip_v", "label": "Flip V", "type": "bool", "default": false, "group": "Sprite"},
+		{"key": "billboard", "type": "bool", "default": false, "group": "Sprite", "tooltip": "Always faces the camera (Godot's Billboard Enabled)."},
+		{"key": "texture_filter", "label": "Filter", "type": "enum", "default": "Nearest", "options": ["Nearest", "Linear"], "group": "Sprite"},
+		{"key": "draw_order", "label": "Draw Order", "type": "enum", "default": "Default", "options": ["Default", "Background", "On Top"], "group": "Sprite",
+			"tooltip": "Background: drawn first, never covers the rest. On Top: drawn over everything."},
+		{"key": "hframes", "type": "int", "default": 1, "min": 1, "max": 256, "group": "Animation", "tooltip": "Columns of the sprite sheet."},
+		{"key": "vframes", "type": "int", "default": 1, "min": 1, "max": 256, "group": "Animation", "tooltip": "Rows of the sprite sheet."},
+		{"key": "frame", "type": "int", "default": 0, "min": 0, "max": 65535, "group": "Animation",
+			"tooltip": "Frame shown, left to right then top to bottom. Scripts change it to animate."},
 	],
 	"TextureRect": [
 		{"key": "texture", "type": "texture", "default": ""},

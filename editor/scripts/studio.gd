@@ -16,7 +16,7 @@ const SerialMonitor := preload("res://scripts/serial_monitor.gd")
 const ProjectSettingsDialog := preload("res://scripts/project_settings_dialog.gd")
 const Hardware := preload("res://scripts/hardware.gd")
 const Actions := preload("res://scripts/input_map.gd")
-const VERSION := "0.2.1"
+const VERSION := "0.3.0"
 const SETTINGS := "user://editor.cfg"
 
 enum Screen { VIEW_3D, SCRIPT, GAME }
@@ -1362,6 +1362,12 @@ func _model_info(path: String) -> Dictionary:
 	return cached.info
 
 func _mesh_bounds(node: Dictionary) -> Array:
+	if str(node.type) == "Sprite3D":
+		# One frame of the texture, pixel_size metres per texel, centred like Godot's.
+		var size := Vector2(_texture_size(str(node.get("texture", ""))))
+		size = size / Vector2(maxi(1, int(node.get("hframes", 1))), maxi(1, int(node.get("vframes", 1)))) * float(node.get("pixel_size", 0.01))
+		if size == Vector2.ZERO: return []
+		return [Vector3(-size.x, -size.y, 0) * 0.5, Vector3(size.x, size.y, 0) * 0.5]
 	for part in _model_info(str(node.get("mesh_file", ""))).get("parts", []):
 		if str(part.name) == str(node.get("mesh_part", "")):
 			var box: AABB = part.aabb
@@ -1758,13 +1764,13 @@ func _file_dropped(id: int, path: String) -> void:
 				n.background_mode = "Panorama"
 			, true)
 			_status("Panorama %s set." % path.get_file())
-		"TextureRect":
+		"TextureRect", "Sprite3D":
 			_change("", true, func(): Document.find(_root_node(), id).texture = path, true)
 			_status("Texture %s applied to %s." % [path.get_file(), node.name])
 		_:
 			_status("Drag images onto a MeshInstance3D or a WorldEnvironment.")
 	_select(id)
-	if str(node.type) in ["MeshInstance3D", "WorldEnvironment", "TextureRect"]: _offer_compression([path])
+	if str(node.type) in ["MeshInstance3D", "WorldEnvironment", "TextureRect", "Sprite3D"]: _offer_compression([path])
 
 ## A Node3D with one MeshInstance3D per OBJ part and the MTL materials, like Godot's imported scenes.
 func _instantiate_model(parent_id: int, path: String, at: Variant = null) -> void:
@@ -2526,7 +2532,7 @@ func _run_smoke() -> void:
 	var pack_path := _root_dir().path_join(".cache/tests/smoke.jetpack")
 	_check(_export_to(pack_path), "export .jetpack")
 	var bytes := FileAccess.get_file_as_bytes(pack_path)
-	_check(bytes.size() > 100 and bytes.slice(0, 5) == PackedByteArray([74, 69, 84, 80, 13]), "package header JETP v13")
+	_check(bytes.size() > 100 and bytes.slice(0, 5) == PackedByteArray([74, 69, 84, 80, 14]), "package header JETP v14")
 	# 2D nodes
 	_add_node("ColorRect", int(_root_node().id))
 	var rect_id: int = _tab().selected
@@ -2539,6 +2545,22 @@ func _run_smoke() -> void:
 	var label_frame := _frame()
 	_property_edited("text", "SCORE 10", true)
 	_check(_frame() != label_frame, "Label text renders over the scene")
+	var label_id: int = _tab().selected
+	var label_item := scene_dock.tree.get_selected()
+	_check(label_item != null and label_item.get_button_by_id(0, SceneDock.BUTTON_VISIBLE) >= 0, "Control nodes have the visibility toggle in the Scene tree")
+	var shown_frame := _frame()
+	_toggle_visibility(label_id)
+	_check(_frame() != shown_frame and not Document.find(_root_node(), label_id).visible, "hiding a Label from the Scene tree removes it from the view")
+	_toggle_visibility(label_id)
+	_add_node("Control", int(_root_node().id))
+	var group_id: int = _tab().selected
+	_property_edited("position", [0.0, 120.0], true)
+	_add_node("Label", group_id)
+	_property_edited("text", "GROUPED", true)
+	var grouped := _frame()
+	_toggle_visibility(group_id)
+	_check(_frame() != grouped, "a plain Control groups 2D nodes: hiding it hides its children")
+	_toggle_visibility(group_id)
 	# Physics
 	_add_node("StaticBody3D", int(_root_node().id))
 	var floor_id: int = _tab().selected
@@ -2634,6 +2656,18 @@ func _run_smoke() -> void:
 	_check(_export_to(big_pack) and _fits_board(big_pack, "build"), "after compression the package fits the board")
 	_undo()
 	_undo()
+	# Sprite3D
+	var before_sprite := _frame()
+	var sprite_id := Document.next_id(_root_node())
+	_change("", true, func():
+		var sprite := Document.new_node("Sprite3D", sprite_id, "Sign")
+		sprite.texture = "res://models/decal.png"
+		sprite.position = [0.0, 1.5, 0.0]
+		sprite.pixel_size = 0.05
+		Document.children(_root_node()).append(sprite))
+	_check(_frame() != before_sprite and _missing_assets(_tab().doc).is_empty()
+		and _mesh_bounds(Document.find(_root_node(), sprite_id)).size() == 2, "Sprite3D draws its texture and has selection bounds")
+	_undo()
 	# Hardware
 	_check(Hardware.boards.has("nano_esp32") and Hardware.displays.has("st7796_320x480"), "hardware profiles are loaded")
 	project.config.hardware = {"board": "esp32s3_devkitc_n8r8", "display": "st7796_320x480", "orientation": "landscape"}
@@ -2671,12 +2705,13 @@ func _run_smoke() -> void:
 	_apply_hardware()
 	# STM32 boards
 	var stm32 := Hardware.settings({"hardware": {"board": "nucleo_f767zi"}})
-	var wrong_sck := Hardware.settings({"hardware": {"board": "nucleo_f767zi", "pins": {"sck": 0x5F}}}) # D2 · PF15
+	var wrong_sck := Hardware.settings({"hardware": {"board": "nucleo_f767zi", "pins": {"sck": 0x5F}}}) # D2 · PF15, no SPI
 	var stm32_ok := true
 	for id in Hardware.boards:
 		if Hardware.platform({"board": id}) == "stm32": stm32_ok = stm32_ok and Hardware.problems(Hardware.settings({"hardware": {"board": id}})).is_empty()
 	_check(Hardware.platform(stm32) == "stm32" and Hardware.pin_label(stm32, 0x05) == "D13 · PA5" and stm32_ok
-		and Hardware.problems(wrong_sck).size() == 1 and "SPI1" in Hardware.problems(wrong_sck)[0], "STM32 boards: pin labels and SPI pins")
+		and Hardware.problems(wrong_sck).is_empty() and Hardware.software_spi(wrong_sck) and not Hardware.software_spi(stm32),
+		"STM32 boards: pin labels, SPI pins and software SPI elsewhere")
 	project.config.erase("hardware")
 	_apply_hardware()
 	_check(_frame().size() == 320 * 240 * 3, "default hardware is 320x240 again")

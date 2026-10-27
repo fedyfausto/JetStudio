@@ -1,0 +1,30 @@
+extends Sprite3D
+
+# Traffic: drives at its own pace and comes back far ahead once the camera passes it.
+const HEIGHT := 0.75
+
+var s := 0.0
+var x := 0.0
+var speed := 0.0
+
+@onready var track = $"../../Track"
+@onready var camera = $"../../Camera3D"
+
+
+func _ready() -> void:
+	# Placed in the editor on the straight road, where -z is the distance along it.
+	s = -position.z
+	x = position.x
+	speed = randf_range(20.0, 30.0)
+
+
+func _process(delta: float) -> void:
+	s += speed * delta
+	var view: float = camera.eye.x
+	if s < view - 6.0 or s > view + 400.0:
+		s = view + randf_range(135.0, 205.0)
+		x = [-3.3, 0.0, 3.3].pick_random() + randf_range(-0.4, 0.4)
+		speed = randf_range(20.0, 30.0)
+	visible = track.is_built(s)
+	if visible:
+		position = track.point(s, x, HEIGHT)

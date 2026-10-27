@@ -273,7 +273,7 @@ func focus_selection() -> void:
 	if node.is_empty() or not Document.is_3d(str(node.type)): return
 	var t := Document.global_transform(root, selected)
 	var radius := 1.0
-	if str(node.type) == "MeshInstance3D":
+	if str(node.type) in ["MeshInstance3D", "Sprite3D"]:
 		var bounds := _bounds_of(node)
 		radius = maxf((t.basis * (bounds[1] - bounds[0])).length() * 0.5, 0.3)
 		t.origin = t * ((bounds[0] + bounds[1]) * 0.5)
@@ -412,7 +412,7 @@ func _draw_overlay() -> void:
 		return
 	if node.is_empty() or not Document.is_3d(str(node.type)) or preview_camera: return
 	var global := Document.global_transform(root, selected)
-	if str(node.type) == "MeshInstance3D":
+	if str(node.type) in ["MeshInstance3D", "Sprite3D"]:
 		var bounds := _bounds_of(node)
 		_draw_box(global, bounds[0], bounds[1], Color("ffb35c"))
 	if playing: return
@@ -424,7 +424,7 @@ func _draw_overlay() -> void:
 
 func _bounds_of(node: Dictionary) -> Array:
 	var mesh := str(node.get("mesh", "Box"))
-	if mesh == "File":
+	if mesh == "File" or str(node.type) == "Sprite3D":
 		var bounds: Array = mesh_bounds.call(node) if mesh_bounds.is_valid() else []
 		return bounds if not bounds.is_empty() else [Vector3(-0.1, -0.1, -0.1), Vector3(0.1, 0.1, 0.1)]
 	return Document.MESH_BOUNDS.get(mesh, Document.MESH_BOUNDS.Box)

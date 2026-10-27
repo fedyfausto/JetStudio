@@ -151,10 +151,14 @@ const char* node_type_name(NodeType type) {
     case NodeType::Area3D: return "Area3D";
     case NodeType::CollisionShape3D: return "CollisionShape3D";
     case NodeType::CPUParticles3D: return "CPUParticles3D";
+    case NodeType::Sprite3D: return "Sprite3D";
+    case NodeType::Control: return "Control";
     }
     return "Node";
 }
-bool is_control(NodeType type) { return type == NodeType::Label || type == NodeType::TextureRect || type == NodeType::ColorRect; }
+bool is_control(NodeType type) {
+    return type == NodeType::Control || type == NodeType::Label || type == NodeType::TextureRect || type == NodeType::ColorRect;
+}
 bool is_node3d(NodeType type) { return type != NodeType::Node && type != NodeType::WorldEnvironment && !is_control(type); }
 uint16_t rgb565(uint32_t c) { return uint16_t(((c >> 19) & 31) << 11 | ((c >> 10) & 63) << 5 | ((c >> 3) & 31)); }
 
@@ -220,7 +224,7 @@ bool validate(const Description& d, std::string& error) {
             if (!n.id || n.id >= AutoloadIdBase || !ids.insert(n.id).second) return fail("Duplicate or null node identifier.");
             if (!valid_name(n.name)) return fail("Invalid node name: \"" + n.name + "\" (1..80 characters, without . : @ / \" %).");
             if (!siblings.insert(std::to_string(n.parent) + "/" + n.name).second) return fail("Two sibling nodes have the same name: " + n.name);
-            if (uint8_t(n.type) > uint8_t(NodeType::CPUParticles3D)) return fail("Unsupported node type.");
+            if (uint8_t(n.type) > uint8_t(NodeType::Control)) return fail("Unsupported node type.");
             if (n.type == NodeType::CPUParticles3D) {
                 const float values[] = {n.lifetime, n.lifetime_randomness, n.explosiveness, n.spread, n.velocity_min, n.velocity_max,
                                         n.damping_min, n.damping_max, n.emission_radius};
@@ -268,6 +272,13 @@ bool validate(const Description& d, std::string& error) {
                     || !uv_ok || !std::isfinite(n.alpha)
                     || n.alpha < 0 || n.alpha > 1 || !std::isfinite(n.specular) || n.specular < 0 || n.specular > 1)
                     return fail("Invalid material in " + n.name + ".");
+            }
+            if (n.type == NodeType::Sprite3D) {
+                if (++meshes > MaxMeshes) return fail("At most 128 meshes per scene.");
+                if (!texture_ok(n.texture) || n.hframes < 1 || n.vframes < 1 || n.hframes > 256 || n.vframes > 256
+                    || n.frame >= n.hframes * n.vframes || !std::isfinite(n.pixel_size) || n.pixel_size <= 0 || n.pixel_size > 100
+                    || n.color > 0xffffff || !std::isfinite(n.alpha) || n.alpha < 0 || n.alpha > 1
+                    || uint8_t(n.draw_order) > uint8_t(DrawOrder::OnTop)) return fail("Invalid sprite in " + n.name + ".");
             }
             if (n.type == NodeType::Camera3D && (!std::isfinite(n.fov) || n.fov < 1 || n.fov > 179 || !std::isfinite(n.near)
                 || !std::isfinite(n.far) || n.near < 0.001f || n.far <= n.near || n.far > 10000)) return fail("Invalid camera in " + n.name + ".");
@@ -330,17 +341,19 @@ Runtime::~Runtime() {
     scene_.getObjects().clear();
 }
 
-bool Runtime::load(const Description& d, std::string& error) {
+bool Runtime::load(Description d, std::string& error) {
     if (!validate(d, error)) return false;
+    pack_ = nullptr;
+    pack_size_ = 0;
     playing_ = false;
     editor_view_ = true;
     vm_->clear();
     vm_->take_errors();
-    description_ = d;
+    description_ = std::move(d);
     scene_nodes_ = &description_.nodes;
     current_scene_ = description_.path;
     pending_scene_.clear();
-    resize(d.width, d.height);
+    resize(description_.width, description_.height);
     return build(error);
 }
 
@@ -349,11 +362,71 @@ int Runtime::index_of(uint32_t id) const {
     return found == index_.end() ? -1 : found->second;
 }
 
+namespace {
+// The frame of a Sprite3D sheet as a UV window; a flip runs the window backwards.
+void sprite_uv(NodeDesc& d) {
+    const float w = 1.0f / float(d.hframes), h = 1.0f / float(d.vframes);
+    const int col = d.frame % d.hframes, row = d.frame / d.hframes;
+    d.uv_scale[0] = d.flip_h ? -w : w;
+    d.uv_scale[1] = d.flip_v ? -h : h;
+    d.uv_offset[0] = float(d.flip_h ? col + 1 : col) * w;
+    d.uv_offset[1] = float(d.flip_v ? row + 1 : row) * h;
+}
+} // namespace
+
+// Jet's primitives are symmetric under the Z mirror, so they're used as is and keep Jet's winding and UV layout.
+Renderer::Object* Runtime::make_mesh(const NodeDesc& d, Renderer::Material* material) const {
+    switch (d.shape) {
+    case Shape::Box: return Primitives::createCube(100, 100, 100, material);
+    case Shape::Sphere: return Primitives::createSphere(50, d.segments, material);
+    case Shape::Plane: return Primitives::createPlane(200, 200, material);
+    case Shape::Pyramid: {
+        Renderer::Object* mesh = Primitives::createPyramid(100, 100, material);
+        for (auto& vertex : mesh->vertices) vertex.position.y -= 50; // pivot at the centre
+        // Jet's pyramid is wound inwards, flip it so it culls like the others.
+        for (auto& t : mesh->triangles) std::swap(t.v2, t.v3);
+        return mesh;
+    }
+    case Shape::Cylinder: return cylinder(d.segments, material);
+    case Shape::Capsule: return capsule(d.segments, material);
+    case Shape::Quad: return quad(material);
+    case Shape::Torus: return torus(d.segments, material);
+    case Shape::Mesh: break;
+    }
+    const auto& asset = description_.meshes[size_t(d.mesh)];
+    return make_object(asset.vertices, asset.indices, material);
+}
+
+bool Runtime::load_pack(const uint8_t* data, size_t size, std::string& error) {
+    Description d;
+    if (!decode_pack(data, size, d, error) || !load(std::move(d), error)) return false;
+    pack_ = data;
+    pack_size_ = size;
+    // Every scene was validated while decoding; the built one now lives in nodes_.
+    std::vector<NodeDesc>().swap(description_.nodes);
+    for (auto& scene : description_.scenes) std::vector<NodeDesc>().swap(scene.nodes);
+    return true;
+}
+
+// The nodes of a scene, from the description or read again from the package.
+const std::vector<NodeDesc>* Runtime::nodes_of(std::string_view path) {
+    const std::vector<NodeDesc>* nodes = nullptr;
+    uint32_t offset = 0;
+    if (path == description_.path) { nodes = &description_.nodes; offset = description_.nodes_offset; }
+    for (const auto& scene : description_.scenes)
+        if (scene.path == path) { nodes = &scene.nodes; offset = scene.offset; }
+    if (!nodes || !pack_ || !nodes->empty()) return nodes;
+    std::string error;
+    if (!decode_nodes(pack_, pack_size_, offset, pack_nodes_, error)) return nullptr;
+    return &pack_nodes_;
+}
+
 bool Runtime::build(std::string& error) {
     error.clear();
     // The scene only borrows the objects, so drop its pointers first.
     scene_.getObjects().clear();
     objects_.clear();
+    shared_meshes_.clear();
     materials_.clear();
     textures_.clear();
     nodes_.clear();
@@ -362,6 +435,9 @@ bool Runtime::build(std::string& error) {
     pending_free_ = false;
     if (!scene_nodes_) scene_nodes_ = &description_.nodes;
     const auto& scene_nodes = *scene_nodes_;
+    // Exact capacity: a push_back past it would double the array, and a Live is ~850 bytes on the device.
+    std::vector<Live>().swap(nodes_);
+    nodes_.reserve(scene_nodes.size() + description_.autoloads.size());
     nodes_.resize(scene_nodes.size());
     for (size_t i = 0; i < nodes_.size(); ++i) {
         Live& n = nodes_[i];
@@ -369,32 +445,23 @@ bool Runtime::build(std::string& error) {
         n.parent = n.d.parent;
         if (n.parent >= 0) nodes_[n.parent].children.push_back(int32_t(i));
         index_[n.d.id] = int32_t(i);
-        if (n.d.type != NodeType::MeshInstance3D || (n.d.shape == Shape::Mesh && n.d.mesh < 0)) continue;
+        if (n.d.type == NodeType::Sprite3D) {
+            // A quad, unlit and double-sided like Godot's Sprite3D, the frame picked through the UVs.
+            n.d.shape = Shape::Quad;
+            n.d.shading = Shading::Unlit;
+            n.d.cull = CullMode::Disabled;
+            n.d.repeat = false;
+            n.d.perspective = true;
+            n.d.reflection = false;
+            sprite_uv(n.d);
+        } else if (n.d.type != NodeType::MeshInstance3D || (n.d.shape == Shape::Mesh && n.d.mesh < 0)) {
+            continue;
+        }
         auto material = std::make_unique<Renderer::Material>(rgb565(n.d.color));
-        Renderer::Object* mesh = nullptr;
-        // Jet's primitives are symmetric under the Z mirror, so they're used as is and keep Jet's winding and UV layout.
-        switch (n.d.shape) {
-        case Shape::Box: mesh = Primitives::createCube(100, 100, 100, material.get()); break;
-        case Shape::Sphere: mesh = Primitives::createSphere(50, n.d.segments, material.get()); break;
-        case Shape::Plane: mesh = Primitives::createPlane(200, 200, material.get()); break;
-        case Shape::Pyramid:
-            mesh = Primitives::createPyramid(100, 100, material.get());
-            for (auto& vertex : mesh->vertices) vertex.position.y -= 50; // pivot at the centre
-            // Jet's pyramid is wound inwards, flip it so it culls like the others.
-            for (auto& t : mesh->triangles) std::swap(t.v2, t.v3);
-            break;
-        case Shape::Cylinder: mesh = cylinder(n.d.segments, material.get()); break;
-        case Shape::Capsule: mesh = capsule(n.d.segments, material.get()); break;
-        case Shape::Quad: mesh = quad(material.get()); break;
-        case Shape::Torus: mesh = torus(n.d.segments, material.get()); break;
-        case Shape::Mesh: {
-            const auto& asset = description_.meshes[size_t(n.d.mesh)];
-            mesh = make_object(asset.vertices, asset.indices, material.get());
-            break;
-        }
-        }
+        // Reflections rewrite their UVs every frame, so they always keep geometry of their own.
+        // The others get their shared copy at the first bake, once the world scale is known.
+        Renderer::Object* mesh = n.d.reflection ? make_mesh(n.d, material.get()) : new Renderer::Object();
         mesh->calculateBoundingBox();
-        n.base_vertices.clear(); // empty: vertices are still the unscaled geometry
         n.baked_scale = {0, 0, 0}; // forces the first bake
         n.object = mesh;
         n.material = material.get();
@@ -426,6 +493,10 @@ bool Runtime::build(std::string& error) {
         index_[a.d.id] = int32_t(nodes_.size());
         nodes_.push_back(std::move(a));
     }
+    if (scene_nodes_ == &pack_nodes_) {
+        std::vector<NodeDesc>().swap(pack_nodes_);
+        scene_nodes_ = nullptr;
+    }
 
     // Each shape belongs to the nearest body or area above it. The hierarchy can't change while playing.
     shape_owners_.clear();
@@ -449,27 +520,10 @@ bool Runtime::build(std::string& error) {
     return true;
 }
 
-void Runtime::bake(Live& n, Vec3 s) {
-    // Scale is baked into the vertices so Jet's bounds match the drawn shape. Normals take the inverse scale.
-    // Unit scale and default UVs keep no base copy (empty base_vertices): one copy less per mesh matters on the device.
-    auto& vertices = n.object->vertices;
-    if (n.base_vertices.empty()) n.base_vertices = vertices;
-    else vertices = n.base_vertices;
-    const float* us = n.d.uv_scale;
-    const float* uo = n.d.uv_offset;
-    auto radius = [&]() {
-        float r2 = 0;
-        for (const auto& v : vertices)
-            r2 = std::max(r2, float(v.position.x) * v.position.x + float(v.position.y) * v.position.y + float(v.position.z) * v.position.z);
-        n.jet_radius = std::sqrt(r2);
-    };
-    if (same(s, {1, 1, 1}) && us[0] == 1 && us[1] == 1 && uo[0] == 0 && uo[1] == 0) {
-        std::vector<Renderer::Object::Vertex>().swap(n.base_vertices);
-        n.object->calculateBoundingBox();
-        n.baked_scale = s;
-        radius();
-        return;
-    }
+namespace {
+// Scale and UV transform baked into the vertices, so Jet's bounds match the drawn shape. Normals take the inverse scale.
+void bake_vertices(std::vector<Renderer::Object::Vertex>& vertices, Vec3 s, const float* us, const float* uo) {
+    if (same(s, {1, 1, 1}) && us[0] == 1 && us[1] == 1 && uo[0] == 0 && uo[1] == 0) return;
     for (auto& vertex : vertices) {
         vertex.uv.x = int32_t(std::lround(vertex.uv.x * us[0] + uo[0] * FIXED_POINT_SCALE));
         vertex.uv.y = int32_t(std::lround(vertex.uv.y * us[1] + uo[1] * FIXED_POINT_SCALE));
@@ -481,9 +535,67 @@ void Runtime::bake(Live& n, Vec3 s) {
         const double length = std::sqrt(nx * nx + ny * ny + nz * nz);
         if (length > 0) normal = {int32_t(nx / length * FIXED_POINT_SCALE), int32_t(ny / length * FIXED_POINT_SCALE), int32_t(nz / length * FIXED_POINT_SCALE)};
     }
+}
+
+float radius_of(const std::vector<Renderer::Object::Vertex>& vertices) {
+    float r2 = 0;
+    for (const auto& v : vertices)
+        r2 = std::max(r2, float(v.position.x) * v.position.x + float(v.position.y) * v.position.y + float(v.position.z) * v.position.z);
+    return std::sqrt(r2);
+}
+} // namespace
+
+// Nodes with the same mesh, world scale and UVs draw one shared copy, like MeshInstance3Ds that share a Godot Mesh.
+// Each keeps its own Jet object for the transform and the material, with the copy as its only instance.
+void Runtime::share(Live& n, Vec3 s) {
+    const auto q = [](float v) { return int32_t(std::lround(v * 10000)); };
+    const NodeDesc& d = n.d;
+    const bool segmented = d.shape == Shape::Sphere || d.shape == Shape::Cylinder || d.shape == Shape::Capsule || d.shape == Shape::Torus;
+    // Front-face culling is a reversed winding (see apply_material), so it is part of the copy.
+    const bool flip = d.cull == CullMode::Front;
+    const std::array<int32_t, 11> key{int32_t(d.shape), segmented ? int32_t(d.segments) : 0, d.shape == Shape::Mesh ? d.mesh : -1,
+        q(s.x), q(s.y), q(s.z), q(d.uv_scale[0]), q(d.uv_scale[1]), q(d.uv_offset[0]), q(d.uv_offset[1]), flip};
+    auto& slot = shared_meshes_[key];
+    Renderer::Object::SharedMesh mesh = slot.lock();
+    if (!mesh) {
+        std::unique_ptr<Renderer::Object> geometry(make_mesh(d, &shared_material_));
+        bake_vertices(geometry->vertices, s, d.uv_scale, d.uv_offset);
+        if (flip) for (auto& t : geometry->triangles) std::swap(t.v2, t.v3);
+        mesh = Renderer::Object::freezeMesh(std::move(*geometry));
+        slot = mesh;
+    }
+    n.object->addInstance(mesh, {}, n.material);
     n.object->calculateBoundingBox();
+    n.flipped = flip;
     n.baked_scale = s;
-    radius();
+    n.jet_radius = radius_of(mesh->vertices);
+}
+
+void Runtime::bake(Live& n, Vec3 s) {
+    auto& object = *n.object;
+    const bool first = same(n.baked_scale, {0, 0, 0});
+    if (first && object.vertices.empty()) {
+        share(n, s);
+        return;
+    }
+    // A script changed the scale or the UVs: the node leaves its shared copy for geometry of its own.
+    // That geometry stays unscaled in base_vertices for the next changes; most meshes never get here.
+    if (!object.instances.empty()) {
+        object.instances.clear();
+        std::unique_ptr<Renderer::Object> fresh(make_mesh(n.d, n.material));
+        object.triangles = std::move(fresh->triangles);
+        if (n.d.cull == CullMode::Front) for (auto& t : object.triangles) std::swap(t.v2, t.v3);
+        n.flipped = n.d.cull == CullMode::Front;
+        n.base_vertices = std::move(fresh->vertices);
+    } else if (n.base_vertices.empty() && !first) {
+        std::unique_ptr<Renderer::Object> fresh(make_mesh(n.d, n.material));
+        n.base_vertices = std::move(fresh->vertices);
+    }
+    if (!n.base_vertices.empty()) object.vertices = n.base_vertices;
+    bake_vertices(object.vertices, s, n.d.uv_scale, n.d.uv_offset);
+    object.calculateBoundingBox();
+    n.baked_scale = s;
+    n.jet_radius = radius_of(object.vertices);
 }
 
 namespace {
@@ -551,8 +663,9 @@ void Runtime::apply_material(Live& n) {
     }
     auto& o = *n.object;
     // Jet's CULL_FRONTFACES draws nothing, so front culling is a reversed winding plus back-face culling.
+    // A node drawing a shared copy has no triangles yet: share() picks a copy with the right winding.
     const bool flip = d.cull == CullMode::Front;
-    if (flip != n.flipped) {
+    if (flip != n.flipped && !o.triangles.empty()) {
         for (auto& t : o.triangles) std::swap(t.v2, t.v3);
         n.flipped = flip;
     }
@@ -567,6 +680,7 @@ void Runtime::apply_material(Live& n) {
 }
 
 void Runtime::sync_object(Live& n) {
+    if (n.d.type == NodeType::Sprite3D) sprite_uv(n.d); // a script may have changed frame or flips
     if (n.synced && n.synced_visible == n.world_visible && n.synced_world == n.world && same_material(n.d, n.applied)
         && same_uv(n.d, n.applied)) return; // nothing changed since the last frame
     n.synced = true;
@@ -574,7 +688,17 @@ void Runtime::sync_object(Live& n) {
     n.synced_visible = n.world_visible;
     Vec3 scale;
     const Basis rotation = n.world.basis.orthonormalized(&scale);
-    if (!same(scale, n.baked_scale) || n.object->vertices.empty() || !same_uv(n.d, n.applied)) {
+    bool shown = n.world_visible;
+    if (n.d.type == NodeType::Sprite3D) {
+        // The quad takes the size of one frame, pixel_size metres per texel; no texture, nothing drawn.
+        shown = shown && n.d.texture >= 0;
+        if (n.d.texture >= 0) {
+            const auto& t = description_.textures[size_t(n.d.texture)];
+            scale.x *= float(t.width) / float(n.d.hframes) * n.d.pixel_size;
+            scale.y *= float(t.height) / float(n.d.vframes) * n.d.pixel_size;
+        }
+    }
+    if (!same(scale, n.baked_scale) || (n.object->vertices.empty() && n.object->instances.empty()) || !same_uv(n.d, n.applied)) {
         n.applied.uv_scale[0] = n.d.uv_scale[0]; n.applied.uv_scale[1] = n.d.uv_scale[1];
         n.applied.uv_offset[0] = n.d.uv_offset[0]; n.applied.uv_offset[1] = n.d.uv_offset[1];
         bake(n, scale);
@@ -583,7 +707,7 @@ void Runtime::sync_object(Live& n) {
     const Vec3 e = rotation.mirrored_z().euler_zyx();
     n.object->setRotation(degrees_int(e.x), degrees_int(e.y), degrees_int(e.z));
     n.object->setPosition(to_jet(n.world.origin));
-    n.object->enabled = n.world_visible;
+    n.object->enabled = shown;
 }
 
 // Physics ticks pass sync = false: world transforms only, the Jet objects are synced later.
@@ -731,13 +855,14 @@ bool Runtime::start(std::vector<ScriptDiagnostic>& errors) {
     playing_ = false;
     vm_->clear();
     vm_->take_errors();
-    scene_nodes_ = &description_.nodes;
+    scene_nodes_ = nodes_of(description_.path);
     current_scene_ = description_.path;
     pending_scene_.clear();
     build(error);
     // Compile every scene's scripts now, so errors show up at Play.
     std::vector<std::shared_ptr<const jetscript::Script>> compiled(description_.scripts.size());
-    std::vector<bool> used(description_.scripts.size());
+    // A package keeps only the scripts its scenes and autoloads use.
+    std::vector<bool> used(description_.scripts.size(), pack_ != nullptr);
     for (const auto& a : description_.autoloads) used[size_t(a.script)] = true;
     for (const auto& n : description_.nodes) if (n.script >= 0) used[n.script] = true;
     for (const auto& scene : description_.scenes)
@@ -831,9 +956,7 @@ bool Runtime::change_scene(std::string_view path) {
 void Runtime::switch_scene() {
     const std::string path = std::move(pending_scene_);
     pending_scene_.clear();
-    const std::vector<NodeDesc>* target = path == description_.path ? &description_.nodes : nullptr;
-    for (const auto& scene : description_.scenes)
-        if (scene.path == path) target = &scene.nodes;
+    const std::vector<NodeDesc>* target = nodes_of(path);
     if (!target) return;
     for (const auto& n : nodes_)
         if (n.d.id < AutoloadIdBase && vm_->has_instance(n.d.id)) vm_->detach(n.d.id);
@@ -850,7 +973,7 @@ void Runtime::stop() {
     playing_ = false;
     vm_->clear();
     flush_script_errors();
-    scene_nodes_ = &description_.nodes;
+    scene_nodes_ = nodes_of(description_.path);
     current_scene_ = description_.path;
     pending_scene_.clear();
     compiled_.clear();
@@ -1011,7 +1134,11 @@ int glyph_index(uint32_t code) {
 void Runtime::prepare_overlay() {
     overlay_.clear();
     for (const auto& n : nodes_) {
-        if (!is_control(n.d.type) || !n.world_visible || n.d.alpha <= 0) continue;
+        if (!is_control(n.d.type) || n.d.type == NodeType::Control || !n.world_visible) continue;
+        // Opacity is inherited from the parent Controls, like Godot's modulate.
+        float alpha = std::clamp(n.d.alpha, 0.0f, 1.0f);
+        for (int p = n.parent; p >= 0 && is_control(nodes_[p].d.type); p = nodes_[p].parent) alpha *= std::clamp(nodes_[p].d.alpha, 0.0f, 1.0f);
+        if (alpha <= 0) continue;
         const auto& d = n.d;
         OverlayItem item;
         item.type = d.type;
@@ -1019,7 +1146,7 @@ void Runtime::prepare_overlay() {
         item.y = int(std::lround(n.world.origin.y));
         item.color = rgb565(d.color);
         item.tint = d.color;
-        item.alpha = uint8_t(std::lround(std::clamp(d.alpha, 0.0f, 1.0f) * 255));
+        item.alpha = uint8_t(std::lround(alpha * 255));
         item.scale = uint8_t(std::max<int>(1, d.text_scale));
         if (d.type == NodeType::ColorRect) {
             item.w = int(std::lround(d.size.x));
@@ -1111,7 +1238,7 @@ void Runtime::draw_overlay() {
 int Runtime::pick_overlay(int x, int y) const {
     for (auto it = nodes_.rbegin(); it != nodes_.rend(); ++it) {
         const auto& d = it->d;
-        if (!is_control(d.type) || !it->world_visible) continue;
+        if (!is_control(d.type) || d.type == NodeType::Control || !it->world_visible) continue;
         int w = int(d.size.x), h = int(d.size.y);
         if (d.type == NodeType::Label) {
             int lines = 1, longest = 0, current = 0;

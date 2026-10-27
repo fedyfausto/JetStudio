@@ -1,0 +1,88 @@
+{
+	"name": "JetRun",
+	"main_scene": "res://main.jetscene",
+	"target": "device",
+	"profile": "debug",
+	"boot_splash": true,
+	"autoload": [],
+	"hardware": {
+		"board": "nano_esp32",
+		"display": "ili9341_240x320",
+		"orientation": "landscape",
+		"pins": {
+			"backlight": -1.0,
+			"cs": 21.0,
+			"dc": 9.0,
+			"mosi": 38.0,
+			"reset": 12.0,
+			"sck": 48.0
+		},
+		"spi_hz": 40000000.0
+	},
+	"input_map": [
+		{
+			"name": "ui_left",
+			"keys": [
+				"Left",
+				"A"
+			],
+			"pin": -1
+		},
+		{
+			"name": "ui_right",
+			"keys": [
+				"Right",
+				"D"
+			],
+			"pin": -1
+		},
+		{
+			"name": "ui_up",
+			"keys": [
+				"Up",
+				"W"
+			],
+			"pin": -1
+		},
+		{
+			"name": "ui_down",
+			"keys": [
+				"Down",
+				"S"
+			],
+			"pin": -1
+		},
+		{
+			"name": "ui_accept",
+			"keys": [
+				"Space",
+				"Enter"
+			],
+			"pin": -1
+		},
+		{
+			"name": "ui_cancel",
+			"keys": [
+				"Escape",
+				"Backspace"
+			],
+			"pin": -1
+		},
+		{
+			"name": "steer_left",
+			"keys": [
+				"Left",
+				"A"
+			],
+			"pin": 18
+		},
+		{
+			"name": "steer_right",
+			"keys": [
+				"Right",
+				"D"
+			],
+			"pin": 10
+		}
+	]
+}

@@ -1,0 +1,38 @@
+extends Node3D
+
+# Three red lamps light up one a second, then all of them turn green.
+const OFF := Color(0.22, 0.04, 0.04)
+const RED := Color(1.0, 0.12, 0.08)
+const GREEN := Color(0.2, 1.0, 0.3)
+
+var s := 0.0
+
+@onready var track = $"../Track"
+@onready var lamps: Array = [$Lamp1, $Lamp2, $Lamp3]
+
+
+func _process(_delta: float) -> void:
+	if not visible:
+		return
+	# Left behind: the road under the gate has been recycled.
+	if not track.is_built(s):
+		hide()
+		return
+	position = track.point(s, 0.0)
+	rotation_degrees = Vector3(0.0, track.yaw_at(s), 0.0)
+
+
+func place(at: float) -> void:
+	s = at
+	light(0)
+	show()
+
+
+func light(count: int) -> void:
+	for i in range(lamps.size()):
+		lamps[i].color = RED if i < count else OFF
+
+
+func go() -> void:
+	for lamp in lamps:
+		lamp.color = GREEN

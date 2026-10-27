@@ -94,11 +94,10 @@ int main(int argc, char** argv) {
     std::ifstream file(argv[1], std::ios::binary);
     if (!file) { std::cerr << "Cannot open the scene.\n"; return 2; }
     const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)), {});
-    jetstudio::Description description;
+    // Like the firmware: the package stays loaded and scenes are decoded when entered.
     std::string error;
-    if (!jetstudio::decode_pack(bytes.data(), bytes.size(), description, error)) { std::cerr << error << '\n'; return 2; }
     jetstudio::Runtime runtime;
-    if (!runtime.load(description, error)) { std::cerr << error << '\n'; return 2; }
+    if (!runtime.load_pack(bytes.data(), bytes.size(), error)) { std::cerr << error << '\n'; return 2; }
     std::vector<jetstudio::ScriptDiagnostic> diagnostics;
     if (!runtime.start(diagnostics)) {
         for (const auto& d : diagnostics) std::cerr << d.path << ':' << d.line << ':' << d.column << ": " << d.message << '\n';

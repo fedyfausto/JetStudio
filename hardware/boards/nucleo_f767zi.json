@@ -19,6 +19,14 @@
   },
   "pins": [
     [
+      "D0 · PG9",
+      105
+    ],
+    [
+      "D1 · PG14",
+      110
+    ],
+    [
       "D2 · PF15",
       95
     ],
@@ -53,6 +61,10 @@
     [
       "D10 · PD14",
       62
+    ],
+    [
+      "D12 · PA6",
+      6
     ],
     [
       "D13 · PA5",
@@ -117,5 +129,5 @@
   },
   "upload": "stlink",
   "verified": false,
-  "notes": "Display on SPI1: SCK D13 (PA5) or D23 (PB3), MOSI D22 (PB5): D11 (PA7) is wired to Ethernet. Flash and log through the ST-LINK USB port."
+  "notes": "Display on SPI1: SCK D13 (PA5) or D23 (PB3), MOSI D22 (PB5): D11 (PA7) is wired to Ethernet. Other pins, such as D12, work as software SPI, about as fast. Flash and log through the ST-LINK USB port."
 }

@@ -3,7 +3,7 @@
 // Half-width interlaced fields, no z-buffer (depth-sorted triangles and draw bands), FAST_Z, nearest sampling, no picking.
 // Derived from runtime/config/JetConfig.hpp (editor and desktop player), keep the two in sync.
 #define JET32_WORLD_SCALE 4
-#define JET_MESH_INSTANCING 0
+#define JET_MESH_INSTANCING 1
 #define RENDER_TILE_BUFFER 0
 #define TILE_WIDTH 16
 #define TILE_HEIGHT 16

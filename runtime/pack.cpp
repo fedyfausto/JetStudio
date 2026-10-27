@@ -6,7 +6,7 @@
 // Scripts travel as bytecode so devices only need the VM. Everything is validated again after decoding.
 namespace jetstudio {
 namespace {
-constexpr uint32_t Magic = 0x5054454a, Version = 13;
+constexpr uint32_t Magic = 0x5054454a, Version = 14;
 
 struct Writer {
     std::vector<uint8_t> out;
@@ -166,6 +166,7 @@ std::vector<uint8_t> encode_pack(const Description& d, std::string& error) {
             w.f32(n.velocity_min); w.f32(n.velocity_max); w.f32(n.damping_min); w.f32(n.damping_max); w.vec(n.gravity);
             w.u8(uint8_t(n.particle_style)); w.u8(uint8_t(n.emission_shape)); w.f32(n.emission_radius); w.vec(n.emission_box);
             w.u32(n.color_end); w.f32(n.puff_size); w.f32(n.puff_size_end);
+            w.u16(n.hframes); w.u16(n.vframes); w.u16(n.frame); w.u8(uint8_t((n.flip_h ? 1 : 0) | (n.flip_v ? 2 : 0))); w.f32(n.pixel_size);
             w.u32(uint32_t(n.script));
             w.u32(uint32_t(n.overrides.size()));
             for (const auto& o : n.overrides) {
@@ -191,11 +192,83 @@ std::vector<uint8_t> encode_pack(const Description& d, std::string& error) {
 }
 #endif
 
+static bool read_nodes(Reader& r, std::vector<NodeDesc>& nodes, std::string& error) {
+    const uint32_t count = r.u32();
+    if (count > MaxNodes) { error = "Too many nodes in the package."; return false; }
+    nodes.reserve(count); // a NodeDesc is ~440 bytes on the device: no doubling
+    for (uint32_t i = 0; i < count && r.ok; ++i) {
+        NodeDesc n;
+        n.id = r.u32(); n.parent = int32_t(r.u32());
+        const uint8_t type = r.u8();
+        n.name = r.str(256);
+        n.position = r.vec(); n.rotation = r.vec(); n.scale = r.vec();
+        const uint8_t visible = r.u8();
+        const uint8_t shape = r.u8();
+        n.color = r.u32();
+        const uint8_t shading = r.u8();
+        n.segments = r.u16();
+        n.fov = r.f32(); n.near = r.f32(); n.far = r.f32();
+        const uint8_t current = r.u8();
+        n.light_color = r.u32(); n.energy = r.f32(); n.background = r.u32(); n.ambient = r.u32();
+        n.texture = int32_t(r.u32()); n.uv_scale[0] = r.f32(); n.uv_scale[1] = r.f32(); n.uv_offset[0] = r.f32(); n.uv_offset[1] = r.f32();
+        const uint8_t flags = r.u8();
+        n.bilinear = flags & 1; n.repeat = (flags & 2) != 0; n.perspective = (flags & 4) != 0; n.billboard = (flags & 8) != 0;
+        n.alpha = r.f32(); n.specular = r.f32(); n.shininess = r.u8();
+        const uint8_t cull = r.u8(), draw_order = r.u8(), background = r.u8();
+        n.sky_top = r.u32(); n.sky_horizon = r.u32(); n.ground_horizon = r.u32(); n.ground_bottom = r.u32();
+        n.sky_texture = int32_t(r.u32());
+        n.diffuse = r.f32(); n.mesh = int32_t(r.u32()); n.text = r.str(MaxText); n.size = r.vec(); n.text_scale = r.u8();
+        const uint8_t collision = r.u8();
+        n.box_size = r.vec(); n.radius = r.f32(); n.height = r.f32();
+        const uint8_t physics_flags = r.u8();
+        n.disabled = physics_flags & 1; n.freeze = (physics_flags & 2) != 0; n.monitoring = (physics_flags & 4) != 0;
+        n.collision_layer = r.u32(); n.collision_mask = r.u32();
+        n.mass = r.f32(); n.gravity_scale = r.f32(); n.linear_damp = r.f32(); n.angular_damp = r.f32(); n.friction = r.f32(); n.bounce = r.f32();
+        n.linear_velocity = r.vec(); n.angular_velocity = r.vec(); n.floor_max_angle = r.f32();
+        if (collision > uint8_t(CollisionKind::Capsule) || physics_flags > 7) r.ok = false;
+        n.collision = CollisionKind(collision);
+        const uint8_t particle_flags = r.u8();
+        n.emitting = particle_flags & 1; n.one_shot = (particle_flags & 2) != 0; n.additive = (particle_flags & 4) != 0;
+        n.no_depth_test = (particle_flags & 8) != 0;
+        n.amount = r.u16();
+        n.lifetime = r.f32(); n.lifetime_randomness = r.f32(); n.explosiveness = r.f32(); n.direction = r.vec(); n.spread = r.f32();
+        n.velocity_min = r.f32(); n.velocity_max = r.f32(); n.damping_min = r.f32(); n.damping_max = r.f32(); n.gravity = r.vec();
+        const uint8_t style = r.u8(), emission = r.u8();
+        n.emission_radius = r.f32(); n.emission_box = r.vec();
+        n.color_end = r.u32(); n.puff_size = r.f32(); n.puff_size_end = r.f32();
+        if (particle_flags > 15 || style > uint8_t(ParticleStyle::Puff) || emission > uint8_t(EmissionShape::Box)) r.ok = false;
+        n.particle_style = ParticleStyle(style); n.emission_shape = EmissionShape(emission);
+        n.reflection = (flags & 16) != 0;
+        n.hframes = r.u16(); n.vframes = r.u16(); n.frame = r.u16();
+        const uint8_t sprite_flags = r.u8();
+        n.flip_h = sprite_flags & 1; n.flip_v = (sprite_flags & 2) != 0;
+        n.pixel_size = r.f32();
+        if (sprite_flags > 3) r.ok = false;
+        n.script = int32_t(r.u32());
+        const uint32_t overrides = r.u32();
+        if (type > uint8_t(NodeType::Control) || shape > uint8_t(Shape::Mesh) || shading > uint8_t(Shading::Water)
+            || cull > uint8_t(CullMode::Disabled) || draw_order > uint8_t(DrawOrder::OnTop)
+            || background > uint8_t(Background::Panorama) || flags > 31
+            || visible > 1 || current > 1 || overrides > 256) { error = "Invalid node in the package."; return false; }
+        n.type = NodeType(type); n.shape = Shape(shape); n.shading = Shading(shading);
+        n.cull = CullMode(cull); n.draw_order = DrawOrder(draw_order); n.background_mode = Background(background);
+        n.visible = visible == 1; n.current = current == 1;
+        for (uint32_t j = 0; j < overrides && r.ok; ++j) {
+            ScriptOverride o;
+            o.name = r.str(80);
+            o.value = r.value();
+            n.overrides.push_back(std::move(o));
+        }
+        nodes.push_back(std::move(n));
+    }
+    return true;
+}
+
 bool decode_pack(const uint8_t* data, size_t size, Description& out, std::string& error) {
     error.clear();
     if (!data || size < 12) { error = "Truncated package."; return false; }
     Reader r{data, size};
-    if (r.u32() != Magic || r.u32() != Version) { error = "Unsupported JETP format (expected version 13): export the project again."; return false; }
+    if (r.u32() != Magic || r.u32() != Version) { error = "Unsupported JETP format (expected version 14): export the project again."; return false; }
     Description d;
     d.name = r.str(256);
     d.width = r.u16();
@@ -263,79 +336,16 @@ bool decode_pack(const uint8_t* data, size_t size, Description& out, std::string
         for (auto& index : m.indices) index = r.u16();
         d.meshes.push_back(std::move(m));
     }
-    auto read_nodes = [&](std::vector<NodeDesc>& nodes) {
-        const uint32_t count = r.u32();
-        if (count > MaxNodes) { error = "Too many nodes in the package."; return false; }
-        for (uint32_t i = 0; i < count && r.ok; ++i) {
-            NodeDesc n;
-            n.id = r.u32(); n.parent = int32_t(r.u32());
-            const uint8_t type = r.u8();
-            n.name = r.str(256);
-            n.position = r.vec(); n.rotation = r.vec(); n.scale = r.vec();
-            const uint8_t visible = r.u8();
-            const uint8_t shape = r.u8();
-            n.color = r.u32();
-            const uint8_t shading = r.u8();
-            n.segments = r.u16();
-            n.fov = r.f32(); n.near = r.f32(); n.far = r.f32();
-            const uint8_t current = r.u8();
-            n.light_color = r.u32(); n.energy = r.f32(); n.background = r.u32(); n.ambient = r.u32();
-            n.texture = int32_t(r.u32()); n.uv_scale[0] = r.f32(); n.uv_scale[1] = r.f32(); n.uv_offset[0] = r.f32(); n.uv_offset[1] = r.f32();
-            const uint8_t flags = r.u8();
-            n.bilinear = flags & 1; n.repeat = (flags & 2) != 0; n.perspective = (flags & 4) != 0; n.billboard = (flags & 8) != 0;
-            n.alpha = r.f32(); n.specular = r.f32(); n.shininess = r.u8();
-            const uint8_t cull = r.u8(), draw_order = r.u8(), background = r.u8();
-            n.sky_top = r.u32(); n.sky_horizon = r.u32(); n.ground_horizon = r.u32(); n.ground_bottom = r.u32();
-            n.sky_texture = int32_t(r.u32());
-            n.diffuse = r.f32(); n.mesh = int32_t(r.u32()); n.text = r.str(MaxText); n.size = r.vec(); n.text_scale = r.u8();
-            const uint8_t collision = r.u8();
-            n.box_size = r.vec(); n.radius = r.f32(); n.height = r.f32();
-            const uint8_t physics_flags = r.u8();
-            n.disabled = physics_flags & 1; n.freeze = (physics_flags & 2) != 0; n.monitoring = (physics_flags & 4) != 0;
-            n.collision_layer = r.u32(); n.collision_mask = r.u32();
-            n.mass = r.f32(); n.gravity_scale = r.f32(); n.linear_damp = r.f32(); n.angular_damp = r.f32(); n.friction = r.f32(); n.bounce = r.f32();
-            n.linear_velocity = r.vec(); n.angular_velocity = r.vec(); n.floor_max_angle = r.f32();
-            if (collision > uint8_t(CollisionKind::Capsule) || physics_flags > 7) r.ok = false;
-            n.collision = CollisionKind(collision);
-            const uint8_t particle_flags = r.u8();
-            n.emitting = particle_flags & 1; n.one_shot = (particle_flags & 2) != 0; n.additive = (particle_flags & 4) != 0;
-            n.no_depth_test = (particle_flags & 8) != 0;
-            n.amount = r.u16();
-            n.lifetime = r.f32(); n.lifetime_randomness = r.f32(); n.explosiveness = r.f32(); n.direction = r.vec(); n.spread = r.f32();
-            n.velocity_min = r.f32(); n.velocity_max = r.f32(); n.damping_min = r.f32(); n.damping_max = r.f32(); n.gravity = r.vec();
-            const uint8_t style = r.u8(), emission = r.u8();
-            n.emission_radius = r.f32(); n.emission_box = r.vec();
-            n.color_end = r.u32(); n.puff_size = r.f32(); n.puff_size_end = r.f32();
-            if (particle_flags > 15 || style > uint8_t(ParticleStyle::Puff) || emission > uint8_t(EmissionShape::Box)) r.ok = false;
-            n.particle_style = ParticleStyle(style); n.emission_shape = EmissionShape(emission);
-            n.reflection = (flags & 16) != 0;
-            n.script = int32_t(r.u32());
-            const uint32_t overrides = r.u32();
-            if (type > uint8_t(NodeType::CPUParticles3D) || shape > uint8_t(Shape::Mesh) || shading > uint8_t(Shading::Water)
-                || cull > uint8_t(CullMode::Disabled) || draw_order > uint8_t(DrawOrder::OnTop)
-                || background > uint8_t(Background::Panorama) || flags > 31
-                || visible > 1 || current > 1 || overrides > 256) { error = "Invalid node in the package."; return false; }
-            n.type = NodeType(type); n.shape = Shape(shape); n.shading = Shading(shading);
-            n.cull = CullMode(cull); n.draw_order = DrawOrder(draw_order); n.background_mode = Background(background);
-            n.visible = visible == 1; n.current = current == 1;
-            for (uint32_t j = 0; j < overrides && r.ok; ++j) {
-                ScriptOverride o;
-                o.name = r.str(80);
-                o.value = r.value();
-                n.overrides.push_back(std::move(o));
-            }
-            nodes.push_back(std::move(n));
-        }
-        return true;
-    };
     d.path = r.str(512);
-    if (!read_nodes(d.nodes)) return false;
+    d.nodes_offset = uint32_t(r.p - data);
+    if (!read_nodes(r, d.nodes, error)) return false;
     const uint32_t scenes = r.u32();
     if (scenes > MaxScenes) { error = "Too many scenes in the package."; return false; }
     for (uint32_t i = 0; i < scenes && r.ok; ++i) {
         SceneDesc scene;
         scene.path = r.str(512);
-        if (!read_nodes(scene.nodes)) return false;
+        scene.offset = uint32_t(r.p - data);
+        if (!read_nodes(r, scene.nodes, error)) return false;
         d.scenes.push_back(std::move(scene));
     }
     const uint8_t autoloads = r.u8();
@@ -349,6 +359,27 @@ bool decode_pack(const uint8_t* data, size_t size, Description& out, std::string
     if (!r.ok || r.remaining) { error = "Truncated package or trailing data."; return false; }
     if (!validate(d, error)) return false;
     out = std::move(d);
+    return true;
+}
+
+
+bool pack_resolution(const uint8_t* data, size_t size, int& width, int& height) {
+    if (!data || size < 12) return false;
+    Reader r{data, size};
+    if (r.u32() != Magic || r.u32() != Version) return false;
+    r.str(256);
+    width = r.u16();
+    height = r.u16();
+    return r.ok;
+}
+
+bool decode_nodes(const uint8_t* data, size_t size, uint32_t offset, std::vector<NodeDesc>& nodes, std::string& error) {
+    error.clear();
+    nodes.clear();
+    if (!data || offset >= size) { error = "Truncated package."; return false; }
+    Reader r{data + offset, size - offset};
+    if (!read_nodes(r, nodes, error)) return false;
+    if (!r.ok) { error = "Truncated package."; return false; }
     return true;
 }
 

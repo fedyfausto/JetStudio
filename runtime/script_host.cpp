@@ -18,7 +18,8 @@ enum Property : int {
     Velocity, LinearVelocity, AngularVelocity, Mass, GravityScale, Freeze, Sleeping, FloorMaxAngle, Monitoring, Disabled,
     CollisionLayer, CollisionMask, Friction, Bounce,
     Emitting, Amount, Lifetime, OneShot, Explosiveness, LifetimeRandomness, Direction, Spread, Gravity,
-    InitialVelocityMin, InitialVelocityMax, DampingMin, DampingMax, CurrentScene, PropertyCount
+    InitialVelocityMin, InitialVelocityMax, DampingMin, DampingMax, CurrentScene,
+    Frame, Hframes, Vframes, FlipH, FlipV, PixelSize, Modulate, PropertyCount
 };
 const char* const property_names[PropertyCount] = {
     "name", "position", "rotation", "rotation_degrees", "scale", "visible", "global_position",
@@ -27,7 +28,8 @@ const char* const property_names[PropertyCount] = {
     "velocity", "linear_velocity", "angular_velocity", "mass", "gravity_scale", "freeze", "sleeping", "floor_max_angle", "monitoring",
     "disabled", "collision_layer", "collision_mask", "friction", "bounce",
     "emitting", "amount", "lifetime", "one_shot", "explosiveness", "lifetime_randomness", "direction", "spread", "gravity",
-    "initial_velocity_min", "initial_velocity_max", "damping_min", "damping_max", "current_scene"};
+    "initial_velocity_min", "initial_velocity_max", "damping_min", "damping_max", "current_scene",
+    "frame", "hframes", "vframes", "flip_h", "flip_v", "pixel_size", "modulate"};
 
 enum Method : int {
     GetNode, GetNodeOrNull, GetParent, GetChildren, GetChild, GetChildCount, FindChild, QueueFree,
@@ -89,6 +91,9 @@ const std::vector<ClassInfo>& class_list() {
              {"gravity", Type::Vector3}, {"initial_velocity_min", Type::Float}, {"initial_velocity_max", Type::Float},
              {"damping_min", Type::Float}, {"damping_max", Type::Float}, {"color", Type::Color}, {"alpha", Type::Float}},
             {{"restart", 0, 0}}});
+        c.push_back({"Sprite3D", "Node3D",
+            {{"frame", Type::Int}, {"hframes", Type::Int}, {"vframes", Type::Int}, {"flip_h", Type::Bool}, {"flip_v", Type::Bool},
+             {"pixel_size", Type::Float}, {"modulate", Type::Color}}, {}});
         c.push_back({"SceneTree", "", {{"current_scene", Type::Object, true}},
             {{"change_scene_to_file", 1, 1, Type::Int}, {"reload_current_scene", 0, 0, Type::Int}}});
         c.push_back({"Input", "", {},
@@ -128,6 +133,8 @@ bool has_property(NodeType type, int p) {
     case Emitting: case Amount: case Lifetime: case OneShot: case Explosiveness: case LifetimeRandomness: case Direction:
     case Spread: case Gravity: case InitialVelocityMin: case InitialVelocityMax: case DampingMin: case DampingMax:
         return type == NodeType::CPUParticles3D;
+    case Frame: case Hframes: case Vframes: case FlipH: case FlipV: case PixelSize: case Modulate:
+        return type == NodeType::Sprite3D;
     }
     return false;
 }
@@ -277,6 +284,13 @@ Status ScriptHost::get_property(ObjectId id, int p, Value& out, std::string& err
     case TextureFilter: out = Value(jetscript::Int(d.bilinear ? 1 : 0)); break; // Godot: 0 nearest, 1 linear
     case Text: out = Value(d.text); break;
     case Size: out = Value(from_vec(d.size)); break;
+    case Frame: out = Value(jetscript::Int(d.frame)); break;
+    case Hframes: out = Value(jetscript::Int(d.hframes)); break;
+    case Vframes: out = Value(jetscript::Int(d.vframes)); break;
+    case FlipH: out = Value(d.flip_h); break;
+    case FlipV: out = Value(d.flip_v); break;
+    case PixelSize: out = Value(d.pixel_size); break;
+    case Modulate: out = Value(to_color(d.color)); break;
     }
     return Status::Ok;
 }
@@ -423,6 +437,24 @@ Status ScriptHost::set_property(ObjectId id, int p, const Value& v, std::string&
         if (!ok) error = "texture_filter must be 0 (nearest) or 1 (linear).";
         else d.bilinear = v.as_int() == 1;
         break;
+    case Frame: {
+        const jetscript::Int frames = jetscript::Int(d.hframes) * d.vframes;
+        ok = v.type() == Type::Int && v.as_int() >= 0 && v.as_int() < frames;
+        if (!ok) error = "Index p_frame = " + v.to_string() + " is out of bounds (vframes * hframes = " + std::to_string(frames) + ").";
+        else d.frame = uint16_t(v.as_int());
+        break;
+    }
+    case Hframes: case Vframes: {
+        ok = v.type() == Type::Int && v.as_int() >= 1 && v.as_int() <= 256;
+        if (!ok) { error = std::string(property_names[p]) + " must be an int between 1 and 256."; break; }
+        (p == Hframes ? d.hframes : d.vframes) = uint16_t(v.as_int());
+        if (d.frame >= d.hframes * d.vframes) d.frame = 0; // as Godot does
+        break;
+    }
+    case FlipH: ok = expect(Type::Bool); if (ok) d.flip_h = v.truthy(); break;
+    case FlipV: ok = expect(Type::Bool); if (ok) d.flip_v = v.truthy(); break;
+    case PixelSize: ok = number(d.pixel_size, 0.0001f, 100); break;
+    case Modulate: ok = expect(Type::Color); if (ok) d.color = from_color(v.as_color()); break;
     }
     return ok ? Status::Ok : Status::Error;
 }

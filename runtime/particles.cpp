@@ -265,7 +265,9 @@ void Runtime::build_occlusion(const ParticleView& view, int x0, int y0, int x1, 
         }
         const Basis rotation = n.world.basis.orthonormalized().mirrored_z(); // as sync_object() gives it to Jet
         const bool two_sided = n.d.cull == CullMode::Disabled;
-        const auto& vertices = n.object->vertices;
+        // What the node draws: its shared copy, or geometry of its own.
+        const Renderer::Object& geometry = n.object->instances.empty() ? *n.object : *n.object->instances[0].mesh;
+        const auto& vertices = geometry.vertices;
         occlusion_points_.resize(vertices.size() * 3);
         for (size_t i = 0; i < vertices.size(); ++i) {
             const float vx = float(vertices[i].position.x), vy = float(vertices[i].position.y), vz = float(vertices[i].position.z);
@@ -280,7 +282,7 @@ void Runtime::build_occlusion(const ParticleView& view, int x0, int y0, int x1, 
             out[1] = view.cy - q[1] * k;
             out[2] = q[2];
         }
-        for (const auto& t : n.object->triangles) {
+        for (const auto& t : geometry.triangles) {
             const float* a = &occlusion_points_[size_t(t.v1) * 3];
             const float* b = &occlusion_points_[size_t(t.v2) * 3];
             const float* d = &occlusion_points_[size_t(t.v3) * 3];

@@ -67,7 +67,7 @@ static func platform(hw: Dictionary) -> String:
 static func board_pins(hw: Dictionary) -> Array:
 	return boards.get(str(hw.get("board", "")), {}).get("pins", [])
 
-## Pins usable as SCK or MOSI. Empty means any pin; only STM32 boards restrict them to the SPI peripheral.
+## Pins where the board's SPI peripheral drives SCK or MOSI. Empty on ESP32, where any pin works.
 static func spi_pins(hw: Dictionary, key: String) -> Array[int]:
 	var out: Array[int] = []
 	for pin in boards.get(str(hw.get("board", "")), {}).get("spi", {}).get(key, []): out.append(int(pin))
@@ -80,6 +80,13 @@ static func pin_label(hw: Dictionary, gpio: int) -> String:
 		if stm32 or str(entry[0]).begins_with("GPIO"): return str(entry[0])
 		return "%s · GPIO%d" % [entry[0], gpio]
 	return "P%s%d" % ["ABCDEFGHIJK"[(gpio >> 4) & 15], gpio & 15] if stm32 else "GPIO%d" % gpio
+
+## STM32 SCK/MOSI off the SPI peripheral: the firmware sends bit by bit (same check as tools/hardware.py).
+static func software_spi(hw: Dictionary) -> bool:
+	for key in ["sck", "mosi"]:
+		var allowed := spi_pins(hw, key)
+		if not allowed.is_empty() and not int(hw.pins.get(key, -1)) in allowed: return true
+	return false
 
 ## Errors that block a firmware build.
 static func problems(hw: Dictionary, buttons: Dictionary = {}) -> Array:
@@ -95,13 +102,6 @@ static func problems(hw: Dictionary, buttons: Dictionary = {}) -> Array:
 		if not usable.has(pin): out.append("%s (%s) is not usable on this board." % [pin_label(hw, pin), PIN_NAMES[key]])
 		elif used.has(pin): out.append("%s is used by both %s and %s." % [pin_label(hw, pin), PIN_NAMES[used[pin]], PIN_NAMES[key]])
 		used[pin] = key
-	for key in ["sck", "mosi"]:
-		var allowed := spi_pins(hw, key)
-		var pin := int(hw.pins.get(key, -1))
-		if not allowed.is_empty() and pin >= 0 and not pin in allowed:
-			var names := PackedStringArray()
-			for allowed_pin in allowed: names.append(pin_label(hw, allowed_pin))
-			out.append("%s must be %s (%s)." % [PIN_NAMES[key], " or ".join(names), boards[hw.board].spi.port])
 	for action in buttons:
 		var pin := int(buttons[action])
 		if used.has(pin): out.append("The %s button pin is also the display's %s pin." % [action, PIN_NAMES[used[pin]]])

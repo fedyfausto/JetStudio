@@ -562,7 +562,7 @@ void VMState::unwind(Exec& ex, const std::string& message) {
     ex.frames.clear();
 }
 
-static Real num_of(const Value& v) { return v.type() == Type::Int ? Real(Heap::i(v)) : Heap::f(v); }
+static Real num_of(const Value& v) { return v.type() == Type::Int ? int_to_real(Heap::i(v)) : Heap::f(v); }
 
 bool VMState::execute(Exec& ex, Value* result) {
     Frame* fr = &ex.frames.back();

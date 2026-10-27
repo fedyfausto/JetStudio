@@ -1,0 +1,2768 @@
+{
+	"format": "jetscene",
+	"version": 2,
+	"root": {
+		"id": 1,
+		"name": "JetRun",
+		"type": "Node3D",
+		"script": "res://scripts/game.jet",
+		"script_properties": {},
+		"children": [
+			{
+				"id": 103,
+				"name": "WorldEnvironment",
+				"type": "WorldEnvironment",
+				"background_mode": "Panorama",
+				"sky_texture": "res://textures/sunset.png",
+				"background_color": 2756672,
+				"ambient_color": 7368832,
+				"children": []
+			},
+			{
+				"id": 104,
+				"name": "Sun",
+				"type": "DirectionalLight3D",
+				"rotation": [
+					-35.0,
+					180.0,
+					0.0
+				],
+				"light_energy": 1.1,
+				"light_color": 16765088,
+				"children": []
+			},
+			{
+				"id": 108,
+				"name": "Track",
+				"type": "Node3D",
+				"script": "res://scripts/track.jet",
+				"children": [
+					{
+						"id": 105,
+						"name": "Grass",
+						"type": "Node3D",
+						"children": [
+							{
+								"id": 38,
+								"name": "Grass0",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-2.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 39,
+								"name": "Grass1",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-7.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 40,
+								"name": "Grass2",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-12.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 41,
+								"name": "Grass3",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-17.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 42,
+								"name": "Grass4",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-22.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 43,
+								"name": "Grass5",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-27.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 44,
+								"name": "Grass6",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-32.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 45,
+								"name": "Grass7",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-37.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 46,
+								"name": "Grass8",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-42.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 47,
+								"name": "Grass9",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-47.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 48,
+								"name": "Grass10",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-52.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 49,
+								"name": "Grass11",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-57.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 50,
+								"name": "Grass12",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-62.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 51,
+								"name": "Grass13",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-67.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 52,
+								"name": "Grass14",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-72.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 53,
+								"name": "Grass15",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-77.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 54,
+								"name": "Grass16",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-82.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 55,
+								"name": "Grass17",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-87.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 56,
+								"name": "Grass18",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-92.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 57,
+								"name": "Grass19",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-97.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 58,
+								"name": "Grass20",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-102.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 59,
+								"name": "Grass21",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-107.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 60,
+								"name": "Grass22",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-112.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 61,
+								"name": "Grass23",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-117.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 62,
+								"name": "Grass24",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-122.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 63,
+								"name": "Grass25",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-127.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 64,
+								"name": "Grass26",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-132.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 65,
+								"name": "Grass27",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-137.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 66,
+								"name": "Grass28",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-142.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 67,
+								"name": "Grass29",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-147.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 68,
+								"name": "Grass30",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-152.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 69,
+								"name": "Grass31",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-157.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 70,
+								"name": "Grass32",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-162.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 71,
+								"name": "Grass33",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-167.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							},
+							{
+								"id": 72,
+								"name": "Grass34",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-172.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 3055166,
+								"children": []
+							},
+							{
+								"id": 73,
+								"name": "Grass35",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									-0.05,
+									-177.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									80.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"color": 2459699,
+								"children": []
+							}
+						]
+					},
+					{
+						"id": 106,
+						"name": "Road",
+						"type": "Node3D",
+						"children": [
+							{
+								"id": 2,
+								"name": "Segment0",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-2.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 3,
+								"name": "Segment1",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-7.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 4,
+								"name": "Segment2",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-12.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 5,
+								"name": "Segment3",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-17.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 6,
+								"name": "Segment4",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-22.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 7,
+								"name": "Segment5",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-27.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 8,
+								"name": "Segment6",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-32.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 9,
+								"name": "Segment7",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-37.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 10,
+								"name": "Segment8",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-42.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 11,
+								"name": "Segment9",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-47.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 12,
+								"name": "Segment10",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-52.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 13,
+								"name": "Segment11",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-57.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 14,
+								"name": "Segment12",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-62.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 15,
+								"name": "Segment13",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-67.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 16,
+								"name": "Segment14",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-72.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 17,
+								"name": "Segment15",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-77.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 18,
+								"name": "Segment16",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-82.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 19,
+								"name": "Segment17",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-87.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 20,
+								"name": "Segment18",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-92.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 21,
+								"name": "Segment19",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-97.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 22,
+								"name": "Segment20",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-102.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 23,
+								"name": "Segment21",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-107.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 24,
+								"name": "Segment22",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-112.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 25,
+								"name": "Segment23",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-117.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 26,
+								"name": "Segment24",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-122.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 27,
+								"name": "Segment25",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-127.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 28,
+								"name": "Segment26",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-132.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 29,
+								"name": "Segment27",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-137.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 30,
+								"name": "Segment28",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-142.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 31,
+								"name": "Segment29",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-147.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 32,
+								"name": "Segment30",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-152.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 33,
+								"name": "Segment31",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-157.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 34,
+								"name": "Segment32",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-162.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 35,
+								"name": "Segment33",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-167.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 36,
+								"name": "Segment34",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-172.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_a.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							},
+							{
+								"id": 37,
+								"name": "Segment35",
+								"type": "MeshInstance3D",
+								"mesh": "Quad",
+								"position": [
+									0.0,
+									0.0,
+									-177.5
+								],
+								"rotation": [
+									-90.0,
+									0.0,
+									0.0
+								],
+								"scale": [
+									10.0,
+									5.2,
+									1.0
+								],
+								"shading": "Unlit",
+								"cull_mode": "Back",
+								"draw_order": "Background",
+								"albedo_texture": "res://textures/road_b.png",
+								"color": 16777215,
+								"texture_filter": "Nearest",
+								"perspective_correct": true,
+								"children": []
+							}
+						]
+					},
+					{
+						"id": 107,
+						"name": "Scenery",
+						"type": "Node3D",
+						"children": [
+							{
+								"id": 74,
+								"name": "Tree0",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									-10.0,
+									3.84,
+									-2.5
+								],
+								"children": []
+							},
+							{
+								"id": 75,
+								"name": "Tree1",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									10.0,
+									3.84,
+									-12.5
+								],
+								"children": []
+							},
+							{
+								"id": 76,
+								"name": "Tree2",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									-10.0,
+									3.84,
+									-22.5
+								],
+								"children": []
+							},
+							{
+								"id": 77,
+								"name": "Tree3",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									10.0,
+									3.84,
+									-32.5
+								],
+								"children": []
+							},
+							{
+								"id": 78,
+								"name": "Tree4",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									-10.0,
+									3.84,
+									-42.5
+								],
+								"children": []
+							},
+							{
+								"id": 79,
+								"name": "Tree5",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									10.0,
+									3.84,
+									-52.5
+								],
+								"children": []
+							},
+							{
+								"id": 80,
+								"name": "Tree6",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									-10.0,
+									3.84,
+									-62.5
+								],
+								"children": []
+							},
+							{
+								"id": 81,
+								"name": "Tree7",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									10.0,
+									3.84,
+									-72.5
+								],
+								"children": []
+							},
+							{
+								"id": 82,
+								"name": "Tree8",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									-10.0,
+									3.84,
+									-82.5
+								],
+								"children": []
+							},
+							{
+								"id": 83,
+								"name": "Tree9",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									10.0,
+									3.84,
+									-92.5
+								],
+								"children": []
+							},
+							{
+								"id": 84,
+								"name": "Tree10",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									-10.0,
+									3.84,
+									-102.5
+								],
+								"children": []
+							},
+							{
+								"id": 85,
+								"name": "Tree11",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									10.0,
+									3.84,
+									-112.5
+								],
+								"children": []
+							},
+							{
+								"id": 86,
+								"name": "Tree12",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									-10.0,
+									3.84,
+									-122.5
+								],
+								"children": []
+							},
+							{
+								"id": 87,
+								"name": "Tree13",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									10.0,
+									3.84,
+									-132.5
+								],
+								"children": []
+							},
+							{
+								"id": 88,
+								"name": "Tree14",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									-10.0,
+									3.84,
+									-142.5
+								],
+								"children": []
+							},
+							{
+								"id": 89,
+								"name": "Tree15",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									10.0,
+									3.84,
+									-152.5
+								],
+								"children": []
+							},
+							{
+								"id": 90,
+								"name": "Tree16",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									-10.0,
+									3.84,
+									-162.5
+								],
+								"children": []
+							},
+							{
+								"id": 91,
+								"name": "Tree17",
+								"type": "Sprite3D",
+								"texture": "res://textures/scenery.png",
+								"hframes": 2,
+								"vframes": 1,
+								"frame": 0,
+								"pixel_size": 0.08,
+								"billboard": true,
+								"texture_filter": "Nearest",
+								"position": [
+									10.0,
+									3.84,
+									-172.5
+								],
+								"children": []
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": 109,
+				"name": "Traffic",
+				"type": "Node3D",
+				"children": [
+					{
+						"id": 92,
+						"name": "Rival0",
+						"type": "Sprite3D",
+						"texture": "res://textures/cars.png",
+						"hframes": 3,
+						"vframes": 1,
+						"frame": 2,
+						"pixel_size": 0.0375,
+						"billboard": true,
+						"texture_filter": "Nearest",
+						"modulate": 3832831,
+						"position": [
+							-3.3,
+							0.75,
+							-50.0
+						],
+						"script": "res://scripts/rival.jet",
+						"children": []
+					},
+					{
+						"id": 93,
+						"name": "Rival1",
+						"type": "Sprite3D",
+						"texture": "res://textures/cars.png",
+						"hframes": 3,
+						"vframes": 1,
+						"frame": 2,
+						"pixel_size": 0.0375,
+						"billboard": true,
+						"texture_filter": "Nearest",
+						"modulate": 16765498,
+						"position": [
+							0.0,
+							0.75,
+							-90.0
+						],
+						"script": "res://scripts/rival.jet",
+						"children": []
+					},
+					{
+						"id": 94,
+						"name": "Rival2",
+						"type": "Sprite3D",
+						"texture": "res://textures/cars.png",
+						"hframes": 3,
+						"vframes": 1,
+						"frame": 2,
+						"pixel_size": 0.0375,
+						"billboard": true,
+						"texture_filter": "Nearest",
+						"modulate": 16053492,
+						"position": [
+							3.3,
+							0.75,
+							-130.0
+						],
+						"script": "res://scripts/rival.jet",
+						"children": []
+					},
+					{
+						"id": 95,
+						"name": "Rival3",
+						"type": "Sprite3D",
+						"texture": "res://textures/cars.png",
+						"hframes": 3,
+						"vframes": 1,
+						"frame": 2,
+						"pixel_size": 0.0375,
+						"billboard": true,
+						"texture_filter": "Nearest",
+						"modulate": 3855466,
+						"position": [
+							0.0,
+							0.75,
+							-170.0
+						],
+						"script": "res://scripts/rival.jet",
+						"children": []
+					}
+				]
+			},
+			{
+				"id": 102,
+				"name": "Gate",
+				"type": "Node3D",
+				"position": [
+					0.0,
+					0.0,
+					-40.0
+				],
+				"script": "res://scripts/start_gate.jet",
+				"children": [
+					{
+						"id": 96,
+						"name": "PoleLeft",
+						"type": "MeshInstance3D",
+						"mesh": "Box",
+						"color": 11579576,
+						"position": [
+							-5.6,
+							3.1,
+							0.0
+						],
+						"scale": [
+							0.4,
+							6.2,
+							0.4
+						],
+						"children": []
+					},
+					{
+						"id": 97,
+						"name": "PoleRight",
+						"type": "MeshInstance3D",
+						"mesh": "Box",
+						"color": 11579576,
+						"position": [
+							5.6,
+							3.1,
+							0.0
+						],
+						"scale": [
+							0.4,
+							6.2,
+							0.4
+						],
+						"children": []
+					},
+					{
+						"id": 98,
+						"name": "Banner",
+						"type": "MeshInstance3D",
+						"mesh": "Box",
+						"color": 16777215,
+						"shading": "Unlit",
+						"albedo_texture": "res://textures/checker.png",
+						"texture_filter": "Nearest",
+						"position": [
+							0.0,
+							6.4,
+							0.0
+						],
+						"scale": [
+							11.6,
+							0.9,
+							0.3
+						],
+						"children": []
+					},
+					{
+						"id": 99,
+						"name": "Lamp1",
+						"type": "MeshInstance3D",
+						"mesh": "Sphere",
+						"segments": 6,
+						"color": 3672586,
+						"shading": "Unlit",
+						"position": [
+							-1.4,
+							5.3,
+							0.3
+						],
+						"scale": [
+							0.7,
+							0.7,
+							0.7
+						],
+						"children": []
+					},
+					{
+						"id": 100,
+						"name": "Lamp2",
+						"type": "MeshInstance3D",
+						"mesh": "Sphere",
+						"segments": 6,
+						"color": 3672586,
+						"shading": "Unlit",
+						"position": [
+							0.0,
+							5.3,
+							0.3
+						],
+						"scale": [
+							0.7,
+							0.7,
+							0.7
+						],
+						"children": []
+					},
+					{
+						"id": 101,
+						"name": "Lamp3",
+						"type": "MeshInstance3D",
+						"mesh": "Sphere",
+						"segments": 6,
+						"color": 3672586,
+						"shading": "Unlit",
+						"position": [
+							1.4,
+							5.3,
+							0.3
+						],
+						"scale": [
+							0.7,
+							0.7,
+							0.7
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"id": 110,
+				"name": "Car",
+				"type": "Sprite3D",
+				"texture": "res://textures/cars.png",
+				"hframes": 3,
+				"vframes": 1,
+				"frame": 0,
+				"pixel_size": 0.0375,
+				"billboard": true,
+				"texture_filter": "Nearest",
+				"position": [
+					0.0,
+					0.75,
+					-12.0
+				],
+				"script": "res://scripts/player.jet",
+				"children": []
+			},
+			{
+				"id": 111,
+				"name": "Camera3D",
+				"type": "Camera3D",
+				"position": [
+					0.0,
+					3.2,
+					0.0
+				],
+				"rotation": [
+					-4.0,
+					0.0,
+					0.0
+				],
+				"fov": 62.0,
+				"near": 0.2,
+				"far": 230.0,
+				"current": true,
+				"script": "res://scripts/chase_camera.jet",
+				"children": []
+			},
+			{
+				"id": 112,
+				"name": "Title",
+				"type": "Label",
+				"text": "JETRUN",
+				"position": [
+					55.0,
+					34.0
+				],
+				"text_scale": 5,
+				"color": 16765770,
+				"visible": true,
+				"children": []
+			},
+			{
+				"id": 115,
+				"name": "Prompt",
+				"type": "Control",
+				"script": "res://scripts/blink.jet",
+				"children": [
+					{
+						"id": 113,
+						"name": "Press",
+						"type": "Label",
+						"text": "PRESS BUTTON",
+						"position": [
+							76.0,
+							150.0
+						],
+						"text_scale": 2,
+						"color": 16777215,
+						"visible": true,
+						"children": []
+					},
+					{
+						"id": 114,
+						"name": "ToStart",
+						"type": "Label",
+						"text": "TO START",
+						"position": [
+							104.0,
+							172.0
+						],
+						"text_scale": 2,
+						"color": 16777215,
+						"visible": true,
+						"children": []
+					}
+				]
+			},
+			{
+				"id": 122,
+				"name": "HUD",
+				"type": "Control",
+				"script": "res://scripts/hud.jet",
+				"children": [
+					{
+						"id": 116,
+						"name": "Time",
+						"type": "Label",
+						"text": "TIME 60",
+						"position": [
+							8.0,
+							6.0
+						],
+						"text_scale": 2,
+						"color": 16769126,
+						"visible": false,
+						"children": []
+					},
+					{
+						"id": 117,
+						"name": "Score",
+						"type": "Label",
+						"text": "0 M",
+						"position": [
+							270.0,
+							6.0
+						],
+						"text_scale": 2,
+						"color": 16777215,
+						"visible": false,
+						"children": []
+					},
+					{
+						"id": 118,
+						"name": "Speed",
+						"type": "Label",
+						"text": "0 KM/H",
+						"position": [
+							8.0,
+							216.0
+						],
+						"text_scale": 2,
+						"color": 16777215,
+						"visible": false,
+						"children": []
+					},
+					{
+						"id": 119,
+						"name": "Big",
+						"type": "Label",
+						"text": "3",
+						"position": [
+							139.0,
+							70.0
+						],
+						"text_scale": 6,
+						"color": 16769126,
+						"visible": false,
+						"children": []
+					},
+					{
+						"id": 120,
+						"name": "Message",
+						"type": "Label",
+						"text": "EXTENDED PLAY!",
+						"position": [
+							62.0,
+							104.0
+						],
+						"text_scale": 2,
+						"color": 8189951,
+						"visible": false,
+						"children": []
+					},
+					{
+						"id": 121,
+						"name": "GameOver",
+						"type": "Label",
+						"text": "GAME OVER",
+						"position": [
+							66.0,
+							70.0
+						],
+						"text_scale": 3,
+						"color": 16732240,
+						"visible": false,
+						"children": []
+					}
+				]
+			}
+		]
+	}
+}

@@ -111,7 +111,7 @@ func rebuild(root: Dictionary, selected: int, locked: bool) -> void:
 		var script_path := str(node.get("script", ""))
 		if not script_path.is_empty():
 			item.add_button(0, Icons.get_icon("Script"), BUTTON_SCRIPT, false, "Open Script: " + script_path)
-		if Document.is_3d(str(node.type)):
+		if not Document.property_def(str(node.type), "visible").is_empty():
 			var shown := bool(node.get("visible", true))
 			item.add_button(0, Icons.get_icon("GuiVisibilityVisible" if shown else "GuiVisibilityHidden"), BUTTON_VISIBLE, locked,
 				"Visible" if shown else "Hidden")

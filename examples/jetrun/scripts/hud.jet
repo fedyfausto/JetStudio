@@ -1,0 +1,77 @@
+extends Control
+
+# Time, distance and speed, the big countdown and short messages.
+const SCREEN_W := 320.0
+
+@onready var time_label = $Time
+@onready var score_label = $Score
+@onready var speed_label = $Speed
+@onready var big = $Big
+@onready var message = $Message
+@onready var game_over = $GameOver
+
+var big_time := 0.0
+var message_time := 0.0
+var shown_time := -1
+var shown_distance := -1
+var shown_speed := -1
+
+
+func _process(delta: float) -> void:
+	if big_time > 0.0:
+		big_time -= delta
+		if big_time <= 0.0:
+			big.hide()
+	if message_time > 0.0:
+		message_time -= delta
+		if message_time <= 0.0:
+			message.hide()
+
+
+func clear() -> void:
+	for label in get_children():
+		label.hide()
+	big_time = 0.0
+	message_time = 0.0
+
+
+func show_stats() -> void:
+	time_label.show()
+	score_label.show()
+	speed_label.show()
+
+
+func update_stats(time_left: float, distance: float, speed: float) -> void:
+	var t := int(ceil(time_left))
+	if t != shown_time:
+		shown_time = t
+		time_label.text = "TIME %d" % t
+	var d := int(distance / 10.0) * 10
+	if d != shown_distance:
+		shown_distance = d
+		score_label.text = "%d M" % d
+		score_label.position = Vector3(SCREEN_W - 8.0 - score_label.text.length() * 14.0, 6.0, 0.0)
+	var kmh := int(speed * 3.6)
+	if kmh != shown_speed:
+		shown_speed = kmh
+		speed_label.text = "%d KM/H" % kmh
+
+
+func countdown(text: String) -> void:
+	big.text = text
+	big.position = Vector3((SCREEN_W - text.length() * 42.0) / 2.0, 70.0, 0.0)
+	big.show()
+	big_time = 1.2
+
+
+func flash(text: String) -> void:
+	message.text = text
+	message.position = Vector3((SCREEN_W - text.length() * 14.0) / 2.0, 104.0, 0.0)
+	message.show()
+	message_time = 2.0
+
+
+func show_game_over(distance: float) -> void:
+	if not game_over.visible:
+		game_over.text = "GAME OVER\n%d M" % int(distance)
+		game_over.show()

@@ -221,19 +221,19 @@ void game(void*) {
     // Internal RAM stays free for the fields, the DMA rows and Jet's transform scratch.
     heap_caps_malloc_extmem_enable(1024);
     std::string error;
-    static jetstudio::Description document;
-    if (!jetstudio::decode_pack(scene_data, sizeof(scene_data), document, error)) {
-        ESP_LOGE(Tag, "Invalid scene: %s", error.c_str());
+    int width = 0, height = 0;
+    if (!jetstudio::pack_resolution(scene_data, sizeof(scene_data), width, height)) {
+        ESP_LOGE(Tag, "Invalid scene: export the project again");
         vTaskDelete(nullptr);
     }
-    if (document.width != Board::screenWidth || document.height != Board::screenHeight) {
+    if (width != Board::screenWidth || height != Board::screenHeight) {
         ESP_LOGE(Tag, "The scene is %dx%d, the display (%s) %dx%d: export it with the project's hardware settings",
-            document.width, document.height, Board::name, Board::screenWidth, Board::screenHeight);
+            width, height, Board::name, Board::screenWidth, Board::screenHeight);
         vTaskDelete(nullptr);
     }
     // Allocate the fields before the scene so they get internal DMA RAM when possible.
     // PSRAM works too, the scanout copies the rows with the CPU anyway, it's just slower.
-    const size_t field_bytes = size_t(document.width / jetstudio::BufferColumnStep) * (document.height / jetstudio::BufferRowStep) * sizeof(uint16_t);
+    const size_t field_bytes = size_t(width / jetstudio::BufferColumnStep) * (height / jetstudio::BufferRowStep) * sizeof(uint16_t);
     uint16_t* fields[2];
     bool internal = true;
     for (auto& f : fields) {
@@ -245,14 +245,13 @@ void game(void*) {
         if (!f) stop("Not enough RAM for the field buffers");
         std::memset(f, 0, field_bytes);
     }
-    if (!present::start(&display, document.width, document.height)) stop("Display task not started");
+    if (!present::start(&display, width, height)) stop("Display task not started");
+    // The package stays in flash: only the scene being played is decoded into RAM.
     static jetstudio::Runtime runtime;
-    const size_t nodes = document.nodes.size(), scripts = document.scripts.size();
-    if (!runtime.load(document, error)) {
+    if (!runtime.load_pack(scene_data, sizeof(scene_data), error)) {
         ESP_LOGE(Tag, "Invalid scene: %s", error.c_str());
         vTaskDelete(nullptr);
     }
-    document = jetstudio::Description(); // the runtime keeps its own copy
     std::vector<jetstudio::ScriptDiagnostic> diagnostics;
     if (!runtime.start(diagnostics)) {
         for (const auto& d : diagnostics)
@@ -267,7 +266,7 @@ void game(void*) {
     ESP_LOGI(Tag, "%s: %dx%d, fields of %dx%d in %s, DMA queue %s", Board::name, runtime.width(), runtime.height(),
         runtime.buffer_width(), runtime.buffer_rows(), internal ? "internal RAM" : "PSRAM (slower)", present::queued ? "on" : "off (polling)");
     ESP_LOGI(Tag, "Scene loaded: %u nodes, %u meshes, %u scripts; internal free %u, PSRAM free %u",
-        unsigned(nodes), unsigned(runtime.mesh_count()), unsigned(scripts),
+        unsigned(runtime.node_count()), unsigned(runtime.mesh_count()), unsigned(runtime.description().scripts.size()),
         unsigned(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)), unsigned(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
 
     int64_t previous = esp_timer_get_time(), total = 0, scripts_time = 0, rendering = 0, waiting = 0, yielded = previous;

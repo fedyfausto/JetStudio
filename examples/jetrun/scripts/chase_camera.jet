@@ -1,0 +1,50 @@
+extends Camera3D
+
+# In the title it cruises down the middle of the road, in the race it chases the car.
+# eye and target are road coordinates: x metres along the road, y to the right, z up.
+const CRUISE_SPEED := 24.0
+
+var eye := Vector3(0.0, 0.0, 3.2)
+var target := Vector3(30.0, 0.0, 1.0)
+var chasing := false
+var cruise_s := 0.0
+var glide := 0.0      # seconds left of the smooth move between the two views
+
+@onready var track = $"../Track"
+@onready var car = $"../Car"
+
+
+func _process(delta: float) -> void:
+	var eye_to: Vector3
+	var target_to: Vector3
+	if chasing:
+		eye_to = Vector3(car.s - 5.6, car.x * 0.75, 2.0)
+		target_to = Vector3(car.s + 16.0, car.x * 0.5, 0.6)
+	else:
+		cruise_s += CRUISE_SPEED * delta
+		eye_to = Vector3(cruise_s, 0.0, 3.2)
+		target_to = Vector3(cruise_s + 30.0, 0.0, 1.0)
+	var k := 1.0
+	if glide > 0.0:
+		glide -= delta
+		k = min(1.0, 3.0 * delta)
+	eye = eye.lerp(eye_to, k)
+	target = target.lerp(target_to, k)
+	var shake := 0.0
+	if car.bump > 0.0:
+		shake = 0.3
+	elif car.racing and car.is_off_road() and car.speed > 5.0:
+		shake = 0.07
+	position = track.point(eye.x, eye.y, eye.z) + Vector3(randf_range(-shake, shake), randf_range(-shake, shake), 0.0)
+	look_at(track.point(target.x, target.y, target.z))
+
+
+func chase() -> void:
+	chasing = true
+	glide = 2.0
+
+
+func cruise() -> void:
+	chasing = false
+	cruise_s = eye.x
+	glide = 2.0

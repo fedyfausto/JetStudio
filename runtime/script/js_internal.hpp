@@ -155,7 +155,20 @@ uint32_t utf8_count(const char* s, size_t len);
 size_t utf8_offset(std::string_view s, Int cp_index); // byte offset of code point (clamped)
 void utf8_append(std::string& out, uint32_t cp);
 
+// Ints keep GDScript's 64 bits, but the ESP32-S3 converts and divides only 32 bit ints in hardware:
+// 64 bit ones and doubles go through libgcc, so these take the 32 bit path whenever the value fits.
+inline bool fits32(Int v) { return v == Int(int32_t(v)); }
+inline Real int_to_real(Int v) { return fits32(v) ? Real(int32_t(v)) : Real(v); }
 Int real_to_int(double x); // saturating, NaN -> 0
+Int real_to_int(Real x);   // same, without double
+// Number as a float for comparisons: exact for floats and for ints up to 2^24, the float mantissa.
+inline bool exact_real(const Value& v, Real& out) {
+    if (v.type() == Type::Float) { out = Heap::f(v); return true; }
+    const Int i = Heap::i(v);
+    if (i < -(Int(1) << 24) || i > (Int(1) << 24)) return false;
+    out = Real(int32_t(i));
+    return true;
+}
 std::string format_int(Int v);
 std::string format_real(Real v); // Godot-like str(float): shortest round-trip, always a decimal part
 void append_fixed(std::string& out, double v, int decimals);

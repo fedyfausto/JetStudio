@@ -1,0 +1,134 @@
+extends Node3D
+
+# Title screen, start lights, then a race against the clock.
+@export var start_time := 60.0
+@export var extend_every := 1500.0   # metres between time bonuses
+@export var extend_time := 25.0
+
+enum { TITLE, ARRIVE, LIGHTS, RACE, OVER }
+
+@onready var car = $Car
+@onready var camera = $Camera3D
+@onready var gate = $Gate
+@onready var title = $Title
+@onready var prompt = $Prompt
+@onready var hud = $HUD
+
+var state := TITLE
+var timer := 0.0
+var lit := 0
+var line_s := 0.0
+var arrive_from := 0.0
+var time_left := 0.0
+var distance := 0.0
+var next_extend := 0.0
+
+
+func _ready() -> void:
+	car.hide()
+	gate.hide()
+	hud.clear()
+
+
+func _process(delta: float) -> void:
+	timer += delta
+	match state:
+		TITLE:
+			if pressed():
+				begin_arrive()
+		ARRIVE:
+			arrive_update()
+		LIGHTS:
+			lights_update()
+		RACE:
+			race_update(delta)
+		OVER:
+			over_update()
+
+
+func pressed() -> bool:
+	return Input.is_action_just_pressed("steer_left") or Input.is_action_just_pressed("steer_right") \
+		or Input.is_action_just_pressed("ui_accept")
+
+
+func begin_arrive() -> void:
+	state = ARRIVE
+	timer = 0.0
+	title.hide()
+	prompt.hide()
+	line_s = camera.eye.x + 34.0
+	arrive_from = camera.eye.x - 7.0
+	car.place(arrive_from)
+	gate.place(line_s)
+	camera.chase()
+
+
+# The car drives in from behind the camera and stops at the start line.
+func arrive_update() -> void:
+	var t: float = min(timer / 2.6, 1.0)
+	car.s = lerpf(arrive_from, line_s - 3.0, 1.0 - (1.0 - t) * (1.0 - t))
+	if t >= 1.0:
+		state = LIGHTS
+		timer = 0.0
+		lit = 0
+
+
+# One red lamp a second, then green.
+func lights_update() -> void:
+	var step := int(timer)
+	if step == lit:
+		return
+	lit = step
+	if step <= 3:
+		gate.light(step)
+		hud.countdown(str(4 - step))
+	else:
+		gate.go()
+		hud.countdown("GO!")
+		start_race()
+
+
+func start_race() -> void:
+	state = RACE
+	timer = 0.0
+	time_left = start_time
+	distance = 0.0
+	next_extend = extend_every
+	car.racing = true
+	hud.show_stats()
+
+
+func race_update(delta: float) -> void:
+	time_left -= delta
+	distance += car.speed * delta
+	if distance >= next_extend:
+		next_extend += extend_every
+		time_left += extend_time
+		hud.flash("EXTENDED PLAY!")
+	if time_left <= 0.0:
+		time_left = 0.0
+		state = OVER
+		timer = 0.0
+		car.racing = false
+		hud.flash("TIME UP")
+	hud.update_stats(time_left, distance, car.speed)
+
+
+func over_update() -> void:
+	hud.update_stats(time_left, distance, car.speed)
+	if timer > 2.0:
+		hud.show_game_over(distance)
+	if timer > 3.5:
+		prompt.show()
+		if pressed():
+			back_to_title()
+
+
+func back_to_title() -> void:
+	state = TITLE
+	timer = 0.0
+	car.hide()
+	gate.hide()
+	hud.clear()
+	title.show()
+	camera.cruise()

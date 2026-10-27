@@ -192,7 +192,7 @@ struct Flattener {
             n.name = utf8(node["name"]);
             if (!choice(node, "type", n.type, {"Node", "Node3D", "MeshInstance3D", "Camera3D", "DirectionalLight3D", "WorldEnvironment",
                                                "Label", "TextureRect", "ColorRect", "StaticBody3D", "CharacterBody3D",
-                                               "RigidBody3D", "Area3D", "CollisionShape3D", "CPUParticles3D"})) {
+                                               "RigidBody3D", "Area3D", "CollisionShape3D", "CPUParticles3D", "Sprite3D", "Control"})) {
                 error = "Unsupported node type: " + String(node["type"]); return false;
             }
             jetstudio::Vec3 uv_scale{n.uv_scale[0], n.uv_scale[1], 1}, uv_offset{};
@@ -249,6 +249,17 @@ struct Flattener {
                 n.box_size = n.size;
                 n.size = jetstudio::NodeDesc{}.size;
             }
+            // Sprite3D, Godot's names; modulate is the colour that tints the texture.
+            uint32_t hframes = n.hframes, vframes = n.vframes, frame = n.frame;
+            ok = ok && integer(node, "hframes", hframes, 256) && integer(node, "vframes", vframes, 256) && integer(node, "frame", frame, 65535)
+                && flag(node, "flip_h", n.flip_h) && flag(node, "flip_v", n.flip_v) && real(node, "pixel_size", n.pixel_size);
+            n.hframes = uint16_t(std::max<uint32_t>(1, hframes));
+            n.vframes = uint16_t(std::max<uint32_t>(1, vframes));
+            n.frame = uint16_t(frame);
+            if (n.type == NodeType::Sprite3D) {
+                n.color = 0xffffff; // Godot's default modulate: the texture as it is
+                ok = ok && integer(node, "modulate", n.color, 0xffffff);
+            }
             uint32_t segments = n.segments, text_scale = n.text_scale;
             ok = ok && integer(node, "segments", segments, 64) && integer(node, "text_scale", text_scale, 8);
             n.segments = uint16_t(segments);
@@ -262,7 +273,7 @@ struct Flattener {
             n.shininess = uint8_t(shininess);
             n.bilinear = filter == 1;
             if (n.type == NodeType::MeshInstance3D) n.texture = texture_index(node.get("albedo_texture", ""));
-            if (n.type == NodeType::TextureRect) n.texture = texture_index(node.get("texture", ""));
+            if (n.type == NodeType::TextureRect || n.type == NodeType::Sprite3D) n.texture = texture_index(node.get("texture", ""));
             if (n.type == NodeType::WorldEnvironment) n.sky_texture = texture_index(node.get("sky_texture", ""));
             if (n.type == NodeType::MeshInstance3D && n.shape == jetstudio::Shape::Mesh)
                 n.mesh = mesh_index(node.get("mesh_file", ""), node.get("mesh_part", ""));

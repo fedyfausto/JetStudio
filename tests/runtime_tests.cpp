@@ -518,6 +518,32 @@ void model_tests() {
     hud.nodes[6].script = 0;
     check(play_scene(hud, 0.1f) != render_scene(hud), "scripts change Label text and Control position");
 
+    // A plain Control draws nothing; its children sit relative to it and hide and fade with it.
+    Description group = scene();
+    auto group_root = node(10, 0, NodeType::Control, "HUD");
+    group_root.position = {40, 40, 0};
+    group.nodes.push_back(group_root);
+    auto bar = node(11, 4, NodeType::ColorRect, "Bar");
+    bar.position = {2, 2, 0}; bar.size = {6, 6, 0}; bar.color = 0xff0000; bar.alpha = 1;
+    group.nodes.push_back(bar);
+    check(overlay.load(group, error), "scene with a plain Control loads");
+    px = frame(overlay);
+    check(at(43, 43) == rgb565(0xff0000) && at(41, 41) != rgb565(0xff0000) && overlay.pick(41, 41) != 10,
+          "a Control groups its children and draws nothing");
+    group.nodes[4].alpha = 0.5f;
+    check(overlay.load(group, error), "faded Control loads");
+    px = frame(overlay);
+    const uint16_t faded = at(43, 43);
+    group.nodes[4].alpha = 1;
+    group.nodes[4].visible = false;
+    check(overlay.load(group, error), "hidden Control loads");
+    px = frame(overlay);
+    check(faded != rgb565(0xff0000) && faded != at(43, 43) && at(43, 43) != rgb565(0xff0000), "children fade and hide with their Control");
+    const auto group_bytes = encode_pack(group, error);
+    Description group_back;
+    check(decode_pack(group_bytes.data(), group_bytes.size(), group_back, error) && group_back.nodes[4].type == NodeType::Control,
+          "the package keeps plain Controls");
+
     // Draw order bands: Background never hides later geometry, On Top covers it.
     auto pair = [](DrawOrder near_order, DrawOrder far_order) {
         Description d = scene();
@@ -593,7 +619,7 @@ void model_tests() {
     const auto bytes = encode_pack(packed, error);
     if (bytes.empty()) std::cerr << "pack: " << error << '\n';
     Description back;
-    check(decode_pack(bytes.data(), bytes.size(), back, error), "pack v13 round trips");
+    check(decode_pack(bytes.data(), bytes.size(), back, error), "pack v14 round trips");
     check(back.meshes.size() == 2 && back.meshes[0].vertices.size() == model.meshes[0].vertices.size()
           && back.meshes[0].indices == model.meshes[0].indices, "pack keeps imported meshes");
     const auto& c = back.nodes[back.nodes.size() - 2];
@@ -602,7 +628,7 @@ void model_tests() {
           "pack keeps mesh references and material fields");
     check(back.nodes[6].type == NodeType::Label && back.nodes[6].text == "HI" && back.nodes[6].text_scale == 2
           && back.nodes[4].size.x == 40, "pack keeps 2D nodes");
-    check(render_scene(packed) == render_scene(back), "decoded v13 pack renders identically");
+    check(render_scene(packed) == render_scene(back), "decoded v14 pack renders identically");
 }
 
 NodeDesc shape(uint32_t id, int32_t parent, CollisionKind kind, Vec3 size = {1, 1, 1}, float radius = 0.5f, float height = 2) {
@@ -804,7 +830,7 @@ func _physics_process(delta):
         simulate(r, 1.5f);
         check(position_of(r, 10).y < -1, "bodies on other layers do not collide");
     }
-    {   // Package v13 keeps the physics fields; 30 balls cost a few milliseconds per second.
+    {   // Package v14 keeps the physics fields; 30 balls cost a few milliseconds per second.
         Description d = floor_scene();
         for (int i = 0; i < 30; ++i) {
             const int ball = add_body(d, uint32_t(100 + i * 2), NodeType::RigidBody3D, "Ball", {float(i % 6) - 2.5f, 1.0f + float(i / 6) * 1.2f, 0},
@@ -982,7 +1008,7 @@ void particle_tests() {
         step(r, 0.5f);
         check(has_log(r, "finished 5 -2", false), "restart() runs one cycle; properties read back");
     }
-    {   // Package v13 keeps the particle fields; out-of-range values are rejected.
+    {   // Package v14 keeps the particle fields; out-of-range values are rejected.
         Description d = scene();
         auto& p = emitter(d);
         p.amount = 64; p.lifetime = 1.5f; p.one_shot = true; p.additive = false; p.spread = 90; p.gravity = {0, -3, 1};
@@ -1046,6 +1072,19 @@ void scene_tests() {
     clash.scenes.push_back(level);
     check(!r.load(clash, error), "duplicate scene paths are rejected");
 
+    // A package played in place, like the firmware: only the current scene stays decoded.
+    Runtime packed;
+    std::vector<ScriptDiagnostic> diagnostics;
+    check(packed.load_pack(bytes.data(), bytes.size(), error) && packed.start(diagnostics), "a package starts from load_pack()");
+    check(packed.description().nodes.empty() && packed.description().scenes[0].nodes.empty() && packed.node_count() == 1,
+          "load_pack() keeps no scene nodes besides the live ones");
+    for (int i = 0; i < 6; ++i) packed.update(1.0f / 60);
+    check(packed.current_scene() == "res://level.jetscene" && packed.node_state(2, state) && state.name == "Cube"
+          && has_log(packed, "level ready Level", false), "scenes are read again from the package when entered and reloaded");
+    packed.stop();
+    check(packed.current_scene() == "res://menu.jetscene" && packed.node_state(1, state) && state.name == "Menu",
+          "Stop rebuilds the starting scene from the package");
+
     // Autoloads keep their state across scene changes and are reachable by name.
     Description game = d;
     game.scripts.push_back({"res://game.jet", "extends Node\nvar score := 0\nfunc _ready():\n\tprint(\"game ready\")\n", {}});
@@ -1074,6 +1113,45 @@ void scene_tests() {
     check(!r.load(bad_autoload, error), "an autoload can't be called Input");
 }
 
+void sprite_tests() {
+    std::string error;
+    // A 4×2 sheet of two frames: frame 0 is red then green, frame 1 is blue.
+    const uint32_t red = 0xff0000ff, green = 0xff00ff00, blue = 0xffff0000; // RGBA bytes, little endian
+    const std::vector<uint32_t> rgba = {red, green, blue, blue, red, green, blue, blue};
+    TextureAsset sheet;
+    check(make_texture("res://sheet.png", 4, 2, reinterpret_cast<const uint8_t*>(rgba.data()), sheet, error), "sprite sheet converts");
+    Description d;
+    d.nodes.push_back(node(1, -1, NodeType::Node3D, "World"));
+    auto camera = node(2, 0, NodeType::Camera3D, "Camera3D");
+    camera.position = {0, 0, 3}; camera.current = true;
+    d.nodes.push_back(camera);
+    auto sprite = node(3, 0, NodeType::Sprite3D, "Sprite3D");
+    sprite.texture = 0; sprite.hframes = 2; sprite.pixel_size = 0.5f; sprite.color = 0xffffff;
+    d.nodes.push_back(sprite);
+    d.textures.push_back(sheet);
+    auto pixel = [](Runtime& r, int dx) { r.render(); return r.pixels()[size_t(r.height() / 2) * size_t(r.width()) + size_t(r.width() / 2 + dx)]; };
+    Runtime r;
+    check(r.load(d, error), "a Sprite3D scene loads");
+    check(pixel(r, -6) == rgb565(0xff0000) && pixel(r, 6) == rgb565(0x00ff00), "Sprite3D shows frame 0 of the sheet, unlit");
+    Description flipped = d;
+    flipped.nodes[2].flip_h = true;
+    check(r.load(flipped, error) && pixel(r, -6) == rgb565(0x00ff00) && pixel(r, 6) == rgb565(0xff0000), "flip_h mirrors the frame");
+    Description scripted = d;
+    scripted.scripts.push_back({"res://car.jet", "extends Sprite3D\nfunc _process(delta):\n\tframe = 1\n", {}});
+    scripted.nodes[2].script = 0;
+    std::vector<ScriptDiagnostic> diagnostics;
+    check(r.load(scripted, error) && r.start(diagnostics), "a Sprite3D script starts");
+    r.update(1.0f / 60);
+    check(pixel(r, -6) == rgb565(0x0000ff) && pixel(r, 6) == rgb565(0x0000ff), "a script changes the frame");
+    Description wrong = d;
+    wrong.nodes[2].frame = 2;
+    check(!r.load(wrong, error), "a frame past hframes × vframes is rejected");
+    const auto bytes = encode_pack(flipped, error);
+    Description back;
+    check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[2].type == NodeType::Sprite3D && back.nodes[2].hframes == 2
+          && back.nodes[2].flip_h && back.nodes[2].pixel_size == 0.5f, "the package keeps the Sprite3D fields");
+}
+
 int main(int argc, char** argv) {
     std::string error;
     bytecode_tests();
@@ -1082,6 +1160,7 @@ int main(int argc, char** argv) {
     physics_tests();
     particle_tests();
     scene_tests();
+    sprite_tests();
     Runtime runtime;
     const Description base = scene();
     check(runtime.load(base, error), "valid scene loads");
@@ -1339,5 +1418,5 @@ int main(int argc, char** argv) {
     }
 
     if (failures) { std::cerr << failures << " runtime test(s) failed\n"; return 1; }
-    std::cout << "PASS: hierarchy, Godot transforms, validation, picking, scripts, input, queue_free, errors, bytecode, textures, materials, sky, OBJ import, quantization, Quad/Torus, reflections, 2D nodes, draw order, resolution, physics, particles, input map, scenes, autoloads, pack v13\n";
+    std::cout << "PASS: hierarchy, Godot transforms, validation, picking, scripts, input, queue_free, errors, bytecode, textures, materials, sky, OBJ import, quantization, Quad/Torus, reflections, 2D nodes, draw order, resolution, physics, particles, input map, scenes, autoloads, Sprite3D, plain Control, pack v14\n";
 }

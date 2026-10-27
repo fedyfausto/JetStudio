@@ -1,0 +1,63 @@
+extends Sprite3D
+
+# The red car: it accelerates on its own, the two buttons steer.
+@export var max_speed := 75.0      # m/s, 270 km/h
+@export var acceleration := 9.0
+@export var grass_speed := 22.0    # top speed off the road
+@export var steering := 12.0       # sideways m/s at top speed
+
+const DRIFT := 0.00025      # curves push the car outwards, more at higher speed
+const HEIGHT := 0.75        # sprite centre above the road
+
+var s := 0.0          # metres along the road
+var x := 0.0          # metres right of the middle
+var speed := 0.0
+var racing := false   # without the race, no control: the car coasts to a stop
+var bump := 0.0       # seconds of camera shake after hitting a car
+
+@onready var track = $"../Track"
+@onready var traffic: Array = $"../Traffic".get_children()
+
+
+func _process(delta: float) -> void:
+	if bump > 0.0:
+		bump -= delta
+	if not visible:
+		return
+	var steer := 0.0
+	if racing:
+		steer = Input.get_axis("steer_left", "steer_right")
+		var top := grass_speed if is_off_road() else max_speed
+		speed = move_toward(speed, top, (acceleration if speed < top else 30.0) * delta)
+	else:
+		speed = move_toward(speed, 0.0, 20.0 * delta)
+	var grip := 0.35 + 0.65 * speed / max_speed
+	x += steer * steering * grip * delta
+	x += track.curve_at(s) * DRIFT * speed * speed * delta
+	x = clampf(x, -track.HALF - 8.0, track.HALF + 8.0)
+	s += speed * delta
+	# Frame 1 is the car turning left; flipped, it turns right.
+	frame = 0 if steer == 0.0 else 1
+	flip_h = steer > 0.0
+	for rival in traffic:
+		var gap: float = rival.s - s
+		if gap > 0.0 and gap < 3.2 and abs(rival.x - x) < 2.0 and speed > rival.speed:
+			speed = rival.speed * 0.6
+			s = rival.s - 3.2
+			bump = 0.35
+	position = track.point(s, x, HEIGHT)
+
+
+func is_off_road() -> bool:
+	return abs(x) > track.HALF + 0.3
+
+
+# Stopped in the middle of the road, s metres along it.
+func place(at: float) -> void:
+	s = at
+	x = 0.0
+	speed = 0.0
+	racing = false
+	frame = 0
+	flip_h = false
+	show()

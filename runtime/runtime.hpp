@@ -4,6 +4,7 @@
 #include "math3d.hpp"
 #include <array>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -25,7 +26,7 @@ constexpr size_t MaxTextureBytes = 4 * 1024 * 1024; // all textures of a scene
 // Named like Godot's. Label, TextureRect and ColorRect are 2D controls drawn over the 3D frame, in screen pixels.
 enum class NodeType : uint8_t { Node, Node3D, MeshInstance3D, Camera3D, DirectionalLight3D, WorldEnvironment,
                                 Label, TextureRect, ColorRect,
-                                StaticBody3D, CharacterBody3D, RigidBody3D, Area3D, CollisionShape3D, CPUParticles3D };
+                                StaticBody3D, CharacterBody3D, RigidBody3D, Area3D, CollisionShape3D, CPUParticles3D, Sprite3D, Control };
 // Godot's BoxShape3D, SphereShape3D, CapsuleShape3D.
 enum class CollisionKind : uint8_t { Box, Sphere, Capsule };
 // Primitives use Godot's default mesh sizes (BoxMesh 1 m, SphereMesh r 0.5...). Mesh is an imported model part.
@@ -110,6 +111,10 @@ struct NodeDesc {
     CullMode cull = CullMode::Back;
     DrawOrder draw_order = DrawOrder::Default;
     bool billboard = false;
+    // Sprite3D, as in Godot: frame `frame` of an hframes × vframes sheet, `pixel_size` metres per texel.
+    uint16_t hframes = 1, vframes = 1, frame = 0;
+    bool flip_h = false, flip_v = false;
+    float pixel_size = 0.01f;
     float diffuse = 1;      // diffuse reflectance 0..1
     bool reflection = false; // albedo texture used as environment panorama (chrome, glass)
     int32_t mesh = -1;      // Shape::Mesh: index in Description::meshes
@@ -175,6 +180,7 @@ std::vector<InputAction> default_actions();
 struct SceneDesc {
     std::string path; // res://...jetscene
     std::vector<NodeDesc> nodes;
+    uint32_t offset = 0; // where its nodes start in the package (decode_pack)
 };
 constexpr size_t MaxScenes = 64;
 
@@ -191,6 +197,7 @@ struct Description {
     int width = DefaultWidth, height = DefaultHeight; // screen resolution
     std::vector<InputAction> actions = default_actions();
     std::vector<NodeDesc> nodes; // depth-first order, nodes[0] is the root
+    uint32_t nodes_offset = 0;   // where `nodes` start in the package (decode_pack)
     std::vector<SceneDesc> scenes; // the project's other scenes
     std::vector<Autoload> autoloads;
     std::vector<ScriptFile> scripts;
@@ -224,7 +231,10 @@ public:
     Runtime();
     ~Runtime();
     // Stops play. On error the previous scene is kept.
-    bool load(const Description&, std::string& error);
+    bool load(Description, std::string& error); // std::move it in to skip the copy
+    // An exported package that outlives the runtime (flash on the device): only the scene being played stays
+    // in RAM, the others are read again from the package when entered.
+    bool load_pack(const uint8_t* data, size_t size, std::string& error);
     // Compiles scripts and runs _ready(). On compile errors nothing runs.
     bool start(std::vector<ScriptDiagnostic>& errors);
     void stop(); // back to the authored state
@@ -263,6 +273,7 @@ public:
     int live_particles() const; // all CPUParticles3D, while playing
     size_t framebuffer_bytes() const { return (color_.size() + depth_.size()) * sizeof(uint16_t); }
     size_t mesh_count() const { return meshes_; }
+    size_t node_count() const { return nodes_.size(); }
     // Live state of a node during play (for the editor); false if missing/freed.
     bool node_state(uint32_t id, NodeDesc& out) const;
 
@@ -321,8 +332,10 @@ public:
 private:
     friend class ScriptHost;
     bool build(std::string& error);
+    Renderer::Object* make_mesh(const NodeDesc&, Renderer::Material*) const;
     void enter_scene();
     void switch_scene();
+    const std::vector<NodeDesc>* nodes_of(std::string_view path);
     void start_autoloads();
     void update_transforms(bool sync = true);
     // Physics (physics.cpp)
@@ -348,6 +361,7 @@ private:
     float random01();
     void sync_object(Live&);
     void bake(Live&, Vec3 scale);
+    void share(Live&, Vec3 scale);
     void apply_camera();
     void apply_environment();
     void apply_material(Live&);
@@ -371,6 +385,9 @@ private:
     Renderer::AmbientLight ambient_;
     std::vector<std::unique_ptr<Renderer::Material>> materials_;
     std::vector<std::unique_ptr<Renderer::Object>> objects_;
+    // Baked meshes shared by nodes with the same mesh, scale and UVs; a copy lives while some node draws it.
+    std::map<std::array<int32_t, 11>, std::weak_ptr<const Renderer::Object>> shared_meshes_;
+    Renderer::Material shared_material_; // what shared copies point at: every node draws them with its own material
     std::vector<std::unique_ptr<Renderer::Texture>> textures_;
     std::vector<uint16_t> gradient_;
     std::vector<int32_t> sky_columns_, sky_rows_;
@@ -385,6 +402,9 @@ private:
     std::vector<int32_t> collision_objects_; // bodies and areas with shapes, once each
     bool transforms_stale_ = false; // scripts ran after the last update_transforms()
     const std::vector<NodeDesc>* scene_nodes_ = nullptr; // the scene that is built
+    const uint8_t* pack_ = nullptr; // set by load_pack()
+    size_t pack_size_ = 0;
+    std::vector<NodeDesc> pack_nodes_; // a scene read from the package, until build() copies it
     std::string current_scene_, pending_scene_;
     std::vector<std::shared_ptr<const jetscript::Script>> compiled_;
     std::vector<std::unique_ptr<Renderer::ParticleSystem>> particles_; // one per CPUParticles3D while playing
@@ -415,4 +435,7 @@ private:
 std::vector<uint8_t> encode_pack(const Description&, std::string& error);
 #endif
 bool decode_pack(const uint8_t*, size_t, Description&, std::string& error);
+bool pack_resolution(const uint8_t*, size_t, int& width, int& height); // header only
+// One scene's nodes, read again from the package at SceneDesc::offset or Description::nodes_offset.
+bool decode_nodes(const uint8_t*, size_t, uint32_t offset, std::vector<NodeDesc>&, std::string& error);
 } // namespace jetstudio

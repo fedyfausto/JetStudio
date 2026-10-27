@@ -240,10 +240,11 @@ func _refresh() -> void:
 		var option: OptionButton = _pins[key]
 		option.clear()
 		option.add_item("—  not connected" if key in Hardware.OPTIONAL_PINS else "—  choose")
-		var allowed := Hardware.spi_pins(_hw, key) # STM32: SCK/MOSI of the SPI peripheral only
+		var fast := Hardware.spi_pins(_hw, key) # STM32: where the SPI peripheral drives SCK/MOSI
 		for entry in Hardware.board_pins(_hw):
-			option.add_item(Hardware.pin_label(_hw, int(entry[1])))
-			if not allowed.is_empty() and not int(entry[1]) in allowed: option.set_item_disabled(option.item_count - 1, true)
+			var label := Hardware.pin_label(_hw, int(entry[1]))
+			if int(entry[1]) in fast: label += "  · " + str(Hardware.boards[_hw.board].spi.port)
+			option.add_item(label)
 		_select_gpio(option, int(_hw.pins.get(key, -1)))
 	_refresh_buttons()
 	_filling = false
@@ -317,6 +318,8 @@ func _button_pins() -> Dictionary:
 func _check() -> void:
 	var size := Hardware.resolution(_hw)
 	_resolution.text = "%d × %d px (the game uses the display's resolution)" % [size.x, size.y]
+	if Hardware.software_spi(_hw):
+		_resolution.text += "\nSCK/MOSI aren't on %s: the display runs on software SPI." % Hardware.boards[_hw.board].spi.port
 	var problems := Hardware.problems(_hw, _button_pins())
 	var buttons := _button_pins().values()
 	for gpio in buttons:

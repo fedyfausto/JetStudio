@@ -18,6 +18,7 @@ class LGFX : public lgfx::LGFX_Device {
     lgfx::Light_PWM light;
     lgfx::Bus_SPI bus;
 public:
+    lgfx::Bus_SPI& panel_bus() { return bus; }
     LGFX() {
         auto b = bus.config();
         b.spi_host = SPI2_HOST; // required by the queued DMA scanout

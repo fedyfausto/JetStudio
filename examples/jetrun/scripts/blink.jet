@@ -1,0 +1,13 @@
+extends Control
+
+# Blinks the children twice a second.
+var elapsed := 0.0
+
+@onready var labels: Array = get_children()
+
+
+func _process(delta: float) -> void:
+	elapsed += delta
+	var on := int(elapsed * 2.0) % 2 == 0
+	for label in labels:
+		label.visible = on

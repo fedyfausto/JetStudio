@@ -468,12 +468,12 @@ bool Value::truthy() const { return detail::truthy(*this); }
 bool Value::as_bool() const { return type_ == Type::Bool && u_.b; }
 Int Value::as_int() const {
     if (type_ == Type::Int) return u_.i;
-    if (type_ == Type::Float) return detail::real_to_int(double(f_));
+    if (type_ == Type::Float) return detail::real_to_int(f_);
     return 0;
 }
 Real Value::as_real() const {
     if (type_ == Type::Float) return f_;
-    if (type_ == Type::Int) return Real(u_.i);
+    if (type_ == Type::Int) return detail::int_to_real(u_.i);
     return 0;
 }
 Vector3 Value::as_vector3() const { return type_ == Type::Vector3 ? Heap::vec(*this) : Vector3(); }

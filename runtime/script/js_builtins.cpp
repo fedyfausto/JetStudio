@@ -150,7 +150,7 @@ double string_to_float(std::string_view s, bool* full = nullptr) {
 bool bf_int(BuiltinCtx& ctx, const Value* a, int, Value& out) {
     switch (a[0].type()) {
     case Type::Int: out = a[0]; return true;
-    case Type::Float: out = Value(real_to_int(double(Heap::f(a[0])))); return true;
+    case Type::Float: out = Value(real_to_int(Heap::f(a[0]))); return true;
     case Type::Bool: out = Value(Int(Heap::b(a[0]) ? 1 : 0)); return true;
     case Type::String: out = Value(string_to_int(Heap::sv(a[0]))); return true;
     default: return fail(ctx, std::string("Cannot convert a value of type '") + type_name(a[0].type()) + "' to int.");
@@ -274,9 +274,9 @@ JS_FLOAT_FN(roundf, std::round(x))
         out = Value(Int(expr));                                           \
         return true;                                                      \
     }
-JS_INT_FN(floori, a[0].type() == Type::Int ? Heap::i(a[0]) : real_to_int(double(std::floor(x))))
-JS_INT_FN(ceili, a[0].type() == Type::Int ? Heap::i(a[0]) : real_to_int(double(std::ceil(x))))
-JS_INT_FN(roundi, a[0].type() == Type::Int ? Heap::i(a[0]) : real_to_int(double(std::round(x))))
+JS_INT_FN(floori, a[0].type() == Type::Int ? Heap::i(a[0]) : real_to_int(std::floor(x)))
+JS_INT_FN(ceili, a[0].type() == Type::Int ? Heap::i(a[0]) : real_to_int(std::ceil(x)))
+JS_INT_FN(roundi, a[0].type() == Type::Int ? Heap::i(a[0]) : real_to_int(std::round(x)))
 JS_INT_FN(signi, a[0].type() == Type::Int ? isign(Heap::i(a[0])) : Int(fsign(x)))
 #undef JS_INT_FN
 
@@ -1153,7 +1153,12 @@ int string_method(MCall& c) {
 }
 
 bool sort_less(const Value& a, const Value& b) {
-    if (is_num(a) && is_num(b)) return num(a) < num(b);
+    if (is_num(a) && is_num(b)) {
+        if (a.type() == Type::Int && b.type() == Type::Int) return Heap::i(a) < Heap::i(b);
+        Real x = 0, y = 0;
+        if (exact_real(a, x) && exact_real(b, y)) return x < y;
+        return num(a) < num(b);
+    }
     if (a.type() != b.type()) return int(a.type()) < int(b.type());
     switch (a.type()) {
     case Type::String: return Heap::sv(a) < Heap::sv(b);

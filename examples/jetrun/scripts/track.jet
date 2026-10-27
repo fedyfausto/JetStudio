@@ -1,0 +1,120 @@
+extends Node3D
+
+# An endless road: a ring of segments, the ones the camera leaves behind move to the far end.
+const SEG := 5.0            # segment length, metres
+const HALF := 5.0           # half the road width
+const TREE_Y := 3.84
+
+@onready var road: Array = $Road.get_children()
+@onready var grass: Array = $Grass.get_children()
+@onready var scenery: Array = $Scenery.get_children()
+@onready var camera = $"../Camera3D"
+
+# Segment i lives in slot i % size of these arrays.
+var size := 0
+var starts := []
+var dirs := []
+var rights := []
+var yaws := []
+var curves := []
+var first := 0
+var next := 0
+var trees := 0
+var cursor := Vector3.ZERO
+var heading := 0.0
+var slope := 0.0
+var section_left := 0
+var section_curve := 0.0
+var section_slope := 0.0
+
+
+func _ready() -> void:
+	randomize()
+	size = road.size()
+	for i in range(size):
+		starts.append(Vector3.ZERO)
+		dirs.append(Vector3.FORWARD)
+		rights.append(Vector3.RIGHT)
+		yaws.append(0.0)
+		curves.append(0.0)
+	for i in range(size):
+		build_segment()
+
+
+func _process(_delta: float) -> void:
+	while int(floor((camera.eye.x - 3.0) / SEG)) - first > 1:
+		first += 1
+		build_segment()
+	if Vector3(cursor.x, 0.0, cursor.z).length() > 400.0:
+		recenter()
+
+
+# The point s metres along the road, x to the right of its middle and height above it.
+func point(s: float, x: float, height := 0.0) -> Vector3:
+	var i := slot_of(s)
+	var k := i % size
+	return starts[k] + dirs[k] * (s - i * SEG) + rights[k] * x + Vector3(0.0, height, 0.0)
+
+
+func yaw_at(s: float) -> float:
+	return yaws[slot_of(s) % size]
+
+
+func curve_at(s: float) -> float:
+	return curves[slot_of(s) % size]
+
+
+func is_built(s: float) -> bool:
+	return s > first * SEG and s < (next - 1) * SEG
+
+
+func slot_of(s: float) -> int:
+	return clampi(int(floor(s / SEG)), first, next - 1)
+
+
+func build_segment() -> void:
+	if section_left <= 0:
+		section_left = randi_range(10, 28)
+		var kind := randi_range(0, 4)
+		section_curve = 0.0 if kind == 0 else randf_range(0.8, 2.2) * (1.0 if kind % 2 == 0 else -1.0)
+		section_slope = randf_range(-0.07, 0.07) if randf() < 0.6 else 0.0
+	section_left -= 1
+	slope = lerpf(slope, section_slope, 0.2)
+	heading += section_curve
+	var k := next % size
+	var a := deg_to_rad(heading)
+	var dir := Vector3(-sin(a), slope, -cos(a)).normalized()
+	starts[k] = cursor
+	dirs[k] = dir
+	rights[k] = Vector3(cos(a), 0.0, -sin(a))
+	yaws[k] = heading
+	curves[k] = section_curve
+	var middle := cursor + dir * (SEG * 0.5)
+	# The quads lie flat: -90 degrees on X, then the hill's tilt.
+	var tilt := Vector3(rad_to_deg(atan(slope)) - 90.0, heading, 0.0)
+	road[k].position = middle
+	road[k].rotation_degrees = tilt
+	grass[k].position = middle - Vector3(0.0, 0.05, 0.0)
+	grass[k].rotation_degrees = tilt
+	# A palm or a sign every other segment, one side then the other.
+	if next % 2 == 0:
+		var tree = scenery[trees % scenery.size()]
+		var side := -1.0 if trees % 2 == 0 else 1.0
+		tree.frame = 1 if randf() < 0.15 else 0
+		tree.position = middle + rights[k] * (side * (HALF + 3.0 + randf() * 5.0)) + Vector3(0.0, TREE_Y, 0.0)
+		trees += 1
+	cursor += dir * SEG
+	next += 1
+
+
+# Keeps coordinates small: the road moves back so its far end sits near the origin.
+# Cars, gate and camera are placed with point() every frame, so they follow.
+func recenter() -> void:
+	var shift := Vector3(cursor.x, 0.0, cursor.z)
+	cursor -= shift
+	for k in range(size):
+		starts[k] = starts[k] - shift
+		road[k].position -= shift
+		grass[k].position -= shift
+	for tree in scenery:
+		tree.position -= shift

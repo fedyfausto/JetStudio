@@ -81,6 +81,33 @@ void print_log() {
     }
 }
 
+// LovyanGFX sends long writes with a DMA that hangs on the F7 (no SPI1 interrupt handler, DTCM, data cache).
+// Rows go through the SPI data register like its command bytes: the SPI clock is the limit either way.
+void write_row(const uint16_t* pixels, int count) {
+#if JET_SOFT_SPI
+    display.panel_bus().writeBytes(reinterpret_cast<const uint8_t*>(pixels), uint32_t(count) * 2, true, false);
+#else
+    SPI_TypeDef* spi = Board::spi();
+    auto* dr = reinterpret_cast<volatile uint8_t*>(&spi->DR);
+    while (!(spi->SR & SPI_SR_TXE) || (spi->SR & SPI_SR_BSY)) {} // the address command is out
+    digitalWriteFast(PinName(Board::dc), HIGH);
+    const auto* bytes = reinterpret_cast<const uint8_t*>(pixels);
+    for (int i = 0, n = count * 2; i < n; ++i) {
+        while (!(spi->SR & SPI_SR_TXE)) {}
+        *dr = bytes[i];
+    }
+    while (!(spi->SR & SPI_SR_TXE) || (spi->SR & SPI_SR_BSY)) {}
+#endif
+}
+
+void clear_screen() {
+    std::vector<uint16_t> black(size_t(Board::screenWidth), 0);
+    display.startWrite();
+    display.setAddrWindow(0, 0, Board::screenWidth, Board::screenHeight);
+    for (int y = 0; y < Board::screenHeight; ++y) write_row(black.data(), Board::screenWidth);
+    display.endWrite();
+}
+
 // Sends the rows of the field just drawn (every other display row), like the ESP32 scanout.
 void send_field(int parity) {
     const int width = runtime->width(), height = runtime->height(), field_width = runtime->buffer_width();
@@ -96,7 +123,7 @@ void send_field(int parity) {
         Renderer::expandSwapRGB565(row.data(), field + size_t(y >> 1) * field_width, size_t(field_width));
         if (y >= overlay_top && y < overlay_bottom) jetstudio::compose_overlay_row(overlay, row.data(), y, width, true);
         display.setAddrWindow(0, y, width, 1);
-        display.writePixels(row.data(), width, false); // already in panel byte order
+        write_row(row.data(), width); // already in panel byte order
     }
     display.endWrite();
 }
@@ -104,26 +131,35 @@ void send_field(int parity) {
 
 void setup() {
     if (SerialLog) Serial.begin(115200);
+    log_line('I', "Starting on %s", Board::name);
     Board::begin_spi();
-    if (!display.init()) halt("Display initialization failed");
+    // Reset by hand and init without LovyanGFX's clear(), which would start its DMA (see write_row).
+    if (Board::reset >= 0) {
+        const uint32_t reset = pinNametoDigitalPin(PinName(Board::reset));
+        pinMode(reset, OUTPUT);
+        digitalWrite(reset, LOW);
+        delay(10);
+        digitalWrite(reset, HIGH);
+        delay(120);
+    }
+    if (!display.init_without_reset(false)) halt("Display initialization failed");
     display.setRotation(Board::rotation);
-    display.fillScreen(0);
+    clear_screen();
     if (Board::backlight >= 0) {
         pinMode(pinNametoDigitalPin(PinName(Board::backlight)), OUTPUT);
         digitalWrite(pinNametoDigitalPin(PinName(Board::backlight)), HIGH);
     }
     std::string error;
-    auto* document = new jetstudio::Description();
-    if (!jetstudio::decode_pack(scene_data, sizeof(scene_data), *document, error)) halt(("Invalid scene: " + error).c_str());
-    if (document->width != Board::screenWidth || document->height != Board::screenHeight) {
+    int width = 0, height = 0;
+    if (!jetstudio::pack_resolution(scene_data, sizeof(scene_data), width, height)) halt("Invalid scene: export the project again");
+    if (width != Board::screenWidth || height != Board::screenHeight) {
         log_line('E', "The scene is %dx%d, the display (%s) %dx%d: export it with the project's hardware settings",
-            document->width, document->height, Board::name, Board::screenWidth, Board::screenHeight);
+            width, height, Board::name, Board::screenWidth, Board::screenHeight);
         halt("Wrong resolution");
     }
-    const size_t nodes = document->nodes.size(), scripts = document->scripts.size();
+    // The package stays in flash: only the scene being played is decoded into RAM.
     runtime = new jetstudio::Runtime();
-    if (!runtime->load(*document, error)) halt(("Invalid scene: " + error).c_str());
-    delete document; // the runtime keeps its own copy
+    if (!runtime->load_pack(scene_data, sizeof(scene_data), error)) halt(("Invalid scene: " + error).c_str());
     std::vector<jetstudio::ScriptDiagnostic> diagnostics;
     if (!runtime->start(diagnostics)) {
         for (const auto& d : diagnostics) log_line('E', "%s:%d:%d %s", d.path.c_str(), d.line, d.column, d.message.c_str());
@@ -134,8 +170,8 @@ void setup() {
     configure_buttons();
     log_line('I', "%s on %s (%s): %dx%d, fields of %dx%d", Board::name, Board::port, F_CPU >= 200000000 ? "Cortex-M7" : "Cortex-M4",
         runtime->width(), runtime->height(), runtime->buffer_width(), runtime->buffer_rows());
-    log_line('I', "Scene loaded: %u nodes, %u meshes, %u scripts; free heap %u", unsigned(nodes), unsigned(runtime->mesh_count()),
-        unsigned(scripts), free_heap());
+    log_line('I', "Scene loaded: %u nodes, %u meshes, %u scripts; free heap %u", unsigned(runtime->node_count()),
+        unsigned(runtime->mesh_count()), unsigned(runtime->description().scripts.size()), free_heap());
     previous = micros();
 }
 

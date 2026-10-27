@@ -671,6 +671,25 @@ static void test_operators(Fixture& fx) {
     CHECK_EQ(ev(fx, "+3").as_int(), Int(3));
     CHECK_EQ(ev(fx, "9223372036854775807 + 1").as_int(), INT64_MIN); // wraps, no UB
     CHECK_EQ(ev(fx, "-9223372036854775807 - 2").as_int(), INT64_MAX);
+    // The 32 bit fast paths must give the 64 bit results.
+    CHECK_EQ(ev(fx, "-2147483648 / -1").as_int(), Int(2147483648));
+    CHECK_EQ(ev(fx, "-2147483648 % -1").as_int(), Int(0));
+    CHECK_EQ(ev(fx, "-2147483649 / 2").as_int(), Int(-1073741824));
+    CHECK_EQ(ev(fx, "(1 << 40) / 3").as_int(), (Int(1) << 40) / 3);
+    CHECK_EQ(ev(fx, "(1 << 40) % 7").as_int(), (Int(1) << 40) % 7);
+    CHECK_EQ(ev(fx, "-7 % -3").as_int(), Int(-1));
+    CHECK_EQ(run_body(fx, "var a = 1 << 40\nvar b = 3\nreturn a / b").as_int(), (Int(1) << 40) / 3);
+    CHECK_EQ(run_body(fx, "var a = 3000000000\nreturn a * 0.5").as_real(), 1.5e9f);
+    CHECK(ev(fx, "16777216 == 16777216.0 and 16777217 != 16777216.0 and 16777217 > 16777216.0").as_bool());
+    CHECK(ev(fx, "-3 < -2.5 and 2.5 < 3 and not (1 < NAN) and not (1 >= NAN) and not (1 == NAN)").as_bool());
+    CHECK_EQ(ev(fx, "int(-2147483648.0)").as_int(), Int(-2147483648LL));
+    CHECK_EQ(ev(fx, "int(3e9)").as_int(), Int(3000000000LL));
+    CHECK_EQ(ev(fx, "int(1e30)").as_int(), INT64_MAX);
+    CHECK_EQ(ev(fx, "int(-1e30)").as_int(), INT64_MIN);
+    CHECK_EQ(ev(fx, "int(NAN)").as_int(), Int(0));
+    CHECK_EQ(ev(fx, "floori(-2.5) + ceili(2.5) + roundi(2.5)").as_int(), Int(-3 + 3 + 3));
+    CHECK_EQ(run_body(fx, "var a = [3, 1.5, 2, -1e9, 20000000]\na.sort()\nreturn str(a)").to_string(),
+             std::string("[-1000000000.0, 1.5, 2, 3, 20000000]"));
     CHECK(ev(fx, "1 == 1.0").as_bool());
     CHECK(ev(fx, "1 != 2").as_bool());
     CHECK(ev(fx, "1 < 2.5").as_bool());
