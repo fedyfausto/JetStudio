@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 GODOT = ROOT / "third_party/godot/bin/godot.linuxbsd.template_debug.x86_64"
 RELEASE_GODOT = ROOT / "third_party/godot/bin/godot.linuxbsd.template_release.x86_64"
 LOCK = ROOT / "dependencies.lock.json"
+PATCHES = ROOT / "tools/patches"
 
 
 # Terminals inside snap apps (VS Code, for one) export the snap's GLib/GTK paths.
@@ -65,10 +66,21 @@ def run(command, cwd=ROOT):
     subprocess.run(list(map(str, command)), cwd=cwd, check=True)
 
 
+def patch(path, patches, reverse=False):
+    """Our fixes to a dependency (tools/patches/<name>-*.patch), kept until upstream has them."""
+    for item in reversed(patches) if reverse else patches:
+        command = ["git", "-C", str(path), "apply"] + (["-R"] if reverse else []) + [str(item)]
+        undo = ["git", "-C", str(path), "apply"] + ([] if reverse else ["-R"]) + ["--check", str(item)]
+        if subprocess.run(undo, capture_output=True).returncode == 0:
+            continue  # already applied (or already removed)
+        run(command)
+
+
 def setup(update=False):
     dependencies = json.loads(LOCK.read_text())
     for name, dependency in dependencies.items():
         path = ROOT / ("firmware/components" if name == "LovyanGFX" else "third_party") / name
+        patches = sorted(PATCHES.glob(f"{name}-*.patch"))
         if not (path / ".git").exists():
             if path.exists() and any(path.iterdir()):
                 raise RuntimeError(f"{path} exists without a Git checkout; inspect it before updating")
@@ -77,13 +89,17 @@ def setup(update=False):
         revision = "master" if update and name in ("godot", "godot-cpp") else dependency["revision"]
         current = subprocess.run(["git", "-C", str(path), "rev-parse", "HEAD"], capture_output=True, text=True)
         if not update and current.stdout.strip() == revision:
+            patch(path, patches)
             continue
+        if current.returncode == 0:
+            patch(path, patches, reverse=True)  # our patches aren't local changes
         status = subprocess.check_output(["git", "-C", str(path), "status", "--porcelain"], text=True)
         if status.strip():
             raise RuntimeError(f"Local changes in {path}; refusing to overwrite them")
         run(["git", "-C", path, "fetch", "--depth", "1", dependency["url"], revision])
         run(["git", "-C", path, "checkout", "--detach", "FETCH_HEAD"])
         dependency["revision"] = subprocess.check_output(["git", "-C", str(path), "rev-parse", "HEAD"], text=True).strip()
+        patch(path, patches)
     LOCK.write_text(json.dumps(dependencies, indent=2) + "\n")
 
 

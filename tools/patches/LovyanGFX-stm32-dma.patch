@@ -1,0 +1,231 @@
+diff --git a/src/lgfx/v1/platforms/stm32/Bus_SPI.cpp b/src/lgfx/v1/platforms/stm32/Bus_SPI.cpp
+index c70f3e6..dcb1c5e 100644
+--- a/src/lgfx/v1/platforms/stm32/Bus_SPI.cpp
++++ b/src/lgfx/v1/platforms/stm32/Bus_SPI.cpp
+@@ -27,14 +27,6 @@ namespace lgfx
+  inline namespace v1
+  {
+ //----------------------------------------------------------------------------
+-  static DMA_HandleTypeDef *dmaHal_single;
+-  
+-  extern "C" void DMA1_Stream4_IRQHandler();
+-  void DMA1_Stream4_IRQHandler(void)
+-  {
+-    // Call the default end of buffer handler
+-    HAL_DMA_IRQHandler(dmaHal_single);
+-  }
+ 
+   void Bus_SPI::config(const config_t& config)
+   {
+@@ -58,54 +50,44 @@ namespace lgfx
+   {
+     lgfx::pinMode(_cfg.pin_dc, pin_mode_t::output);
+ 
+-    dmaHal_single = &_dmaHal;
+-
+-    //_spiHal.Init.
+-
+-    _spiHal.Instance = _cfg.spi_port;
++    // The end of a transfer is polled (see finish_dma), so no DMA interrupt handler is needed.
++    _dma_busy = false;
++    _dmaHal.Instance = nullptr;
+     if (_cfg.spi_port == SPI1)
+     {
+-      __HAL_RCC_DMA2_CLK_ENABLE();                           // Enable DMA2 clock
+-      _dmaHal.Init.Channel = DMA_CHANNEL_3;                   // DMA channel 3 is for SPI1 TX
++      __HAL_RCC_DMA2_CLK_ENABLE();
++      _dmaHal.Init.Channel = DMA_CHANNEL_3;                   // DMA2 stream 3 channel 3 is SPI1 TX
+       _dmaHal.Instance = DMA2_Stream3;
+     }
+     else if (_cfg.spi_port == SPI2)
+     {
+-      __HAL_RCC_DMA1_CLK_ENABLE();                           // Enable DMA2 clock
+-      _dmaHal.Init.Channel = DMA_CHANNEL_0;                   // DMA channel 0 is for SPI2 TX
++      __HAL_RCC_DMA1_CLK_ENABLE();
++      _dmaHal.Init.Channel = DMA_CHANNEL_0;                   // DMA1 stream 4 channel 0 is SPI2 TX
+       _dmaHal.Instance = DMA1_Stream4;
+     }
++    if (_dmaHal.Instance == nullptr) { return true; }        // other SPI ports: CPU writes only
+ 
+-    _dmaHal.Init.Mode =  DMA_NORMAL; //DMA_CIRCULAR;   //   // Normal = send buffer once
++    _dmaHal.Init.Mode = DMA_NORMAL;                          // Normal = send buffer once
+     _dmaHal.Init.Direction = DMA_MEMORY_TO_PERIPH;          // Copy memory to the peripheral
+     _dmaHal.Init.PeriphInc = DMA_PINC_DISABLE;              // Don't increment peripheral address
+     _dmaHal.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE; // Peripheral is byte aligned
+     _dmaHal.Init.MemInc = DMA_MINC_ENABLE;                  // Increment memory address
+     _dmaHal.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;    // Memory is byte aligned
++    _dmaHal.Init.Priority = DMA_PRIORITY_HIGH;
++    _dmaHal.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
++    _dmaHal.Init.MemBurst = DMA_MBURST_SINGLE;
++    _dmaHal.Init.PeriphBurst = DMA_PBURST_SINGLE;
+ 
+     if (HAL_DMA_Init(&_dmaHal) != HAL_OK)
+-    {                  // Init DMA with settings
+-      // for (;;) {};
+-      // return; // error
+-    };
+-
+-    if (_cfg.spi_port == SPI1)
+-    {
+-      HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);  // Enable DMA end interrupt handler
+-    }
+-    else if (_cfg.spi_port == SPI2)
+     {
+-      HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);  // Enable DMA end interrupt handler
++      _dmaHal.Instance = nullptr;
+     }
+-
+-    __HAL_LINKDMA(&_spiHal, hdmatx, _dmaHal);   // Attach DMA engine to SPI peripheral
+-//*/
+-
+     return true;
+   }
+ 
+   void Bus_SPI::release(void)
+   {
++    wait_dma();
+   }
+ 
+   void Bus_SPI::beginTransaction(void)
+@@ -122,6 +104,7 @@ namespace lgfx
+ 
+   void Bus_SPI::beginRead(void)
+   {
++    wait_dma();
+     SPI.endTransaction();
+     SPISettings setting(_cfg.freq_read, BitOrder::MSBFIRST, _cfg.spi_mode, false);
+     SPI.beginTransaction(setting);
+@@ -135,12 +118,14 @@ namespace lgfx
+ 
+   void Bus_SPI::wait(void)
+   {
++    wait_dma();
+     wait_spi();
+   }
+ 
+   bool Bus_SPI::busy(void) const
+   {
+-    return _cfg.spi_port->SR  & SPI_SR_BSY;
++    if (_dma_busy && (_dmaHal.Instance->CR & DMA_SxCR_EN)) { return true; }
++    return _cfg.spi_port->SR & SPI_SR_BSY;
+   }
+ 
+   bool Bus_SPI::writeCommand(uint32_t data, uint_fast8_t bit_length)
+@@ -257,18 +242,71 @@ namespace lgfx
+   {
+     dc_control(dc);
+ 
+-    if (length < 16)
++    // Without use_dma the caller may reuse the buffer as soon as this returns.
++    if (!use_dma || length < 16 || _dmaHal.Instance == nullptr)
+     {
+-      SPI.transfer(const_cast<uint8_t*>(data), length);
++      write_polling(data, length);
+       return;
+     }
+-    _spiHal.State = HAL_SPI_STATE_READY;
++    // One DMA transfer sends at most 65535 bytes.
+     while (length > 0xFFFF)
+     {
+-      HAL_SPI_Transmit(&_spiHal, (uint8_t*)data, 0x1000, HAL_MAX_DELAY);
+-      length -= 0x1000; data += 0x1000;
++      start_dma(data, 0xFFFF);
++      finish_dma();
++      length -= 0xFFFF; data += 0xFFFF;
++    }
++    start_dma(data, length);
++  }
++
++  void Bus_SPI::write_polling(const uint8_t* data, uint32_t length)
++  {
++    auto spidr = reinterpret_cast<volatile uint8_t*>(&_cfg.spi_port->DR);
++    auto spisr = &_cfg.spi_port->SR;
++    for (uint32_t i = 0; i < length; ++i)
++    {
++      do {} while (!(*spisr & sr_mask));
++      *spidr = data[i];
+     }
+-    HAL_SPI_Transmit_DMA(&_spiHal, (uint8_t*)data, length);
++  }
++
++  // Starts sending and returns at once; finish_dma() waits for the end.
++  void Bus_SPI::start_dma(const uint8_t* data, uint32_t length)
++  {
++#if defined (__DCACHE_PRESENT) && (__DCACHE_PRESENT == 1U)
++    // The DMA reads the RAM, not the data cache (Cortex-M7): write the cached lines back first.
++    if (SCB->CCR & SCB_CCR_DC_Msk)
++    {
++      const uint32_t address = reinterpret_cast<uint32_t>(data);
++      SCB_CleanDCache_by_Addr(reinterpret_cast<uint32_t*>(address & ~31u), int32_t(length + (address & 31u)));
++    }
++#endif
++    if (HAL_DMA_Start(&_dmaHal, reinterpret_cast<uint32_t>(data), reinterpret_cast<uint32_t>(&_cfg.spi_port->DR), length) != HAL_OK)
++    {
++      write_polling(data, length);
++      return;
++    }
++    _dma_busy = true;
++    _cfg.spi_port->CR2 |= SPI_CR2_TXDMAEN;
++  }
++
++  void Bus_SPI::finish_dma(void)
++  {
++    HAL_DMA_PollForTransfer(&_dmaHal, HAL_DMA_FULL_TRANSFER, HAL_MAX_DELAY);
++    auto spi = _cfg.spi_port;
++    // The last bytes are still in the SPI.
++#if defined (SPI_SR_FTLVL)
++    do {} while (spi->SR & SPI_SR_FTLVL);
++#endif
++    do {} while (!(spi->SR & sr_mask));
++    do {} while (spi->SR & SPI_SR_BSY);
++    spi->CR2 &= ~SPI_CR2_TXDMAEN;
++    // Nobody reads what came back during the transfer: drop it and clear the overrun flag.
++#if defined (SPI_SR_FRLVL)
++    while (spi->SR & SPI_SR_FRLVL) { (void)*reinterpret_cast<volatile uint8_t*>(&spi->DR); }
++#endif
++    (void)spi->DR;
++    (void)spi->SR;
++    _dma_busy = false;
+   }
+ 
+   uint32_t Bus_SPI::readData(uint_fast8_t bit_length)
+diff --git a/src/lgfx/v1/platforms/stm32/Bus_SPI.hpp b/src/lgfx/v1/platforms/stm32/Bus_SPI.hpp
+index 62de14e..7041898 100644
+--- a/src/lgfx/v1/platforms/stm32/Bus_SPI.hpp
++++ b/src/lgfx/v1/platforms/stm32/Bus_SPI.hpp
+@@ -81,6 +81,10 @@ namespace lgfx
+ 
+   private:
+ 
++    void start_dma(const uint8_t* data, uint32_t length);
++    void finish_dma(void);
++    void write_polling(const uint8_t* data, uint32_t length);
++
+ #if defined(STM32H7xx) || defined(STM32MP1xx)
+       static constexpr uint32_t sr_mask = SPI_SR_TXP;
+ #else
+@@ -93,8 +97,15 @@ namespace lgfx
+       do {} while (*spisr & SPI_SR_BSY);
+     }
+ 
++    // A DMA transfer may still be running: the SPI can look idle between two of its bytes.
++    __attribute__ ((always_inline)) inline void wait_dma(void)
++    {
++      if (_dma_busy) { finish_dma(); }
++    }
++
+     __attribute__ ((always_inline)) inline void dc_control(bool flg)
+     {
++      wait_dma();
+       auto gpio_reg_dc = _gpio_reg_dc;
+       auto mask_reg_dc = flg ? _mask_reg_dc_h : _mask_reg_dc_l;
+       volatile uint32_t *spisr = &_cfg.spi_port->SR;
+@@ -130,7 +141,7 @@ namespace lgfx
+     uint32_t _clkdiv_read;
+     volatile uint32_t* _gpio_reg_dc;
+     DMA_HandleTypeDef _dmaHal;
+-    SPI_HandleTypeDef _spiHal;
++    bool _dma_busy = false;
+   };
+ 
+ //----------------------------------------------------------------------------

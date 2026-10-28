@@ -1,0 +1,38 @@
+diff --git a/src/Scene.cpp b/src/Scene.cpp
+index 62ccb3f..cde12b0 100644
+--- a/src/Scene.cpp
++++ b/src/Scene.cpp
+@@ -301,6 +301,15 @@ void Scene::resize(uint16_t* newFramebuffer, uint16_t* newZBuffer,
+     }
+ }
+ 
++void Scene::reserveTriangles(size_t triangles) {
++    renderQueue.reserve(triangles);
++#if TEXTURE_MAPPING
++    textureQueue.reserve(triangles);
++#endif
++    renderBuckets.reserve(triangles);
++    renderOrder.reserve(triangles);
++}
++
+ void Scene::addObject(Object* obj) {
+     objects.push_back(obj);
+ }
+diff --git a/src/Scene.hpp b/src/Scene.hpp
+index b481564..833780a 100644
+--- a/src/Scene.hpp
++++ b/src/Scene.hpp
+@@ -59,6 +59,13 @@ public:
+     /// @param obj Object to add. Pointer is borrowed; caller retains ownership.
+     void addObject(Object* obj);
+ 
++    /// @brief Reserve the per-frame triangle queues for up to `triangles` faces.
++    /// They otherwise grow while drawing, and each growth briefly holds the old
++    /// and the doubled buffer at once: on boards without external RAM that peak
++    /// can be the difference between a scene fitting or not. Call it once the
++    /// scene's objects are known, while the heap is still in one piece.
++    void reserveTriangles(size_t triangles);
++
+     /// @brief Add a point light to the scene.
+     /// @param light Light to add. Pointer is borrowed; caller retains ownership.
+     void addPointLight(PointLight* light);

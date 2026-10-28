@@ -230,18 +230,18 @@ void Runtime::physics_begin() {
     world.shapes.clear();
     for (const auto& [i, body] : shape_owners_) {
         const Live& n = nodes_[size_t(i)];
-        if (n.freed || n.d.disabled || nodes_[size_t(body)].freed) continue;
+        if (n.freed || n.d.more().disabled || nodes_[size_t(body)].freed) continue;
         physics::Shape shape;
-        shape.kind = n.d.collision;
-        shape.size = n.d.box_size;
-        shape.authored_radius = n.d.radius;
-        shape.authored_height = n.d.height;
+        shape.kind = n.d.more().collision;
+        shape.size = n.d.more().box_size;
+        shape.authored_radius = n.d.more().radius;
+        shape.authored_height = n.d.more().height;
         shape.body = body;
         shape.node = int(i);
         const NodeDesc& owner = nodes_[size_t(body)].d;
         shape.owner = owner.type;
-        shape.layer = owner.collision_layer;
-        shape.mask = owner.collision_mask;
+        shape.layer = owner.more().collision_layer;
+        shape.mask = owner.more().collision_mask;
         shape.local = nodes_[size_t(body)].world.inverse() * n.world;
         physics::place(shape, n.world);
         world.shapes.push_back(shape);
@@ -272,8 +272,8 @@ void Runtime::move_body(int index, const Transform& world, bool rotated) {
 }
 
 void Runtime::wake(Live& n) {
-    n.sleeping = false;
-    n.still_time = 0;
+    n.edit_motion().sleeping = false;
+    n.edit_motion().still_time = 0;
 }
 
 bool Runtime::deepest_contact(int index, physics::Contact& best, int& other) const {
@@ -300,9 +300,9 @@ bool Runtime::move_and_slide(int index) {
     if (!physics_->valid) physics_begin();
     Live& c = nodes_[size_t(index)];
     const Vec3 up{0, 1, 0};
-    const float floor_cos = std::cos(radians(std::clamp(c.d.floor_max_angle, 0.0f, 89.0f)));
-    const bool was_on_floor = c.on_floor;
-    c.on_floor = c.on_wall = c.on_ceiling = false;
+    const float floor_cos = std::cos(radians(std::clamp(c.d.more().floor_max_angle, 0.0f, 89.0f)));
+    const bool was_on_floor = c.motion().on_floor;
+    c.edit_motion().on_floor = c.edit_motion().on_wall = c.edit_motion().on_ceiling = false;
     float smallest = 1e30f;
     for (const auto& s : physics_->shapes) {
         if (s.body != index) continue;
@@ -311,17 +311,17 @@ bool Runtime::move_and_slide(int index) {
     if (smallest == 1e30f) {
         // No shape: plain motion, like Godot.
         Transform world = c.world;
-        world.origin = world.origin + c.velocity * physics_delta_;
+        world.origin = world.origin + c.motion().velocity * physics_delta_;
         move_body(index, world, false);
         return false;
     }
     Transform world = c.world;
     // Standing on a moving body (platform): move with it first.
-    if (was_on_floor && c.floor_body >= 0 && !nodes_[size_t(c.floor_body)].freed) {
-        const Live& floor = nodes_[size_t(c.floor_body)];
-        world.origin = world.origin + floor.last_motion; // as in Godot, the platform's last step
+    if (was_on_floor && c.motion().floor_body >= 0 && !nodes_[size_t(c.motion().floor_body)].freed) {
+        const Live& floor = nodes_[size_t(c.motion().floor_body)];
+        world.origin = world.origin + floor.motion().last_motion; // as in Godot, the platform's last step
     }
-    c.floor_body = -1;
+    c.edit_motion().floor_body = -1;
     bool collided = false;
     auto resolve = [&]() {
         for (int iteration = 0; iteration < 4; ++iteration) {
@@ -329,33 +329,33 @@ bool Runtime::move_and_slide(int index) {
             int other;
             if (!deepest_contact(index, contact, other)) return;
             collided = true;
-            const Vec3 moving = c.velocity; // before the contact removes its push into the surface
+            const Vec3 moving = c.motion().velocity; // before the contact removes its push into the surface
             const float facing = contact.normal.dot(up);
             if (facing > floor_cos) {
                 // Floor: lift straight up, so standing on a slope does not slide.
-                c.on_floor = true;
-                c.floor_normal = contact.normal;
-                c.floor_body = other;
+                c.edit_motion().on_floor = true;
+                c.edit_motion().floor_normal = contact.normal;
+                c.edit_motion().floor_body = other;
                 world.origin.y += contact.depth / std::max(facing, 0.3f) + 0.0005f;
-                if (c.velocity.y < 0) c.velocity.y = 0;
+                if (c.edit_motion().velocity.y < 0) c.edit_motion().velocity.y = 0;
             } else {
-                if (facing < -floor_cos) c.on_ceiling = true; else c.on_wall = true;
+                if (facing < -floor_cos) c.edit_motion().on_ceiling = true; else c.edit_motion().on_wall = true;
                 world.origin = world.origin + contact.normal * (contact.depth + 0.0005f);
-                const float into = c.velocity.dot(contact.normal);
-                if (into < 0) c.velocity = c.velocity - contact.normal * into;
+                const float into = c.motion().velocity.dot(contact.normal);
+                if (into < 0) c.edit_motion().velocity = c.edit_motion().velocity - contact.normal * into;
             }
             Live& o = nodes_[size_t(other)];
-            if (o.d.type == NodeType::RigidBody3D && !o.d.freeze) {
+            if (o.d.type == NodeType::RigidBody3D && !o.d.more().freeze) {
                 const Vec3 push = -contact.normal;
                 const float wanted = std::max(0.0f, moving.dot(push));
-                const float current = o.velocity.dot(push);
-                if (wanted > current) o.velocity = o.velocity + push * ((wanted - current) * 0.8f + 0.2f);
+                const float current = o.motion().velocity.dot(push);
+                if (wanted > current) o.edit_motion().velocity = o.edit_motion().velocity + push * ((wanted - current) * 0.8f + 0.2f);
                 wake(o);
             }
             move_body(index, world, false);
         }
     };
-    const Vec3 motion = c.velocity * physics_delta_;
+    const Vec3 motion = c.motion().velocity * physics_delta_;
     const int steps = std::clamp(int(std::ceil(motion.length() / std::max(0.02f, smallest * 0.5f))), 1, 8);
     for (int s = 0; s < steps; ++s) {
         world.origin = world.origin + motion * (1.0f / float(steps));
@@ -363,17 +363,17 @@ bool Runtime::move_and_slide(int index) {
         resolve();
     }
     // Snap to the floor when walking down slopes and steps (not while jumping).
-    if (was_on_floor && !c.on_floor && c.velocity.dot(up) <= 0.01f) {
+    if (was_on_floor && !c.motion().on_floor && c.motion().velocity.dot(up) <= 0.01f) {
         const Transform before = world;
-        const bool wall = c.on_wall, ceiling = c.on_ceiling;
+        const bool wall = c.motion().on_wall, ceiling = c.motion().on_ceiling;
         world.origin.y -= 0.2f;
         move_body(index, world, false);
         resolve();
-        if (!c.on_floor) {
+        if (!c.motion().on_floor) {
             world = before;
             move_body(index, world, false);
-            c.on_wall = wall;
-            c.on_ceiling = ceiling;
+            c.edit_motion().on_wall = wall;
+            c.edit_motion().on_ceiling = ceiling;
         }
     }
     return collided;
@@ -385,17 +385,17 @@ void Runtime::physics_step(float dt) {
     const Vec3 gravity{0, -physics::Gravity, 0};
     for (size_t i = 0; i < nodes_.size(); ++i) {
         Live& r = nodes_[i];
-        if (r.freed || r.d.type != NodeType::RigidBody3D || r.d.freeze) continue;
-        if (r.sleeping && r.force.dot(r.force) == 0) continue;
-        const float inv_mass = 1.0f / std::max(r.d.mass, 0.001f);
-        r.velocity = r.velocity + (gravity * r.d.gravity_scale + r.force * inv_mass) * dt;
-        r.force = {};
-        r.velocity = r.velocity * (1.0f / (1.0f + dt * (physics::DefaultLinearDamp + r.d.linear_damp)));
-        r.angular = r.angular * (1.0f / (1.0f + dt * (physics::DefaultAngularDamp + r.d.angular_damp)));
+        if (r.freed || r.d.type != NodeType::RigidBody3D || r.d.more().freeze) continue;
+        if (r.motion().sleeping && r.motion().force.dot(r.motion().force) == 0) continue;
+        const float inv_mass = 1.0f / std::max(r.d.more().mass, 0.001f);
+        r.edit_motion().velocity = r.edit_motion().velocity + (gravity * r.d.more().gravity_scale + r.edit_motion().force * inv_mass) * dt;
+        r.edit_motion().force = {};
+        r.edit_motion().velocity = r.edit_motion().velocity * (1.0f / (1.0f + dt * (physics::DefaultLinearDamp + r.d.more().linear_damp)));
+        r.edit_motion().angular = r.edit_motion().angular * (1.0f / (1.0f + dt * (physics::DefaultAngularDamp + r.d.more().angular_damp)));
         Transform world = r.world;
-        world.origin = world.origin + r.velocity * dt;
-        const float spin = r.angular.length();
-        if (spin > 1e-5f) world.basis = Basis::axis_angle(r.angular * (1.0f / spin), spin * dt) * world.basis;
+        world.origin = world.origin + r.motion().velocity * dt;
+        const float spin = r.motion().angular.length();
+        if (spin > 1e-5f) world.basis = Basis::axis_angle(r.motion().angular * (1.0f / spin), spin * dt) * world.basis;
         move_body(int(i), world, spin > 1e-5f);
     }
     auto& shapes = physics_->shapes;
@@ -405,7 +405,7 @@ void Runtime::physics_step(float dt) {
             if (a.owner != NodeType::RigidBody3D) continue;
             const size_t i = size_t(a.body);
             Live& r = nodes_[i];
-            if (r.freed || r.d.freeze || r.sleeping) continue;
+            if (r.freed || r.d.more().freeze || r.motion().sleeping) continue;
             for (size_t m = 0; m < shapes.size(); ++m) {
                 const physics::Shape& b = shapes[m];
                 if (b.body == int(i) || b.owner == NodeType::Area3D || !physics::masks_match(a, b) || !physics::overlap_bounds(a, b)) continue;
@@ -413,8 +413,8 @@ void Runtime::physics_step(float dt) {
                 if (o.freed) continue;
                 physics::Contact c;
                 if (!physics::collide(a, b, c)) continue;
-                const bool dynamic = o.d.type == NodeType::RigidBody3D && !o.d.freeze;
-                const float inv_a = 1.0f / std::max(r.d.mass, 0.001f), inv_b = dynamic ? 1.0f / std::max(o.d.mass, 0.001f) : 0;
+                const bool dynamic = o.d.type == NodeType::RigidBody3D && !o.d.more().freeze;
+                const float inv_a = 1.0f / std::max(r.d.more().mass, 0.001f), inv_b = dynamic ? 1.0f / std::max(o.d.more().mass, 0.001f) : 0;
                 const float correction = std::max(c.depth - 0.002f, 0.0f) * 0.8f / (inv_a + inv_b);
                 Transform wa = r.world;
                 wa.origin = wa.origin + c.normal * (correction * inv_a);
@@ -424,46 +424,46 @@ void Runtime::physics_step(float dt) {
                     wb.origin = wb.origin - c.normal * (correction * inv_b);
                     move_body(b.body, wb, false);
                     // Only a moving body or a real overlap wakes the other one, so resting stacks can sleep.
-                    if (o.sleeping && (r.velocity.dot(r.velocity) > 0.0025f || c.depth > 0.01f)) wake(o);
+                    if (o.motion().sleeping && (r.motion().velocity.dot(r.motion().velocity) > 0.0025f || c.depth > 0.01f)) wake(o);
                 }
                 // Kinematic characters push with their velocity; static bodies are still.
-                const Vec3 other_velocity = dynamic || o.d.type == NodeType::CharacterBody3D ? o.velocity : Vec3{};
-                const Vec3 relative = r.velocity - other_velocity;
+                const Vec3 other_velocity = dynamic || o.d.type == NodeType::CharacterBody3D ? o.motion().velocity : Vec3{};
+                const Vec3 relative = r.motion().velocity - other_velocity;
                 const float vn = relative.dot(c.normal);
                 if (vn < 0) {
                     // Godot's PhysicsMaterial combine: bounces add up to at most 1, friction takes the smaller one.
-                    float e = std::min(1.0f, r.d.bounce + o.d.bounce);
+                    float e = std::min(1.0f, r.d.more().bounce + o.d.more().bounce);
                     if (-vn < 0.6f) e = 0; // resting contact: no jitter
                     const float j = -(1 + e) * vn / (inv_a + inv_b);
-                    r.velocity = r.velocity + c.normal * (j * inv_a);
-                    if (dynamic) o.velocity = o.velocity - c.normal * (j * inv_b);
+                    r.edit_motion().velocity = r.edit_motion().velocity + c.normal * (j * inv_a);
+                    if (dynamic) o.edit_motion().velocity = o.edit_motion().velocity - c.normal * (j * inv_b);
                     const Vec3 tangent = relative - c.normal * vn;
                     const float slip = tangent.length();
                     if (slip > 1e-4f) {
-                        const float mu = std::max(0.0f, std::min(r.d.friction, o.d.friction));
+                        const float mu = std::max(0.0f, std::min(r.d.more().friction, o.d.more().friction));
                         const float jt = std::min(slip / (inv_a + inv_b), mu * j);
                         const Vec3 t = tangent * (1.0f / slip);
-                        r.velocity = r.velocity - t * (jt * inv_a);
-                        if (dynamic) o.velocity = o.velocity + t * (jt * inv_b);
+                        r.edit_motion().velocity = r.edit_motion().velocity - t * (jt * inv_a);
+                        if (dynamic) o.edit_motion().velocity = o.edit_motion().velocity + t * (jt * inv_b);
                     }
                 }
                 // Spheres roll on what they stand on (no slipping).
                 if (a.kind == CollisionKind::Sphere && c.normal.y > 0.5f && a.radius > 0)
-                    r.angular = c.normal.cross(r.velocity - other_velocity) * (1.0f / a.radius);
+                    r.edit_motion().angular = c.normal.cross(r.edit_motion().velocity - other_velocity) * (1.0f / a.radius);
             }
         }
     }
     // Sleep after half a second (almost) at rest.
     for (auto& r : nodes_) {
-        if (r.freed || r.d.type != NodeType::RigidBody3D || r.d.freeze || r.sleeping) continue;
-        if (r.velocity.dot(r.velocity) < 0.0025f && r.angular.dot(r.angular) < 0.01f) {
-            r.still_time += dt;
-            if (r.still_time > 0.5f) {
-                r.sleeping = true;
-                r.velocity = r.angular = {};
+        if (r.freed || r.d.type != NodeType::RigidBody3D || r.d.more().freeze || r.motion().sleeping) continue;
+        if (r.motion().velocity.dot(r.motion().velocity) < 0.0025f && r.motion().angular.dot(r.motion().angular) < 0.01f) {
+            r.edit_motion().still_time += dt;
+            if (r.motion().still_time > 0.5f) {
+                r.edit_motion().sleeping = true;
+                r.edit_motion().velocity = r.edit_motion().angular = {};
             }
         } else {
-            r.still_time = 0;
+            r.edit_motion().still_time = 0;
         }
     }
     update_areas();
@@ -476,7 +476,7 @@ void Runtime::update_areas() {
         Live& area = nodes_[i];
         if (area.freed || area.d.type != NodeType::Area3D) continue;
         std::vector<uint32_t> inside;
-        if (area.d.monitoring) {
+        if (area.d.more().monitoring) {
             for (const auto& a : shapes) {
                 if (a.body != int(i)) continue;
                 for (const auto& b : shapes) {
@@ -488,8 +488,8 @@ void Runtime::update_areas() {
                 }
             }
         }
-        const std::vector<uint32_t> before = area.overlaps;
-        area.overlaps = inside;
+        const std::vector<uint32_t> before = area.motion().overlaps;
+        area.edit_motion().overlaps = inside;
         if (!playing_ || !vm_->has_instance(area.d.id)) continue;
         for (uint32_t id : inside)
             if (std::find(before.begin(), before.end(), id) == before.end()) {
@@ -526,8 +526,8 @@ void Runtime::physics_tick(float dt) {
         transforms_stale_ = true;
         for (int32_t i : collision_objects_) {
             Live& n = nodes_[size_t(i)];
-            n.last_motion = n.world.origin - n.last_origin;
-            n.last_origin = n.world.origin;
+            n.edit_motion().last_motion = n.world.origin - n.edit_motion().last_origin;
+            n.edit_motion().last_origin = n.world.origin;
         }
     }
     physics_->valid = false;

@@ -55,7 +55,7 @@ int Runtime::live_particles() const {
 }
 
 void Runtime::restart_particles(Live& n) {
-    n.d.emitting = true;
+    n.d.extras().emitting = true;
     n.cycle = 0;
     n.emitted = 0;
     if (n.particles >= 0)
@@ -71,35 +71,35 @@ void Runtime::emit_particle(Live& n, Renderer::ParticleSystem& system, float age
     const NodeDesc& d = n.d;
     const Basis& basis = n.world.basis;
     Vec3 offset{};
-    if (d.emission_shape == EmissionShape::Sphere) {
+    if (d.more().emission_shape == EmissionShape::Sphere) {
         // Uniform in the ball: rejection sampling of the unit cube.
         Vec3 u;
         do u = {random01() * 2 - 1, random01() * 2 - 1, random01() * 2 - 1}; while (u.dot(u) > 1);
-        offset = u * d.emission_radius;
-    } else if (d.emission_shape == EmissionShape::Box) {
-        offset = {(random01() * 2 - 1) * d.emission_box.x, (random01() * 2 - 1) * d.emission_box.y, (random01() * 2 - 1) * d.emission_box.z};
+        offset = u * d.more().emission_radius;
+    } else if (d.more().emission_shape == EmissionShape::Box) {
+        offset = {(random01() * 2 - 1) * d.more().emission_box.x, (random01() * 2 - 1) * d.more().emission_box.y, (random01() * 2 - 1) * d.more().emission_box.z};
     }
     const Vec3 origin = n.world.origin + basis.xform(offset);
     // Spread cone around the direction, from two random angles like Godot.
-    Vec3 axis = basis.orthonormalized().xform(d.direction).normalized();
+    Vec3 axis = basis.orthonormalized().xform(d.more().direction).normalized();
     if (axis.dot(axis) == 0) axis = {0, 1, 0};
     const Vec3 u = perpendicular(axis), v = axis.cross(u);
-    const float spread = radians(std::clamp(d.spread, 0.0f, 180.0f));
+    const float spread = radians(std::clamp(d.more().spread, 0.0f, 180.0f));
     const float a = (random01() * 2 - 1) * spread, b = (random01() * 2 - 1) * spread;
     const Vec3 dir = (axis * (std::cos(a) * std::cos(b)) + u * std::sin(a) + v * (std::sin(b) * std::cos(a))).normalized();
-    const float speed = d.velocity_min + (d.velocity_max - d.velocity_min) * random01();
-    const float life = std::max(0.01f, d.lifetime * (1 - std::clamp(d.lifetime_randomness, 0.0f, 1.0f) * random01()));
+    const float speed = d.more().velocity_min + (d.more().velocity_max - d.more().velocity_min) * random01();
+    const float life = std::max(0.01f, d.more().lifetime * (1 - std::clamp(d.more().lifetime_randomness, 0.0f, 1.0f) * random01()));
     if (age >= life) return;
     particle_damping_[size_t(n.particles)][size_t(slot - system.pool)] =
-        (d.damping_min + (d.damping_max - d.damping_min) * random01()) * JetUnits;
+        (d.more().damping_min + (d.more().damping_max - d.more().damping_min) * random01()) * JetUnits;
     Vec3 velocity = dir * speed;
-    const Vec3 position = origin + velocity * age + d.gravity * (0.5f * age * age);
-    velocity = velocity + d.gravity * age;
+    const Vec3 position = origin + velocity * age + d.more().gravity * (0.5f * age * age);
+    velocity = velocity + d.more().gravity * age;
     slot->pos = to_jet_f(position);
     slot->vel = to_jet_f(velocity);
     slot->maxLife = life;
     slot->life = life - age;
-    slot->kind = d.particle_style == ParticleStyle::Water ? Renderer::ParticleKind::Splash : Renderer::ParticleKind::Spark;
+    slot->kind = d.more().particle_style == ParticleStyle::Water ? Renderer::ParticleKind::Splash : Renderer::ParticleKind::Spark;
     slot->active = true;
 }
 
@@ -108,7 +108,7 @@ void Runtime::update_particles(float dt) {
     for (auto& n : nodes_) {
         if (n.particles < 0 || n.freed) continue;
         Renderer::ParticleSystem& system = *particles_[size_t(n.particles)];
-        const Renderer::Vec3f gravity = to_jet_f(n.d.gravity);
+        const Renderer::Vec3f gravity = to_jet_f(n.d.more().gravity);
         const auto& damping = particle_damping_[size_t(n.particles)];
         for (auto& p : system.pool) {
             if (!p.active) continue;
@@ -123,16 +123,16 @@ void Runtime::update_particles(float dt) {
             p.life -= dt;
             if (p.life <= 0) p.active = false;
         }
-        system.additiveSparks = n.d.additive;
-        if (!n.d.emitting) continue;
-        const int amount = std::clamp(int(n.d.amount), 1, MaxParticles);
-        const float lifetime = std::max(n.d.lifetime, 0.01f);
-        const float window = lifetime * (1 - std::clamp(n.d.explosiveness, 0.0f, 1.0f));
+        system.additiveSparks = n.d.more().additive;
+        if (!n.d.more().emitting) continue;
+        const int amount = std::clamp(int(n.d.more().amount), 1, MaxParticles);
+        const float lifetime = std::max(n.d.more().lifetime, 0.01f);
+        const float window = lifetime * (1 - std::clamp(n.d.more().explosiveness, 0.0f, 1.0f));
         n.cycle += dt;
         for (int guard = 0; guard < 8 * MaxParticles; ++guard) {
             if (n.emitted >= amount) {
                 if (n.cycle < lifetime) break;
-                if (n.d.one_shot) { n.d.emitting = false; break; }
+                if (n.d.more().one_shot) { n.d.extras().emitting = false; break; }
                 n.cycle -= lifetime;
                 n.emitted = 0;
                 continue;
@@ -179,8 +179,8 @@ void Runtime::render_particles() {
     // Screen area and farthest depth of the live particles: only meshes in there and nearer can hide them.
     float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f, far_z = 0;
     for (const auto& n : nodes_) {
-        if (n.particles < 0 || n.freed || !n.world_visible || n.d.no_depth_test) continue;
-        const float margin = n.d.particle_style == ParticleStyle::Puff ? std::max(n.d.puff_size, n.d.puff_size_end) * JetUnits * 0.5f : 0;
+        if (n.particles < 0 || n.freed || !n.world_visible || n.d.more().no_depth_test) continue;
+        const float margin = n.d.more().particle_style == ParticleStyle::Puff ? std::max(n.d.more().puff_size, n.d.more().puff_size_end) * JetUnits * 0.5f : 0;
         for (const auto& p : particles_[size_t(n.particles)]->pool) {
             if (!p.active) continue;
             float c[3];
@@ -204,7 +204,7 @@ void Runtime::render_particles() {
     bool over = false;
     for (const auto& n : nodes_) {
         if (n.particles < 0 || n.freed || !n.world_visible) continue;
-        if (n.d.no_depth_test) over = true;
+        if (n.d.more().no_depth_test) over = true;
         else particle_triangles_ += draw_particles(n, view);
     }
     if (!over) return;
@@ -212,16 +212,16 @@ void Runtime::render_particles() {
     std::fill(depth_.begin(), depth_.end(), uint16_t(0xffff));
 #endif
     for (const auto& n : nodes_)
-        if (n.particles >= 0 && !n.freed && n.world_visible && n.d.no_depth_test) particle_triangles_ += draw_particles(n, view);
+        if (n.particles >= 0 && !n.freed && n.world_visible && n.d.more().no_depth_test) particle_triangles_ += draw_particles(n, view);
 }
 
 unsigned Runtime::draw_particles(const Live& n, const ParticleView& view) {
     Renderer::ParticleSystem& system = *particles_[size_t(n.particles)];
-    if (n.d.particle_style == ParticleStyle::Puff) return draw_puffs(n, system, view);
+    if (n.d.more().particle_style == ParticleStyle::Puff) return draw_puffs(n, system, view);
 #if !Z_BUFFERING
     // Jet draws its streaks over the frame: leave out those behind a mesh.
     bool hidden[MaxParticles] = {};
-    if (!occlusion_.empty() && !n.d.no_depth_test)
+    if (!occlusion_.empty() && !n.d.more().no_depth_test)
         for (int i = 0; i < MaxParticles; ++i) {
             auto& p = system.pool[i];
             if (!p.active) continue;
@@ -338,10 +338,10 @@ unsigned Runtime::draw_puffs(const Live& n, Renderer::ParticleSystem& system, co
     const int parity = FIELD_BUFFERS ? ((scene_.frameCounter - 1) % 2 == 0 ? 1 : 0) : 0;
     const int columns = buffer_width(), rows = buffer_rows();
 #if Z_BUFFERING
-    const uint16_t* depth = n.d.no_depth_test ? nullptr : depth_.data();
+    const uint16_t* depth = n.d.more().no_depth_test ? nullptr : depth_.data();
 #else
     const int gw = (width_ + OcclusionCell - 1) / OcclusionCell;
-    const uint16_t* cells = occlusion_.empty() || n.d.no_depth_test ? nullptr : occlusion_.data();
+    const uint16_t* cells = occlusion_.empty() || n.d.more().no_depth_test ? nullptr : occlusion_.data();
 #endif
     const NodeDesc& d = n.d;
     unsigned drawn = 0;
@@ -350,12 +350,12 @@ unsigned Runtime::draw_puffs(const Live& n, Renderer::ParticleSystem& system, co
         // Opacity: quick fade in (first tenth of the life), then out to zero.
         const float opacity = d.alpha * std::min(1.0f, p.age * 10) * (1 - p.age);
         if (opacity < 0.02f) continue;
-        const float diameter = (d.puff_size + (d.puff_size_end - d.puff_size) * p.age) * JetUnits;
+        const float diameter = (d.more().puff_size + (d.more().puff_size_end - d.more().puff_size) * p.age) * JetUnits;
         const float scale = view.fov / p.z;
         const float radius = std::min(diameter * 0.5f * scale, 96.0f);
         if (radius < 0.75f) continue;
         const float px = p.x * scale + view.cx, py = view.cy - p.y * scale;
-        const uint32_t rgb = mix_rgb(d.color, d.color_end, p.age);
+        const uint32_t rgb = mix_rgb(d.color, d.more().color_end, p.age);
         const int r = int((rgb >> 16) & 255) >> 3, g = int((rgb >> 8) & 255) >> 2, b = int(rgb & 255) >> 3;
         const int y0 = std::max(0, int(std::ceil(py - radius))), y1 = std::min(height_ - 1, int(std::floor(py + radius)));
         const uint16_t z = uint16_t(std::min(p.z, 65534.0f));

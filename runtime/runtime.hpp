@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <new>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -51,10 +52,14 @@ struct TextureAsset {
     uint16_t width = 0, height = 0;
     std::vector<uint16_t> pixels;  // RGB565, when palette is empty
     std::vector<uint8_t> indices;  // palette mode
+    const uint8_t* packed_indices = nullptr; // palette mode, read in place from the package instead of indices
     std::vector<uint16_t> palette; // up to 256 entries
     bool has_alpha = false;
     uint16_t alpha_color = 0; // colour key of transparent pixels
-    size_t bytes() const { return pixels.size() * 2 + indices.size() + palette.size() * 2; }
+    const uint8_t* index_data() const { return packed_indices ? packed_indices : indices.data(); }
+    size_t bytes() const {
+        return pixels.size() * 2 + (packed_indices ? size_t(width) * height : indices.size()) + palette.size() * 2;
+    }
 };
 // Quantize forces the palette by reducing to 256 colours (median cut).
 enum class PaletteMode : uint8_t { Auto, Quantize, Rgb565 };
@@ -65,6 +70,8 @@ bool make_texture(std::string path, int width, int height, const uint8_t* rgba, 
 const char* node_type_name(NodeType);
 bool is_node3d(NodeType);
 bool is_control(NodeType);
+// The node types whose fields include NodeExtras (all but Node, Node3D, MeshInstance3D and Sprite3D).
+bool uses_extras(NodeType);
 
 // Godot space (metres, Y up, -Z forward), UV origin top-left.
 struct MeshVertex { Vec3 position, normal; float u = 0, v = 0; };
@@ -89,35 +96,45 @@ struct OverlayItem {
 // swapped: the row holds big-endian pixels, as sent to the panel.
 void compose_overlay_row(const std::vector<OverlayItem>& items, uint16_t* row, int y, int width, bool swapped);
 
-// Godot conventions: metres, Y up, -Z forward, rotation in degrees applied in YXZ order.
-struct NodeDesc {
-    uint32_t id = 1;
-    int32_t parent = -1; // index in Description::nodes; parents precede children
-    NodeType type = NodeType::Node3D;
-    Vec3 position{}, rotation{}, scale{1, 1, 1}; // next to type: read by every transform pass
-    bool visible = true;
-    std::string name = "Node3D";
-    // MeshInstance3D, material is a StandardMaterial3D subset
-    Shape shape = Shape::Box;
-    uint32_t color = 0xe6a45c; // albedo; multiplies the texture
-    Shading shading = Shading::Gouraud;
-    uint16_t segments = 12;
-    int32_t texture = -1; // index in Description::textures
-    float uv_scale[2] = {1, 1}, uv_offset[2] = {0, 0};
-    bool bilinear = false, repeat = true, perspective = true;
-    float alpha = 1;      // 0..1
-    float specular = 0.5f; // Phong highlight / water ripple strength, 0..1
-    uint8_t shininess = 32;
-    CullMode cull = CullMode::Back;
-    DrawOrder draw_order = DrawOrder::Default;
-    bool billboard = false;
-    // Sprite3D, as in Godot: frame `frame` of an hframes × vframes sheet, `pixel_size` metres per texel.
-    uint16_t hframes = 1, vframes = 1, frame = 0;
-    bool flip_h = false, flip_v = false;
-    float pixel_size = 0.01f;
-    float diffuse = 1;      // diffuse reflectance 0..1
-    bool reflection = false; // albedo texture used as environment panorama (chrome, glass)
-    int32_t mesh = -1;      // Shape::Mesh: index in Description::meshes
+// Rarely used node data (Lazy blocks) is allocated through these: malloc/free, but the ESP32 firmware puts it
+// in PSRAM, keeping the internal RAM for the buffers that drawing touches every frame.
+void* cold_alloc(size_t bytes);
+void cold_free(void* p);
+
+// A T allocated on the first edit and copied with its owner; until then get() returns the defaults.
+template <class T> class Lazy {
+public:
+    Lazy() = default;
+    Lazy(const Lazy& o) : p_(o.p_ ? make(o.p_.get()) : nullptr) {}
+    Lazy(Lazy&&) noexcept = default;
+    Lazy& operator=(const Lazy& o) {
+        if (this != &o) p_.reset(o.p_ ? make(o.p_.get()) : nullptr);
+        return *this;
+    }
+    Lazy& operator=(Lazy&&) noexcept = default;
+    // A class member, not a local static: no initialization guard (a memory barrier on the ESP32) on every read.
+    const T& get() const { return p_ ? *p_ : defaults_; }
+    T& edit() {
+        if (!p_) p_.reset(make(nullptr));
+        return *p_;
+    }
+    bool allocated() const { return p_ != nullptr; }
+
+private:
+    struct Free {
+        void operator()(T* p) const { p->~T(); cold_free(p); }
+    };
+    static T* make(const T* from) {
+        void* memory = cold_alloc(sizeof(T));
+        return from ? new (memory) T(*from) : new (memory) T();
+    }
+    static const T defaults_;
+    std::unique_ptr<T, Free> p_;
+};
+template <class T> const T Lazy<T>::defaults_{};
+
+// Fields of the less common node types (2D, camera, light, environment, physics, particles).
+struct NodeExtras {
     // Label / TextureRect / ColorRect (color and alpha are shared with materials)
     std::string text;
     Vec3 size{100, 30, 0};  // TextureRect: 0 = texture size
@@ -162,10 +179,49 @@ struct NodeDesc {
     // Puff: colour goes from color to color_end, opacity from alpha to 0, diameter from puff_size to puff_size_end (m)
     uint32_t color_end = 0x404040;
     float puff_size = 0.2f, puff_size_end = 0.6f;
+};
+
+// Godot conventions: metres, Y up, -Z forward, rotation in degrees applied in YXZ order.
+struct NodeDesc {
+    uint32_t id = 1;
+    int32_t parent = -1; // index in Description::nodes; parents precede children
+    NodeType type = NodeType::Node3D;
+    Vec3 position{}, rotation{}, scale{1, 1, 1}; // next to type: read by every transform pass
+    bool visible = true;
+    std::string name = "Node3D";
+    // MeshInstance3D, material is a StandardMaterial3D subset
+    Shape shape = Shape::Box;
+    uint32_t color = 0xe6a45c; // albedo; multiplies the texture
+    Shading shading = Shading::Gouraud;
+    uint16_t segments = 12;
+    int32_t texture = -1; // index in Description::textures
+    float uv_scale[2] = {1, 1}, uv_offset[2] = {0, 0};
+    bool bilinear = false, repeat = true, perspective = true;
+    float alpha = 1;      // 0..1
+    float specular = 0.5f; // Phong highlight / water ripple strength, 0..1
+    uint8_t shininess = 32;
+    CullMode cull = CullMode::Back;
+    DrawOrder draw_order = DrawOrder::Default;
+    bool billboard = false;
+    // Sprite3D, as in Godot: frame `frame` of an hframes × vframes sheet, `pixel_size` metres per texel.
+    uint16_t hframes = 1, vframes = 1, frame = 0;
+    bool flip_h = false, flip_v = false;
+    float pixel_size = 0.01f;
+    float diffuse = 1;      // diffuse reflectance 0..1
+    bool reflection = false; // albedo texture used as environment panorama (chrome, glass)
+    int32_t mesh = -1;      // Shape::Mesh: index in Description::meshes
     int32_t script = -1; // index in Description::scripts
     std::vector<ScriptOverride> overrides;
-};
-// Source in the editor, bytecode in packages.
+
+    // Every live node keeps its NodeDesc and most are meshes or sprites, so the other types' fields live
+    // in a block of their own: more() reads them (the defaults when missing), extras() allocates it to write.
+    const NodeExtras& more() const { return extras_.get(); }
+    NodeExtras& extras() { return extras_.edit(); }
+    bool has_extras() const { return extras_.allocated(); }
+
+private:
+    Lazy<NodeExtras> extras_;
+};// Source in the editor, bytecode in packages.
 struct ScriptFile { std::string path, source; std::vector<uint8_t> bytecode; };
 // Bit i of the input mask is actions[i]. Keys are Godot key names, used by the PC players.
 // Board buttons are wired per action in the firmware (generated_inputs.hpp).
@@ -234,7 +290,8 @@ public:
     bool load(Description, std::string& error); // std::move it in to skip the copy
     // An exported package that outlives the runtime (flash on the device): only the scene being played stays
     // in RAM, the others are read again from the package when entered.
-    bool load_pack(const uint8_t* data, size_t size, std::string& error);
+    // textures_in_place: palette textures are read from the package, not copied (boards without PSRAM).
+    bool load_pack(const uint8_t* data, size_t size, std::string& error, bool textures_in_place = false);
     // Compiles scripts and runs _ready(). On compile errors nothing runs.
     bool start(std::vector<ScriptDiagnostic>& errors);
     void stop(); // back to the authored state
@@ -274,6 +331,8 @@ public:
     size_t framebuffer_bytes() const { return (color_.size() + depth_.size()) * sizeof(uint16_t); }
     size_t mesh_count() const { return meshes_; }
     size_t node_count() const { return nodes_.size(); }
+    // RAM of the live nodes: their array, the extra fields and the body state of the nodes that have them.
+    size_t node_bytes() const;
     // Live state of a node during play (for the editor); false if missing/freed.
     bool node_state(uint32_t id, NodeDesc& out) const;
 
@@ -293,6 +352,16 @@ public:
     };
 
     // Node state while playing, shared with ScriptHost.
+    struct Motion {
+        Vec3 velocity{}, angular{}, force{}; // m/s, rad/s, accumulated force for the next step
+        bool on_floor = false, on_wall = false, on_ceiling = false, sleeping = false;
+        Vec3 floor_normal{0, 1, 0};
+        int floor_body = -1;            // CharacterBody3D: what it stands on (moving platforms)
+        Vec3 last_origin{};             // world position at the end of the previous physics tick
+        Vec3 last_motion{};             // how far it moved during that tick
+        float still_time = 0;
+        std::vector<uint32_t> overlaps; // Area3D: ids of the bodies inside
+    };
     struct Live {
         // Hot in every transform pass: kept together since each scattered field costs a PSRAM cache miss on the ESP32.
         int32_t parent = -1;
@@ -314,15 +383,10 @@ public:
         Applied applied;              // material/UV state last pushed to Jet
         Transform synced_world;       // pose last pushed to the Jet object
         bool synced = false, synced_visible = false;
-        // Physics (physics.cpp)
-        Vec3 velocity{}, angular{}, force{}; // m/s, rad/s, accumulated force for the next step
-        bool on_floor = false, on_wall = false, on_ceiling = false, sleeping = false;
-        Vec3 floor_normal{0, 1, 0};
-        int floor_body = -1;            // CharacterBody3D: what it stands on (moving platforms)
-        Vec3 last_origin{};             // world position at the end of the previous physics tick
-        Vec3 last_motion{};             // how far it moved during that tick
-        float still_time = 0;
-        std::vector<uint32_t> overlaps; // Area3D: ids of the bodies inside
+        // Physics (physics.cpp): only bodies allocate it.
+        const Motion& motion() const { return motion_.get(); }
+        Motion& edit_motion() { return motion_.edit(); }
+        Lazy<Motion> motion_;
         // CPUParticles3D (particles.cpp)
         int32_t particles = -1; // index in Runtime::particles_
         float cycle = 0;        // seconds into the current emission cycle
@@ -360,6 +424,7 @@ private:
     void emit_particle(Live& n, Renderer::ParticleSystem& system, float age);
     float random01();
     void sync_object(Live&);
+    void reserve_triangle_queues();
     void bake(Live&, Vec3 scale);
     void share(Live&, Vec3 scale);
     void apply_camera();
@@ -385,6 +450,7 @@ private:
     Renderer::AmbientLight ambient_;
     std::vector<std::unique_ptr<Renderer::Material>> materials_;
     std::vector<std::unique_ptr<Renderer::Object>> objects_;
+    bool queues_reserved_ = false; // Jet's per-frame triangle queues, sized once per scene
     // Baked meshes shared by nodes with the same mesh, scale and UVs; a copy lives while some node draws it.
     std::map<std::array<int32_t, 11>, std::weak_ptr<const Renderer::Object>> shared_meshes_;
     Renderer::Material shared_material_; // what shared copies point at: every node draws them with its own material
@@ -434,7 +500,7 @@ private:
 // Packages carry bytecode only, no script source.
 std::vector<uint8_t> encode_pack(const Description&, std::string& error);
 #endif
-bool decode_pack(const uint8_t*, size_t, Description&, std::string& error);
+bool decode_pack(const uint8_t*, size_t, Description&, std::string& error, bool textures_in_place = false);
 bool pack_resolution(const uint8_t*, size_t, int& width, int& height); // header only
 // One scene's nodes, read again from the package at SceneDesc::offset or Description::nodes_offset.
 bool decode_nodes(const uint8_t*, size_t, uint32_t offset, std::vector<NodeDesc>&, std::string& error);

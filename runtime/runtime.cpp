@@ -159,6 +159,13 @@ const char* node_type_name(NodeType type) {
 bool is_control(NodeType type) {
     return type == NodeType::Control || type == NodeType::Label || type == NodeType::TextureRect || type == NodeType::ColorRect;
 }
+// Weak: a firmware may define its own (see cold_alloc in runtime.hpp).
+__attribute__((weak)) void* cold_alloc(size_t bytes) { return std::malloc(bytes); }
+__attribute__((weak)) void cold_free(void* p) { std::free(p); }
+
+bool uses_extras(NodeType type) {
+    return type != NodeType::Node && type != NodeType::Node3D && type != NodeType::MeshInstance3D && type != NodeType::Sprite3D;
+}
 bool is_node3d(NodeType type) { return type != NodeType::Node && type != NodeType::WorldEnvironment && !is_control(type); }
 uint16_t rgb565(uint32_t c) { return uint16_t(((c >> 19) & 31) << 11 | ((c >> 10) & 63) << 5 | ((c >> 3) & 31)); }
 
@@ -191,11 +198,11 @@ bool validate(const Description& d, std::string& error) {
         const size_t count = size_t(t.width) * t.height;
         const bool indexed = !t.palette.empty();
         if (!t.width || !t.height || t.width > MaxTextureSide || t.height > MaxTextureSide
-            || (indexed ? (t.indices.size() != count || t.palette.size() > 256 || !t.pixels.empty())
-                        : (t.pixels.size() != count || !t.indices.empty())))
+            || (indexed ? ((!t.packed_indices && t.indices.size() != count) || t.palette.size() > 256 || !t.pixels.empty())
+                        : (t.pixels.size() != count || !t.indices.empty() || t.packed_indices)))
             return fail("Invalid texture: " + t.path);
         if (indexed)
-            for (uint8_t i : t.indices) if (i >= t.palette.size()) return fail("Invalid texture: " + t.path);
+            for (size_t i = 0; i < count; ++i) if (t.index_data()[i] >= t.palette.size()) return fail("Invalid texture: " + t.path);
         texture_bytes += t.bytes();
     }
     if (texture_bytes > MaxTextureBytes) return fail("Textures exceed 4 MiB in total.");
@@ -226,36 +233,36 @@ bool validate(const Description& d, std::string& error) {
             if (!siblings.insert(std::to_string(n.parent) + "/" + n.name).second) return fail("Two sibling nodes have the same name: " + n.name);
             if (uint8_t(n.type) > uint8_t(NodeType::Control)) return fail("Unsupported node type.");
             if (n.type == NodeType::CPUParticles3D) {
-                const float values[] = {n.lifetime, n.lifetime_randomness, n.explosiveness, n.spread, n.velocity_min, n.velocity_max,
-                                        n.damping_min, n.damping_max, n.emission_radius};
+                const float values[] = {n.more().lifetime, n.more().lifetime_randomness, n.more().explosiveness, n.more().spread, n.more().velocity_min, n.more().velocity_max,
+                                        n.more().damping_min, n.more().damping_max, n.more().emission_radius};
                 for (float v : values) if (!std::isfinite(v)) return fail("Invalid particle parameter in " + n.name + ".");
-                if (n.amount < 1 || n.amount > MaxParticles || n.lifetime < 0.01f || n.lifetime > 600 || n.lifetime_randomness < 0
-                    || n.lifetime_randomness > 1 || n.explosiveness < 0 || n.explosiveness > 1 || n.spread < 0 || n.spread > 180
-                    || n.velocity_min < 0 || n.velocity_max < 0 || n.velocity_min > 1000 || n.velocity_max > 1000 || !bounded(n.direction, 1000)
-                    || n.damping_min < 0 || n.damping_max < 0 || n.damping_min > 1000 || n.damping_max > 1000
-                    || !bounded(n.gravity, 1000) || n.emission_radius < 0 || n.emission_radius > 1000 || !bounded(n.emission_box, 1000)
-                    || n.emission_box.x < 0 || n.emission_box.y < 0 || n.emission_box.z < 0
-                    || uint8_t(n.particle_style) > uint8_t(ParticleStyle::Puff) || uint8_t(n.emission_shape) > uint8_t(EmissionShape::Box)
-                    || n.color > 0xffffff || n.color_end > 0xffffff || !std::isfinite(n.alpha) || n.alpha < 0 || n.alpha > 1
-                    || !std::isfinite(n.puff_size) || !std::isfinite(n.puff_size_end) || n.puff_size < 0 || n.puff_size > 100
-                    || n.puff_size_end < 0 || n.puff_size_end > 100)
+                if (n.more().amount < 1 || n.more().amount > MaxParticles || n.more().lifetime < 0.01f || n.more().lifetime > 600 || n.more().lifetime_randomness < 0
+                    || n.more().lifetime_randomness > 1 || n.more().explosiveness < 0 || n.more().explosiveness > 1 || n.more().spread < 0 || n.more().spread > 180
+                    || n.more().velocity_min < 0 || n.more().velocity_max < 0 || n.more().velocity_min > 1000 || n.more().velocity_max > 1000 || !bounded(n.more().direction, 1000)
+                    || n.more().damping_min < 0 || n.more().damping_max < 0 || n.more().damping_min > 1000 || n.more().damping_max > 1000
+                    || !bounded(n.more().gravity, 1000) || n.more().emission_radius < 0 || n.more().emission_radius > 1000 || !bounded(n.more().emission_box, 1000)
+                    || n.more().emission_box.x < 0 || n.more().emission_box.y < 0 || n.more().emission_box.z < 0
+                    || uint8_t(n.more().particle_style) > uint8_t(ParticleStyle::Puff) || uint8_t(n.more().emission_shape) > uint8_t(EmissionShape::Box)
+                    || n.color > 0xffffff || n.more().color_end > 0xffffff || !std::isfinite(n.alpha) || n.alpha < 0 || n.alpha > 1
+                    || !std::isfinite(n.more().puff_size) || !std::isfinite(n.more().puff_size_end) || n.more().puff_size < 0 || n.more().puff_size > 100
+                    || n.more().puff_size_end < 0 || n.more().puff_size_end > 100)
                     return fail("Particle parameter out of range in " + n.name + " (amount 1-200, lifetime 0.01-600 s, spread 0-180).");
             }
             if (n.type == NodeType::CollisionShape3D
-                && (uint8_t(n.collision) > uint8_t(CollisionKind::Capsule) || !bounded(n.box_size, 1000) || n.box_size.x <= 0 || n.box_size.y <= 0
-                    || n.box_size.z <= 0 || !std::isfinite(n.radius) || n.radius <= 0 || n.radius > 1000 || !std::isfinite(n.height)
-                    || n.height <= 0 || n.height > 1000)) return fail("Invalid collision shape in " + n.name + ".");
+                && (uint8_t(n.more().collision) > uint8_t(CollisionKind::Capsule) || !bounded(n.more().box_size, 1000) || n.more().box_size.x <= 0 || n.more().box_size.y <= 0
+                    || n.more().box_size.z <= 0 || !std::isfinite(n.more().radius) || n.more().radius <= 0 || n.more().radius > 1000 || !std::isfinite(n.more().height)
+                    || n.more().height <= 0 || n.more().height > 1000)) return fail("Invalid collision shape in " + n.name + ".");
             if (physics::is_collision_object(n.type)) {
-                const float values[] = {n.mass, n.gravity_scale, n.linear_damp, n.angular_damp, n.friction, n.bounce, n.floor_max_angle};
+                const float values[] = {n.more().mass, n.more().gravity_scale, n.more().linear_damp, n.more().angular_damp, n.more().friction, n.more().bounce, n.more().floor_max_angle};
                 for (float v : values) if (!std::isfinite(v) || std::abs(v) > 100000) return fail("Invalid physics parameter in " + n.name + ".");
-                if (n.mass <= 0 || n.bounce < 0 || n.bounce > 1 || n.friction < 0 || n.linear_damp < 0 || n.angular_damp < 0
-                    || n.floor_max_angle < 0 || n.floor_max_angle > 89 || !bounded(n.linear_velocity, 1000) || !bounded(n.angular_velocity, 1000))
+                if (n.more().mass <= 0 || n.more().bounce < 0 || n.more().bounce > 1 || n.more().friction < 0 || n.more().linear_damp < 0 || n.more().angular_damp < 0
+                    || n.more().floor_max_angle < 0 || n.more().floor_max_angle > 89 || !bounded(n.more().linear_velocity, 1000) || !bounded(n.more().angular_velocity, 1000))
                     return fail("Physics parameter out of range in " + n.name + ".");
             }
             if (!bounded(n.position, is_control(n.type) ? 10000 : 1000) || !bounded(n.rotation, 100000) || !valid_scale(n.scale))
                 return fail("Transform out of range in " + n.name + ".");
-            if (is_control(n.type) && (n.text.size() > MaxText || !n.size.finite() || n.size.x < 0 || n.size.y < 0 || n.size.x > 4096
-                || n.size.y > 4096 || n.text_scale < 1 || n.text_scale > 8 || n.color > 0xffffff || !std::isfinite(n.alpha) || n.alpha < 0
+            if (is_control(n.type) && (n.more().text.size() > MaxText || !n.more().size.finite() || n.more().size.x < 0 || n.more().size.y < 0 || n.more().size.x > 4096
+                || n.more().size.y > 4096 || n.more().text_scale < 1 || n.more().text_scale > 8 || n.color > 0xffffff || !std::isfinite(n.alpha) || n.alpha < 0
                 || n.alpha > 1 || !texture_ok(n.texture))) return fail("Invalid 2D node: " + n.name + ".");
             if (n.type == NodeType::MeshInstance3D) {
                 if (++meshes > MaxMeshes) return fail("At most 128 meshes per scene.");
@@ -280,13 +287,13 @@ bool validate(const Description& d, std::string& error) {
                     || n.color > 0xffffff || !std::isfinite(n.alpha) || n.alpha < 0 || n.alpha > 1
                     || uint8_t(n.draw_order) > uint8_t(DrawOrder::OnTop)) return fail("Invalid sprite in " + n.name + ".");
             }
-            if (n.type == NodeType::Camera3D && (!std::isfinite(n.fov) || n.fov < 1 || n.fov > 179 || !std::isfinite(n.near)
-                || !std::isfinite(n.far) || n.near < 0.001f || n.far <= n.near || n.far > 10000)) return fail("Invalid camera in " + n.name + ".");
-            if (n.type == NodeType::DirectionalLight3D && (n.light_color > 0xffffff || !std::isfinite(n.energy) || n.energy < 0 || n.energy > 16))
+            if (n.type == NodeType::Camera3D && (!std::isfinite(n.more().fov) || n.more().fov < 1 || n.more().fov > 179 || !std::isfinite(n.more().near)
+                || !std::isfinite(n.more().far) || n.more().near < 0.001f || n.more().far <= n.more().near || n.more().far > 10000)) return fail("Invalid camera in " + n.name + ".");
+            if (n.type == NodeType::DirectionalLight3D && (n.more().light_color > 0xffffff || !std::isfinite(n.more().energy) || n.more().energy < 0 || n.more().energy > 16))
                 return fail("Invalid light in " + n.name + ".");
-            if (n.type == NodeType::WorldEnvironment && (n.background > 0xffffff || n.ambient > 0xffffff
-                || uint8_t(n.background_mode) > uint8_t(Background::Panorama) || n.sky_top > 0xffffff || n.sky_horizon > 0xffffff
-                || n.ground_horizon > 0xffffff || n.ground_bottom > 0xffffff || !texture_ok(n.sky_texture)))
+            if (n.type == NodeType::WorldEnvironment && (n.more().background > 0xffffff || n.more().ambient > 0xffffff
+                || uint8_t(n.more().background_mode) > uint8_t(Background::Panorama) || n.more().sky_top > 0xffffff || n.more().sky_horizon > 0xffffff
+                || n.more().ground_horizon > 0xffffff || n.more().ground_bottom > 0xffffff || !texture_ok(n.more().sky_texture)))
                 return fail("Invalid environment in " + n.name + ".");
             if (n.script < -1 || (n.script >= 0 && size_t(n.script) >= d.scripts.size())) return fail("Missing script for " + n.name + ".");
             for (const auto& o : n.overrides) if (o.name.empty() || o.name.size() > 80) return fail("Invalid script property in " + n.name + ".");
@@ -397,9 +404,18 @@ Renderer::Object* Runtime::make_mesh(const NodeDesc& d, Renderer::Material* mate
     return make_object(asset.vertices, asset.indices, material);
 }
 
-bool Runtime::load_pack(const uint8_t* data, size_t size, std::string& error) {
+size_t Runtime::node_bytes() const {
+    size_t bytes = nodes_.capacity() * sizeof(Live);
+    for (const auto& n : nodes_) {
+        if (n.d.has_extras()) bytes += sizeof(NodeExtras);
+        if (n.motion_.allocated()) bytes += sizeof(Motion);
+    }
+    return bytes;
+}
+
+bool Runtime::load_pack(const uint8_t* data, size_t size, std::string& error, bool textures_in_place) {
     Description d;
-    if (!decode_pack(data, size, d, error) || !load(std::move(d), error)) return false;
+    if (!decode_pack(data, size, d, error, textures_in_place) || !load(std::move(d), error)) return false;
     pack_ = data;
     pack_size_ = size;
     // Every scene was validated while decoding; the built one now lives in nodes_.
@@ -426,6 +442,7 @@ bool Runtime::build(std::string& error) {
     // The scene only borrows the objects, so drop its pointers first.
     scene_.getObjects().clear();
     objects_.clear();
+    queues_reserved_ = false;
     shared_meshes_.clear();
     materials_.clear();
     textures_.clear();
@@ -435,7 +452,7 @@ bool Runtime::build(std::string& error) {
     pending_free_ = false;
     if (!scene_nodes_) scene_nodes_ = &description_.nodes;
     const auto& scene_nodes = *scene_nodes_;
-    // Exact capacity: a push_back past it would double the array, and a Live is ~850 bytes on the device.
+    // Exact capacity: a push_back past it would double the array, and a Live is ~490 bytes on the device.
     std::vector<Live>().swap(nodes_);
     nodes_.reserve(scene_nodes.size() + description_.autoloads.size());
     nodes_.resize(scene_nodes.size());
@@ -468,7 +485,7 @@ bool Runtime::build(std::string& error) {
         if (n.d.texture >= 0) {
             const auto& asset = description_.textures[size_t(n.d.texture)];
             const bool indexed = !asset.palette.empty();
-            auto* data = indexed ? reinterpret_cast<uint16_t*>(const_cast<uint8_t*>(asset.indices.data()))
+            auto* data = indexed ? reinterpret_cast<uint16_t*>(const_cast<uint8_t*>(asset.index_data()))
                                  : const_cast<uint16_t*>(asset.pixels.data());
             auto texture = std::make_unique<Renderer::Texture>(asset.width, asset.height, data, asset.has_alpha, asset.alpha_color,
                 false, Renderer::WRAP, indexed ? const_cast<uint16_t*>(asset.palette.data()) : nullptr);
@@ -641,8 +658,8 @@ void Runtime::apply_material(Live& n) {
         if (expand) {
             std::vector<uint16_t> palette(asset.palette.size());
             for (size_t i = 0; i < palette.size(); ++i) palette[i] = tint(asset.palette[i]);
-            n.tinted.resize(asset.indices.size());
-            for (size_t i = 0; i < asset.indices.size(); ++i) n.tinted[i] = palette[asset.indices[i]];
+            n.tinted.resize(size_t(asset.width) * asset.height);
+            for (size_t i = 0; i < n.tinted.size(); ++i) n.tinted[i] = palette[asset.index_data()[i]];
         } else if (d.color != 0xffffff) {
             const std::vector<uint16_t>& source = indexed ? asset.palette : asset.pixels;
             n.tinted.resize(source.size());
@@ -651,7 +668,7 @@ void Runtime::apply_material(Live& n) {
             n.tinted.clear();
         }
         if (indexed && !expand) {
-            n.texture->data = reinterpret_cast<uint16_t*>(const_cast<uint8_t*>(asset.indices.data()));
+            n.texture->data = reinterpret_cast<uint16_t*>(const_cast<uint8_t*>(asset.index_data()));
             n.texture->palette = const_cast<uint16_t*>(n.tinted.empty() ? asset.palette.data() : n.tinted.data());
         } else {
             n.texture->data = const_cast<uint16_t*>(n.tinted.empty() ? asset.pixels.data() : n.tinted.data());
@@ -747,23 +764,23 @@ void Runtime::apply_environment() {
         if (!environment && n.d.type == NodeType::WorldEnvironment) environment = &n;
         if (!light && n.d.type == NodeType::DirectionalLight3D && n.world_visible) light = &n;
     }
-    scene_.setBackcolor(rgb565(environment ? environment->d.background : 0x161c28));
-    ambient_.color = color_of(environment ? environment->d.ambient : 0x4e586e);
+    scene_.setBackcolor(rgb565(environment ? environment->d.more().background : 0x161c28));
+    ambient_.color = color_of(environment ? environment->d.more().ambient : 0x4e586e);
     if (!light) { scene_.setDirectionalLight(nullptr); return; }
     // Godot lights shine along -Z; Jet wants the direction towards the light.
     const Vec3 toward = light->world.basis.orthonormalized().column(2).normalized();
     sun_.worldLightDir = {int32_t(std::lround(toward.x * FIXED_POINT_SCALE)), int32_t(std::lround(toward.y * FIXED_POINT_SCALE)),
                           int32_t(std::lround(-toward.z * FIXED_POINT_SCALE))};
     sun_.lightDir = sun_.worldLightDir;
-    sun_.color = color_of(light->d.light_color);
-    sun_.intensity = uint16_t(std::clamp(light->d.energy * 220.0f, 0.0f, 255.0f));
+    sun_.color = color_of(light->d.more().light_color);
+    sun_.intensity = uint16_t(std::clamp(light->d.more().energy * 220.0f, 0.0f, 255.0f));
     scene_.setDirectionalLight(&sun_);
 }
 
 void Runtime::apply_camera() {
     const Live* camera = nullptr;
     if (playing_ && !editor_view_) {
-        for (const auto& n : nodes_) if (!n.freed && n.d.type == NodeType::Camera3D && n.d.current) { camera = &n; break; }
+        for (const auto& n : nodes_) if (!n.freed && n.d.type == NodeType::Camera3D && n.d.more().current) { camera = &n; break; }
         if (!camera) for (const auto& n : nodes_) if (!n.freed && n.d.type == NodeType::Camera3D) { camera = &n; break; }
     }
     Basis basis;
@@ -772,7 +789,7 @@ void Runtime::apply_camera() {
     if (camera) {
         basis = camera->world.basis.orthonormalized();
         position = camera->world.origin;
-        fov = camera->d.fov; near = camera->d.near; far = camera->d.far;
+        fov = camera->d.more().fov; near = camera->d.more().near; far = camera->d.more().far;
     } else {
         basis = Basis::from_euler(editor_rotation_);
         position = editor_position_;
@@ -907,8 +924,8 @@ void Runtime::enter_scene() {
     start_particles();
     for (auto& n : nodes_)
         if (n.d.type == NodeType::RigidBody3D) {
-            n.velocity = n.d.linear_velocity;
-            n.angular = n.d.angular_velocity;
+            n.edit_motion().velocity = n.d.more().linear_velocity;
+            n.edit_motion().angular = n.d.more().angular_velocity;
         }
     for (auto& n : nodes_) {
         if (n.d.script < 0 || vm_->has_instance(n.d.id)) continue; // autoloads are already running
@@ -940,7 +957,7 @@ void Runtime::enter_scene() {
     flush_script_errors();
     free_pending();
     update_transforms();
-    for (auto& n : nodes_) n.last_origin = n.world.origin;
+    for (int32_t i : collision_objects_) nodes_[size_t(i)].edit_motion().last_origin = nodes_[size_t(i)].world.origin;
     apply_environment();
     apply_camera();
 }
@@ -1041,9 +1058,9 @@ void Runtime::prepare_background() {
     const Vec3 forward = -view_basis_.column(2);
     const float focal = (height_ * 0.5f) / std::tan(radians(view_fov_) * 0.5f);
     const float pitch = std::asin(std::clamp(forward.y, -1.0f, 1.0f));
-    const Background mode = env ? env->d.background_mode : Background::Color;
+    const Background mode = env ? env->d.more().background_mode : Background::Color;
     if (mode == Background::Color) {
-        std::fill(gradient_.begin(), gradient_.end(), rgb565(env ? env->d.background : 0x161c28));
+        std::fill(gradient_.begin(), gradient_.end(), rgb565(env ? env->d.more().background : 0x161c28));
     } else {
         // Horizon row from the camera pitch; colours follow the angle from it.
         const float horizon = height_ * 0.5f + focal * std::tan(pitch);
@@ -1052,19 +1069,19 @@ void Runtime::prepare_background() {
             const float angle = std::atan((horizon - float(y)) / focal) / (Pi * 0.5f);
             if (angle >= 0) {
                 const float t = 1 - (1 - std::min(angle, 1.0f)) * (1 - std::min(angle, 1.0f));
-                gradient_[size_t(y)] = lerp565(e.sky_horizon, e.sky_top, t);
+                gradient_[size_t(y)] = lerp565(e.more().sky_horizon, e.more().sky_top, t);
             } else {
                 const float t = std::min(-angle * 4, 1.0f);
-                gradient_[size_t(y)] = lerp565(e.ground_horizon, e.ground_bottom, t);
+                gradient_[size_t(y)] = lerp565(e.more().ground_horizon, e.more().ground_bottom, t);
             }
         }
     }
     scene_.backgroundGradientColors = gradient_.data();
-    const bool panorama = mode == Background::Panorama && env->d.sky_texture >= 0;
+    const bool panorama = mode == Background::Panorama && env->d.more().sky_texture >= 0;
     scene_.setClearBuffer(!panorama);
     if (!panorama) return;
     // Separable: yaw depends only on the column, pitch only on the row.
-    const auto& sky = description_.textures[size_t(env->d.sky_texture)];
+    const auto& sky = description_.textures[size_t(env->d.more().sky_texture)];
     const float yaw = std::atan2(forward.x, -forward.z);
     sky_columns_.resize(size_t(width_));
     sky_rows_.resize(size_t(height_));
@@ -1079,12 +1096,13 @@ void Runtime::prepare_background() {
         sky_rows_[size_t(y)] = int32_t(v * sky.height) * sky.width;
     }
     const bool indexed = !sky.palette.empty();
+    const uint8_t* indices = sky.index_data();
     // Only the rows and columns this build stores (see buffer_width()).
     uint16_t* out = target_;
     for (int y = FIELD_BUFFERS ? next_field() : 0; y < height_; y += BufferRowStep) {
         const int32_t row = sky_rows_[size_t(y)];
         if (indexed)
-            for (int x = 0; x < width_; x += BufferColumnStep) *out++ = sky.palette[sky.indices[size_t(row + sky_columns_[size_t(x)])]];
+            for (int x = 0; x < width_; x += BufferColumnStep) *out++ = sky.palette[indices[size_t(row + sky_columns_[size_t(x)])]];
         else
             for (int x = 0; x < width_; x += BufferColumnStep) *out++ = sky.pixels[size_t(row + sky_columns_[size_t(x)])];
     }
@@ -1147,19 +1165,19 @@ void Runtime::prepare_overlay() {
         item.color = rgb565(d.color);
         item.tint = d.color;
         item.alpha = uint8_t(std::lround(alpha * 255));
-        item.scale = uint8_t(std::max<int>(1, d.text_scale));
+        item.scale = uint8_t(std::max<int>(1, d.more().text_scale));
         if (d.type == NodeType::ColorRect) {
-            item.w = int(std::lround(d.size.x));
-            item.h = int(std::lround(d.size.y));
+            item.w = int(std::lround(d.more().size.x));
+            item.h = int(std::lround(d.more().size.y));
         } else if (d.type == NodeType::TextureRect) {
             if (d.texture < 0) continue;
             item.texture = &description_.textures[size_t(d.texture)];
-            item.w = d.size.x > 0 ? int(std::lround(d.size.x)) : item.texture->width * item.scale;
-            item.h = d.size.y > 0 ? int(std::lround(d.size.y)) : item.texture->height * item.scale;
+            item.w = d.more().size.x > 0 ? int(std::lround(d.more().size.x)) : item.texture->width * item.scale;
+            item.h = d.more().size.y > 0 ? int(std::lround(d.more().size.y)) : item.texture->height * item.scale;
         } else {
             // UTF-8 to glyphs, one list per line.
             item.lines.emplace_back();
-            const std::string& text = d.text;
+            const std::string& text = d.more().text;
             size_t longest = 0;
             for (size_t i = 0; i < text.size();) {
                 uint32_t code = uint8_t(text[i++]);
@@ -1196,7 +1214,7 @@ void compose_overlay_row(const std::vector<OverlayItem>& items, uint16_t* row, i
             const size_t ty = size_t((y - it.y) * t.height / it.h) * t.width;
             for (int x = x0; x < x1; ++x) {
                 const size_t i = ty + size_t((x - it.x) * t.width / it.w);
-                uint16_t c = indexed ? t.palette[t.indices[i]] : t.pixels[i];
+                uint16_t c = indexed ? t.palette[t.index_data()[i]] : t.pixels[i];
                 if (t.has_alpha && c == t.alpha_color) continue;
                 if (it.tint != 0xffffff) c = tint565(c, it.tint);
                 put(x, c, it.alpha);
@@ -1239,19 +1257,19 @@ int Runtime::pick_overlay(int x, int y) const {
     for (auto it = nodes_.rbegin(); it != nodes_.rend(); ++it) {
         const auto& d = it->d;
         if (!is_control(d.type) || d.type == NodeType::Control || !it->world_visible) continue;
-        int w = int(d.size.x), h = int(d.size.y);
+        int w = int(d.more().size.x), h = int(d.more().size.y);
         if (d.type == NodeType::Label) {
             int lines = 1, longest = 0, current = 0;
-            for (char ch : d.text) {
+            for (char ch : d.more().text) {
                 if (ch == '\n') { ++lines; current = 0; continue; }
                 if ((uint8_t(ch) & 0xC0) != 0x80) longest = std::max(longest, ++current);
             }
-            w = longest * font::Width * d.text_scale;
-            h = lines * font::Height * d.text_scale;
+            w = longest * font::Width * d.more().text_scale;
+            h = lines * font::Height * d.more().text_scale;
         } else if (d.type == NodeType::TextureRect && d.texture >= 0) {
             const auto& t = description_.textures[size_t(d.texture)];
-            if (w <= 0) w = t.width * d.text_scale;
-            if (h <= 0) h = t.height * d.text_scale;
+            if (w <= 0) w = t.width * d.more().text_scale;
+            if (h <= 0) h = t.height * d.more().text_scale;
         }
         const Vec3& p = it->world.origin;
         if (x >= p.x && y >= p.y && x < p.x + w && y < p.y + h) return int(d.id);
@@ -1259,10 +1277,26 @@ int Runtime::pick_overlay(int x, int y) const {
     return -1;
 }
 
+// Jet's per-frame queues would grow while drawing, each time holding the old and the doubled buffer for a moment:
+// reserve them once per scene instead. Back faces and what's out of view never reach them, so half of the scene's
+// triangles is usually plenty (hidden nodes count, they have geometry too); a busier frame still grows them.
+void Runtime::reserve_triangle_queues() {
+    size_t triangles = 0;
+    for (const auto& o : objects_) {
+        triangles += o->triangles.size();
+#if JET_MESH_INSTANCING
+        for (const auto& instance : o->instances) triangles += instance.mesh->triangles.size();
+#endif
+    }
+    scene_.reserveTriangles(triangles / 2 + 32);
+    queues_reserved_ = true;
+}
+
 void Runtime::render() {
     apply_camera();
     prepare_background();
     update_reflections();
+    if (!queues_reserved_) reserve_triangle_queues();
     scene_.render(executor_);
     render_particles(); // after the raster bands joined, as JetExamples' RenderEffects
     draw_overlay();

@@ -22,6 +22,14 @@
 // It sleeps while DMA runs, so the raster worker gets core 0 most of the time.
 // Two field buffers: one is drawn while the other is sent.
 
+// Rarely used node data (extra fields, body state) goes to PSRAM: small blocks would otherwise take internal RAM
+// from the buffers that drawing touches every frame.
+void* jetstudio::cold_alloc(size_t bytes) {
+    void* p = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    return p ? p : malloc(bytes);
+}
+void jetstudio::cold_free(void* p) { heap_caps_free(p); }
+
 namespace {
 constexpr const char* Tag = "JetStudio";
 // The release profile (sdkconfig.release) has no console: the log is just drained and no frame stats are computed.
@@ -265,8 +273,8 @@ void game(void*) {
     else ESP_LOGW(Tag, "Raster worker not started: single-core rendering");
     ESP_LOGI(Tag, "%s: %dx%d, fields of %dx%d in %s, DMA queue %s", Board::name, runtime.width(), runtime.height(),
         runtime.buffer_width(), runtime.buffer_rows(), internal ? "internal RAM" : "PSRAM (slower)", present::queued ? "on" : "off (polling)");
-    ESP_LOGI(Tag, "Scene loaded: %u nodes, %u meshes, %u scripts; internal free %u, PSRAM free %u",
-        unsigned(runtime.node_count()), unsigned(runtime.mesh_count()), unsigned(runtime.description().scripts.size()),
+    ESP_LOGI(Tag, "Scene loaded: %u nodes (%u bytes), %u meshes, %u scripts; internal free %u, PSRAM free %u",
+        unsigned(runtime.node_count()), unsigned(runtime.node_bytes()), unsigned(runtime.mesh_count()), unsigned(runtime.description().scripts.size()),
         unsigned(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)), unsigned(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
 
     int64_t previous = esp_timer_get_time(), total = 0, scripts_time = 0, rendering = 0, waiting = 0, yielded = previous;

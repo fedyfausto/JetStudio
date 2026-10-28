@@ -1,4 +1,4 @@
-# Jet Studio - prototype 0.3.0
+# Jet Studio - prototype 0.3.1
 
 A **Godot**-style 3D desktop editor, built with Godot's UI, with an **independent C++17** game
 runtime, the **Jet** renderer and the **JetScript** scripting language (GDScript syntax). The
@@ -322,7 +322,7 @@ firmware configuration (`generated_board.hpp` and the board's PlatformIO environ
 | ESP32-S3-DevKitC-1 N16R8 | 16 MB flash, 8 MB octal PSRAM |
 | ESP32-S3-DevKitC-1 N8R2 | 8 MB flash, 2 MB quad PSRAM |
 | ST Nucleo-F767ZI | STM32F767, Cortex-M7 216 MHz, 512 KB RAM, 2 MB flash |
-| ST Nucleo-F746ZG | STM32F746, Cortex-M7 216 MHz, 320 KB RAM, 1 MB flash. **Tested** (ILI9341, software SPI on D12) |
+| ST Nucleo-F746ZG | STM32F746, Cortex-M7 216 MHz, 320 KB RAM, 1 MB flash. **Tested** (ILI9341 on SPI1 with DMA, 54 MHz) |
 | ST Nucleo-F722ZE | STM32F722, Cortex-M7 216 MHz, 256 KB RAM, 512 KB flash |
 | WeAct Black Pill F411CE | STM32F411, Cortex-M4 100 MHz, 128 KB RAM, 512 KB flash: small scenes only |
 
@@ -330,18 +330,26 @@ firmware configuration (`generated_board.hpp` and the board's PlatformIO environ
 F2/F4/F7 families (not the H7). The firmware is a separate PlatformIO project, `firmware_stm32/`
 (Arduino STM32 core), with the same runtime, the same scripts and the same device rendering
 profile (half-width interlaced fields, no z-buffer): the emulator applies to these boards too.
-It runs on a single core: every frame it updates the scene, draws a field and sends it to the
-display; flashing goes through the ST-LINK (the Nucleo's USB), and the Debug serial log comes
-from the ST-LINK virtual port (Black Pill: USB-C) into the Serial panel. Pins are the board's
-(e.g. `D13 · PA5`). SCK and MOSI on SPI1 pins use the SPI peripheral (marked `SPI1` in the
-editor). Any other pin works through software SPI, which reaches about the same speed because
-the rows are sent without DMA anyway: LovyanGFX's STM32 DMA hangs on the F7, since its SPI1
-interrupt has no handler and the DMA can't read DTCM. On the Nucleo F746ZG/F767ZI, D11 (PA7)
-is connected to the Ethernet, so MOSI goes on D22 (PB5), or on D12 through software SPI.
-Memory: the RAM is the internal RAM (no PSRAM). The firmware keeps only the scene being played
-in RAM, and identical meshes share one copy. Verified on a Nucleo-F746ZG: `examples/textured_boxes`
-runs at ~30 ms per frame, 24 of them spent sending fields at ~27 MHz. `examples/physics_demo` doesn't
-fit in its 320 KB yet, because Jet's triangle queue runs out of memory when it grows.
+It runs on a single core: every frame it updates the scene and draws a field, while the DMA sends
+the previous field to the display in the background (the DMA interrupt starts each row). Flashing
+goes through the ST-LINK (the Nucleo's USB), and the Debug serial log comes from the ST-LINK
+virtual port (Black Pill: USB-C) into the Serial panel. Pins are the board's (e.g. `D13 · PA5`).
+SCK and MOSI on SPI1 pins use the SPI peripheral and its DMA (marked `SPI1` in the editor); any
+other pin works through software SPI, which is much slower and can't send in the background. On
+the Nucleo F746ZG/F767ZI, D11 (PA7) is also wired to the Ethernet: remove jumper JP6 to use it as
+MOSI, or use D22 (PB5). The SPI clock is 27 or 54 MHz (APB2 / 4 or / 2): at 54 MHz a 320×240 field
+takes ~12 ms, and many ILI9341 modules take it even over jumper wires. The blue B1 USER button of
+the Nucleo-144 boards (PC13) can be an Input Map button.
+LovyanGFX's STM32 DMA hung on the F7 (no interrupt handler for SPI1's DMA stream, the data cache
+not written back): `tools/patches/LovyanGFX-stm32-dma.patch` fixes it, and `./jet-studio setup`
+applies it.
+Memory: the RAM is the internal RAM (no PSRAM), so the firmware keeps only the scene being played
+in RAM, reads palette textures straight from the package in flash, shares identical meshes and
+gives each node only the fields of its type. The second field buffer (38 KB at 320×240) is given
+up when the scene needs the RAM: drawing then waits for the DMA. Running out of RAM is reported in
+the log instead of crashing. Verified on a Nucleo-F746ZG with an ILI9341 at 54 MHz:
+`examples/textured_boxes` and `examples/first_world` run at ~12 ms per frame (83 fps),
+`examples/jetrun` at ~25 ms with one field buffer. `examples/physics_demo` doesn't fit in 320 KB.
 The firmware takes ~425 KB of flash (Jet, runtime, VM and LovyanGFX): on the 512 KB boards
 ~90 KB remain for the scene.
 
@@ -429,7 +437,7 @@ $USER`, then log in again).
 **3. Dependencies and build**:
 
 ```sh
-./jet-studio setup        # clones Godot, godot-cpp, Jet, LovyanGFX and JetExamples at the locked revisions
+./jet-studio setup        # clones Godot, godot-cpp, Jet, LovyanGFX and JetExamples at the locked revisions, applies tools/patches
 ./jet-studio godot -j 10  # builds the Godot template that runs the editor UI (10-20 minutes)
 ./jet-studio build -j 8   # builds Jet, the runtime, JetScript, the bridge and the players
 ./jet-studio examples     # regenerates examples/neon_car (local copy of the JetExamples car) and examples/physics_demo
@@ -437,7 +445,9 @@ $USER`, then log in again).
 ```
 
 The revisions are in `dependencies.lock.json`; `./jet-studio setup --update` moves Godot and
-godot-cpp to their latest master and records the new revisions. `tools/diagrams.py` (the README
+godot-cpp to their latest master and records the new revisions. Our fixes to the dependencies
+live in `tools/patches/<name>-*.patch` until upstream has them: `setup` applies them after the
+checkout and takes them out before moving to another revision. `tools/diagrams.py` (the README
 diagrams) needs only Python.
 
 **4. Release package** (optional):
@@ -575,7 +585,11 @@ bilinear filter, no picking):
   (`compose_overlay_row()`). It then queues the row in the 8-row `S3Scanout` DMA queue (from
   JetExamples) and sleeps while DMA runs, so the raster worker gets core 0.
 - The STM32 firmware (`firmware_stm32/src/main.cpp`) uses the same runtime and profile on one
-  core: update, render, then rows sent with `writePixels` (no DMA).
+  core: update and render, while the field drawn in the previous frame goes out through the SPI
+  DMA. The DMA interrupt sets the next row's window and starts it, and the row after it is
+  prepared (columns doubled, HUD composited) while the DMA works. Palette textures are read from
+  the package in flash (`load_pack(..., textures_in_place)`); the runtime reserves Jet's triangle
+  queues once per scene, so they never double while drawing.
 
 ### Editor
 

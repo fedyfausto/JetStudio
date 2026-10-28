@@ -23,7 +23,7 @@ Description scene() {
     Description d;
     d.nodes.push_back(node(1, -1, NodeType::Node3D, "World"));
     auto camera = node(2, 0, NodeType::Camera3D, "Camera3D");
-    camera.position = {0, 1, 6}; camera.current = true;
+    camera.position = {0, 1, 6}; camera.extras().current = true;
     d.nodes.push_back(camera);
     auto cube = node(3, 0, NodeType::MeshInstance3D, "Cube");
     cube.position = {0, 0.6f, 2.5f}; cube.color = 0xff0000; cube.shading = Shading::Unlit;
@@ -93,7 +93,7 @@ int main() {
     // 2D nodes are composited at full resolution while rows are sent.
     Description hud = scene();
     auto panel = node(9, 0, NodeType::ColorRect, "Panel");
-    panel.position = {11, 21, 0}; panel.size = {3, 3, 0}; panel.color = 0x00ff00;
+    panel.position = {11, 21, 0}; panel.extras().size = {3, 3, 0}; panel.color = 0x00ff00;
     hud.nodes.push_back(panel);
     Runtime overlay;
     check(overlay.load(hud, error) && overlay.start(diagnostics), "HUD scene starts");
@@ -120,8 +120,8 @@ int main() {
     // Panorama sky into the half-width field layout.
     Description sky = scene();
     auto env = node(6, 0, NodeType::WorldEnvironment, "Env");
-    env.background_mode = Background::Panorama;
-    env.sky_texture = 0;
+    env.extras().background_mode = Background::Panorama;
+    env.extras().sky_texture = 0;
     sky.nodes.push_back(env);
     std::vector<uint8_t> rgba(64 * 32 * 4);
     for (size_t i = 0; i < 64 * 32; ++i) { rgba[i * 4] = 40; rgba[i * 4 + 1] = uint8_t(i % 64 * 4); rgba[i * 4 + 2] = 200; rgba[i * 4 + 3] = 255; }
@@ -166,12 +166,12 @@ int main() {
         Description d = scene();
         auto puff = node(9, 0, NodeType::CPUParticles3D, "Smoke");
         puff.position = {0, 1, 3};
-        puff.particle_style = ParticleStyle::Puff;
-        puff.amount = 1; puff.explosiveness = 1; puff.lifetime = 10;
-        puff.gravity = {}; puff.color = puff.color_end = 0x00ff00; puff.alpha = 1; puff.puff_size = puff.puff_size_end = 1;
+        puff.extras().particle_style = ParticleStyle::Puff;
+        puff.extras().amount = 1; puff.extras().explosiveness = 1; puff.extras().lifetime = 10;
+        puff.extras().gravity = {}; puff.color = puff.extras().color_end = 0x00ff00; puff.alpha = 1; puff.extras().puff_size = puff.extras().puff_size_end = 1;
         d.nodes.push_back(puff);
         auto edge = puff; // huge, half off screen
-        edge.id = 10; edge.name = "Edge"; edge.position = {2.2f, 2.4f, 5}; edge.puff_size = edge.puff_size_end = 40;
+        edge.id = 10; edge.name = "Edge"; edge.position = {2.2f, 2.4f, 5}; edge.extras().puff_size = edge.extras().puff_size_end = 40;
         d.nodes.push_back(edge);
 
         Device screen = two_fields(d, 90); // past the fade in
@@ -181,13 +181,13 @@ int main() {
         Description behind = d;
         behind.nodes.pop_back();
         behind.nodes[3].position = {0, 0.6f, 1.5f};
-        behind.nodes[3].puff_size = behind.nodes[3].puff_size_end = 5;
+        behind.nodes[3].extras().puff_size = behind.nodes[3].extras().puff_size_end = 5;
         Device view = two_fields(behind, 90);
         check(red(view.at(Width / 2, Height / 2 + 6)) && green(view.at(Width / 2 - 40, Height / 2 + 6)),
               "meshes hide the puffs behind them (occlusion cells)");
 
         Description over = behind;
-        over.nodes[3].no_depth_test = true;
+        over.nodes[3].extras().no_depth_test = true;
         check(green(two_fields(over, 90).at(Width / 2, Height / 2 + 6)), "No Depth Test puffs are drawn over the meshes");
 
         auto quad_centre = [&](float yaw) {
@@ -201,9 +201,9 @@ int main() {
         auto sparks_on_cube = [&](bool over_meshes) {
             Description sparks = behind;
             auto& e = sparks.nodes[3];
-            e.particle_style = ParticleStyle::Sparks; e.additive = false; e.no_depth_test = over_meshes;
-            e.amount = 150; e.spread = 180; e.velocity_min = e.velocity_max = 0.2f;
-            e.emission_shape = EmissionShape::Sphere; e.emission_radius = 0.2f;
+            e.extras().particle_style = ParticleStyle::Sparks; e.extras().additive = false; e.extras().no_depth_test = over_meshes;
+            e.extras().amount = 150; e.extras().spread = 180; e.extras().velocity_min = e.extras().velocity_max = 0.2f;
+            e.extras().emission_shape = EmissionShape::Sphere; e.extras().emission_radius = 0.2f;
             const Device frames = two_fields(sparks, 6);
             int bright = 0;
             for (int y = Height / 2 - 8; y <= Height / 2 + 14; ++y)

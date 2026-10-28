@@ -30,7 +30,7 @@ Description scene() {
     sun.rotation = {-50, -35, 0};
     d.nodes.push_back(sun);
     auto camera = node(3, 0, NodeType::Camera3D, "Camera3D");
-    camera.position = {0, 2, 5}; camera.rotation = {-20, 0, 0}; camera.current = true;
+    camera.position = {0, 2, 5}; camera.rotation = {-20, 0, 0}; camera.extras().current = true;
     d.nodes.push_back(camera);
     auto cube = node(4, 0, NodeType::MeshInstance3D, "Cube");
     cube.position = {0, 0.5f, 0}; cube.color = 0xf0a45b;
@@ -256,8 +256,8 @@ void material_tests() {
     // Sky: gradient follows the camera pitch, panorama fills the background.
     Description sky = scene();
     sky.nodes.push_back(node(5, 0, NodeType::WorldEnvironment, "Env"));
-    sky.nodes[4].background_mode = Background::Gradient;
-    sky.nodes[4].sky_top = 0x0000ff; sky.nodes[4].sky_horizon = 0xffffff; sky.nodes[4].ground_horizon = 0x404040; sky.nodes[4].ground_bottom = 0x000000;
+    sky.nodes[4].extras().background_mode = Background::Gradient;
+    sky.nodes[4].extras().sky_top = 0x0000ff; sky.nodes[4].extras().sky_horizon = 0xffffff; sky.nodes[4].extras().ground_horizon = 0x404040; sky.nodes[4].extras().ground_bottom = 0x000000;
     Runtime r;
     check(r.load(sky, error), "scene with gradient sky loads");
     r.set_editor_camera({0, 1, 6}, {0, 0, 0}, 70);
@@ -266,9 +266,9 @@ void material_tests() {
     r.set_editor_camera({0, 1, 6}, {0.6f, 0, 0}, 70);
     check(frame(r) != level, "gradient horizon moves with the camera pitch");
     Description pano = sky;
-    pano.nodes[4].background_mode = Background::Panorama;
+    pano.nodes[4].extras().background_mode = Background::Panorama;
     pano.textures.push_back(large);
-    pano.nodes[4].sky_texture = 0;
+    pano.nodes[4].extras().sky_texture = 0;
     check(r.load(pano, error), "scene with panorama sky loads");
     r.set_editor_camera({0, 1, 6}, {0, 0, 0}, 70);
     const auto first = frame(r);
@@ -291,8 +291,8 @@ void material_tests() {
     packed.nodes[3].uv_offset[0] = 0.5f;
     packed.nodes[3].cull = CullMode::Front;
     packed.nodes.push_back(node(9, 0, NodeType::WorldEnvironment, "Env"));
-    packed.nodes.back().background_mode = Background::Panorama;
-    packed.nodes.back().sky_texture = 1;
+    packed.nodes.back().extras().background_mode = Background::Panorama;
+    packed.nodes.back().extras().sky_texture = 1;
     const auto bytes = encode_pack(packed, error);
     Description back;
     check(decode_pack(bytes.data(), bytes.size(), back, error), "pack with textures round trips");
@@ -300,8 +300,12 @@ void material_tests() {
           && back.textures[1].pixels == large.pixels && back.textures[2].has_alpha && back.textures[2].alpha_color == holes.alpha_color,
           "pack keeps palette, RGB565 and colour-key textures");
     check(back.nodes[3].shading == Shading::Phong && back.nodes[3].uv_offset[0] == 0.5f && back.nodes[3].cull == CullMode::Front
-          && back.nodes.back().background_mode == Background::Panorama && back.nodes.back().sky_texture == 1, "pack keeps material and sky fields");
+          && back.nodes.back().more().background_mode == Background::Panorama && back.nodes.back().more().sky_texture == 1, "pack keeps material and sky fields");
     check(render_scene(packed) == render_scene(back), "decoded pack renders identically");
+    Description in_place;
+    check(decode_pack(bytes.data(), bytes.size(), in_place, error, true) && in_place.textures[0].packed_indices
+          && in_place.textures[0].indices.empty() && render_scene(in_place) == render_scene(back)
+          && encode_pack(in_place, error) == bytes, "palette textures read in place from the package render and save identically");
 }
 
 // Unit cube OBJ: two objects and materials, quads, shared per-face normals, negative indices, plus an MTL.
@@ -481,16 +485,16 @@ void model_tests() {
     // 2D nodes over the 3D scene: fill, alpha, nesting, text, texture, picking.
     Description hud = scene();
     auto panel = node(10, 0, NodeType::ColorRect, "Panel");
-    panel.position = {10, 10, 0}; panel.size = {40, 30, 0}; panel.color = 0xff0000; panel.alpha = 1;
+    panel.position = {10, 10, 0}; panel.extras().size = {40, 30, 0}; panel.color = 0xff0000; panel.alpha = 1;
     hud.nodes.push_back(panel);
     auto inner = node(11, 4, NodeType::ColorRect, "Inner");
-    inner.position = {5, 5, 0}; inner.size = {4, 4, 0}; inner.color = 0x00ff00; inner.alpha = 1;
+    inner.position = {5, 5, 0}; inner.extras().size = {4, 4, 0}; inner.color = 0x00ff00; inner.alpha = 1;
     hud.nodes.push_back(inner);
     auto title = node(12, 0, NodeType::Label, "Title");
-    title.position = {100, 200, 0}; title.text = "HI"; title.text_scale = 2; title.color = 0xffffff; title.alpha = 1;
+    title.position = {100, 200, 0}; title.extras().text = "HI"; title.extras().text_scale = 2; title.color = 0xffffff; title.alpha = 1;
     hud.nodes.push_back(title);
     auto icon = node(13, 0, NodeType::TextureRect, "Icon");
-    icon.position = {250, 20, 0}; icon.texture = 0; icon.text_scale = 2; icon.color = 0xffffff; icon.alpha = 1; icon.size = {0, 0, 0};
+    icon.position = {250, 20, 0}; icon.texture = 0; icon.extras().text_scale = 2; icon.color = 0xffffff; icon.alpha = 1; icon.extras().size = {0, 0, 0};
     hud.nodes.push_back(icon);
     TextureAsset two_colour;
     check(make_texture("res://icon.png", 16, 16, two.data(), two_colour, error), "icon texture");
@@ -524,7 +528,7 @@ void model_tests() {
     group_root.position = {40, 40, 0};
     group.nodes.push_back(group_root);
     auto bar = node(11, 4, NodeType::ColorRect, "Bar");
-    bar.position = {2, 2, 0}; bar.size = {6, 6, 0}; bar.color = 0xff0000; bar.alpha = 1;
+    bar.position = {2, 2, 0}; bar.extras().size = {6, 6, 0}; bar.color = 0xff0000; bar.alpha = 1;
     group.nodes.push_back(bar);
     check(overlay.load(group, error), "scene with a plain Control loads");
     px = frame(overlay);
@@ -626,14 +630,14 @@ void model_tests() {
     check(c.shape == Shape::Mesh && c.mesh == 0 && c.diffuse == 0.4f && c.reflection && c.draw_order == DrawOrder::Background
           && back.nodes.back().shape == Shape::Torus,
           "pack keeps mesh references and material fields");
-    check(back.nodes[6].type == NodeType::Label && back.nodes[6].text == "HI" && back.nodes[6].text_scale == 2
-          && back.nodes[4].size.x == 40, "pack keeps 2D nodes");
+    check(back.nodes[6].type == NodeType::Label && back.nodes[6].more().text == "HI" && back.nodes[6].more().text_scale == 2
+          && back.nodes[4].more().size.x == 40, "pack keeps 2D nodes");
     check(render_scene(packed) == render_scene(back), "decoded v14 pack renders identically");
 }
 
 NodeDesc shape(uint32_t id, int32_t parent, CollisionKind kind, Vec3 size = {1, 1, 1}, float radius = 0.5f, float height = 2) {
     NodeDesc n = node(id, parent, NodeType::CollisionShape3D, "Shape");
-    n.collision = kind; n.box_size = size; n.radius = radius; n.height = height;
+    n.extras().collision = kind; n.extras().box_size = size; n.extras().radius = radius; n.extras().height = height;
     return n;
 }
 // Static 20x1x20 floor with its top at y = 0.
@@ -694,7 +698,7 @@ void physics_tests() {
     {   // Bounce.
         Description d = floor_scene();
         const int ball = add_body(d, 10, NodeType::RigidBody3D, "Ball", {0, 3, 0}, shape(0, 0, CollisionKind::Sphere));
-        d.nodes[size_t(ball)].bounce = 0.8f;
+        d.nodes[size_t(ball)].extras().bounce = 0.8f;
         Runtime r;
         start_scene(r, d);
         float lowest = 10, highest_after = 0;
@@ -823,8 +827,8 @@ func _physics_process(delta):
     {   // Layers and masks.
         Description d = floor_scene();
         const int ball = add_body(d, 10, NodeType::RigidBody3D, "Ghost", {0, 2, 0}, shape(0, 0, CollisionKind::Sphere));
-        d.nodes[size_t(ball)].collision_layer = 2;
-        d.nodes[size_t(ball)].collision_mask = 2;
+        d.nodes[size_t(ball)].extras().collision_layer = 2;
+        d.nodes[size_t(ball)].extras().collision_mask = 2;
         Runtime r;
         start_scene(r, d);
         simulate(r, 1.5f);
@@ -837,12 +841,12 @@ func _physics_process(delta):
                                       shape(0, 0, CollisionKind::Sphere, {1, 1, 1}, 0.4f));
             d.nodes[size_t(ball)].name = "Ball" + std::to_string(i);
         }
-        d.nodes[3].bounce = 0.3f;
-        d.nodes[3].linear_velocity = {1, 2, 3};
+        d.nodes[3].extras().bounce = 0.3f;
+        d.nodes[3].extras().linear_velocity = {1, 2, 3};
         const auto bytes = encode_pack(d, error);
         Description back;
-        check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[3].bounce == 0.3f && back.nodes[4].radius == 0.4f
-              && back.nodes[4].collision == CollisionKind::Sphere && back.nodes[3].linear_velocity.z == 3, "pack keeps the physics fields");
+        check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[3].more().bounce == 0.3f && back.nodes[4].more().radius == 0.4f
+              && back.nodes[4].more().collision == CollisionKind::Sphere && back.nodes[3].more().linear_velocity.z == 3, "pack keeps the physics fields");
         Runtime r;
         start_scene(r, d);
         const auto t0 = std::chrono::steady_clock::now();
@@ -861,9 +865,9 @@ void particle_tests() {
     auto emitter = [](Description& d) -> NodeDesc& {
         auto p = node(20, 0, NodeType::CPUParticles3D, "Particles");
         p.position = {0, 1, 0};
-        p.direction = {0, 1, 0};
-        p.spread = 20;
-        p.velocity_min = p.velocity_max = 2;
+        p.extras().direction = {0, 1, 0};
+        p.extras().spread = 20;
+        p.extras().velocity_min = p.extras().velocity_max = 2;
         d.nodes.push_back(p);
         return d.nodes.back();
     };
@@ -873,8 +877,8 @@ void particle_tests() {
     {   // Continuous emission: `amount` particles over each lifetime, drawn over the scene.
         Description d = scene();
         auto& p = emitter(d);
-        p.amount = 20;
-        p.lifetime = 1;
+        p.extras().amount = 20;
+        p.extras().lifetime = 1;
         Runtime r;
         check(start_scene(r, d), "particle scene starts");
         step(r, 0.5f);
@@ -885,7 +889,7 @@ void particle_tests() {
         const auto with = frame(r);
         const int drawn = r.triangles();
         Description off = d;
-        off.nodes.back().emitting = false;
+        off.nodes.back().extras().emitting = false;
         Runtime quiet;
         start_scene(quiet, off);
         step(quiet, 2);
@@ -894,10 +898,10 @@ void particle_tests() {
     {   // One shot, explosiveness 1: the whole amount at once, then the emitter stops.
         Description d = scene();
         auto& p = emitter(d);
-        p.amount = 30;
-        p.lifetime = 0.5f;
-        p.explosiveness = 1;
-        p.one_shot = true;
+        p.extras().amount = 30;
+        p.extras().lifetime = 0.5f;
+        p.extras().explosiveness = 1;
+        p.extras().one_shot = true;
         Runtime r;
         start_scene(r, d);
         step(r, 1.0f / 60);
@@ -905,17 +909,17 @@ void particle_tests() {
         step(r, 0.6f);
         NodeDesc state;
         r.node_state(20, state);
-        check(burst == 30 && r.live_particles() == 0 && !state.emitting, "one-shot explosive burst ends and stops emitting");
+        check(burst == 30 && r.live_particles() == 0 && !state.more().emitting, "one-shot explosive burst ends and stops emitting");
     }
     {   // Pool limit and lifetime randomness; emission shapes stay inside their volume.
         Description d = scene();
         auto& p = emitter(d);
-        p.amount = 200;
-        p.lifetime = 2;
-        p.explosiveness = 1;
-        p.lifetime_randomness = 1;
-        p.emission_shape = EmissionShape::Box;
-        p.emission_box = {3, 0.1f, 3};
+        p.extras().amount = 200;
+        p.extras().lifetime = 2;
+        p.extras().explosiveness = 1;
+        p.extras().lifetime_randomness = 1;
+        p.extras().emission_shape = EmissionShape::Box;
+        p.extras().emission_box = {3, 0.1f, 3};
         Runtime r;
         start_scene(r, d);
         step(r, 1.0f / 60);
@@ -927,22 +931,22 @@ void particle_tests() {
     {   // Puff style (smoke): soft discs over the scene, coloured by the node; damping slows them.
         Description d = scene();
         auto& p = emitter(d);
-        p.particle_style = ParticleStyle::Puff;
-        p.amount = 30;
-        p.lifetime = 2;
+        p.extras().particle_style = ParticleStyle::Puff;
+        p.extras().amount = 30;
+        p.extras().lifetime = 2;
         p.color = 0xff0000;
-        p.color_end = 0xff0000;
+        p.extras().color_end = 0xff0000;
         p.alpha = 1;
-        p.puff_size = p.puff_size_end = 0.5f;
-        p.velocity_min = p.velocity_max = 3;
-        p.gravity = {};
+        p.extras().puff_size = p.extras().puff_size_end = 0.5f;
+        p.extras().velocity_min = p.extras().velocity_max = 3;
+        p.extras().gravity = {};
         Runtime r;
         start_scene(r, d);
         step(r, 1);
         const auto smoke = frame(r);
         const size_t red = size_t(std::count_if(smoke.begin(), smoke.end(), [](uint16_t c) { return (c >> 11) > 24 && ((c >> 5) & 63) < 20; }));
         Description slow = d;
-        slow.nodes.back().damping_min = slow.nodes.back().damping_max = 3; // stops within a second: puffs stay near the emitter
+        slow.nodes.back().extras().damping_min = slow.nodes.back().extras().damping_max = 3; // stops within a second: puffs stay near the emitter
         Runtime damped;
         start_scene(damped, slow);
         step(damped, 1);
@@ -955,10 +959,10 @@ void particle_tests() {
         d.nodes[3].position = {0, 1, 0};
         auto& p = emitter(d);
         p.position = {0, 0.6f, -2}; // behind the cube, on the line from the camera (0, 2, 5)
-        p.particle_style = ParticleStyle::Puff;
-        p.amount = 1; p.explosiveness = 1; p.lifetime = 10;
-        p.gravity = {}; p.color = p.color_end = 0x00ff00; p.alpha = 1; p.puff_size = p.puff_size_end = 4;
-        p.velocity_min = p.velocity_max = 0; // stays where it is emitted
+        p.extras().particle_style = ParticleStyle::Puff;
+        p.extras().amount = 1; p.extras().explosiveness = 1; p.extras().lifetime = 10;
+        p.extras().gravity = {}; p.color = p.extras().color_end = 0x00ff00; p.alpha = 1; p.extras().puff_size = p.extras().puff_size_end = 4;
+        p.extras().velocity_min = p.extras().velocity_max = 0; // stays where it is emitted
         auto green = [](uint16_t c) { return ((c >> 5) & 63) > 30 && (c >> 11) < 8; };
         const auto plain = render_scene(d);
         int x0 = Width, y0 = Height, x1 = -1, y1 = -1;
@@ -972,7 +976,7 @@ void particle_tests() {
         const auto pixels = frame(r);
         check(x1 >= 0 && pixels[centre] == rgb565(0x0000ff) && green(pixels[beside]), "a mesh in front hides the puffs behind it");
         Description over = d;
-        over.nodes.back().no_depth_test = true;
+        over.nodes.back().extras().no_depth_test = true;
         Runtime r_over;
         start_scene(r_over, over);
         step(r_over, 1.5f);
@@ -981,9 +985,9 @@ void particle_tests() {
         auto sparks_on_cube = [&](bool over_meshes) {
             Description s = d;
             auto& e = s.nodes.back();
-            e.particle_style = ParticleStyle::Sparks; e.additive = false; e.no_depth_test = over_meshes;
-            e.amount = 150; e.spread = 180; e.velocity_min = e.velocity_max = 0.3f; e.emission_shape = EmissionShape::Sphere;
-            e.emission_radius = 0.3f;
+            e.extras().particle_style = ParticleStyle::Sparks; e.extras().additive = false; e.extras().no_depth_test = over_meshes;
+            e.extras().amount = 150; e.extras().spread = 180; e.extras().velocity_min = e.extras().velocity_max = 0.3f; e.extras().emission_shape = EmissionShape::Sphere;
+            e.extras().emission_radius = 0.3f;
             Runtime rs;
             start_scene(rs, s);
             step(rs, 0.1f);
@@ -998,7 +1002,7 @@ void particle_tests() {
     {   // Script API: properties and restart(), as in Godot.
         Description d = scene();
         auto& p = emitter(d);
-        p.emitting = false;
+        p.extras().emitting = false;
         p.script = 0;
         d.scripts.push_back({"res://burst.jet", "extends CPUParticles3D\nvar done := false\nfunc _ready():\n"
             "\tamount = 5\n\tone_shot = true\n\texplosiveness = 1.0\n\tlifetime = 0.2\n\tgravity = Vector3(0, -2, 0)\n\trestart()\n"
@@ -1011,20 +1015,20 @@ void particle_tests() {
     {   // Package v14 keeps the particle fields; out-of-range values are rejected.
         Description d = scene();
         auto& p = emitter(d);
-        p.amount = 64; p.lifetime = 1.5f; p.one_shot = true; p.additive = false; p.spread = 90; p.gravity = {0, -3, 1};
-        p.damping_min = 0.5f; p.damping_max = 2;
-        p.color_end = 0x123456; p.puff_size_end = 1.25f; p.no_depth_test = true;
-        p.particle_style = ParticleStyle::Water; p.emission_shape = EmissionShape::Sphere; p.emission_radius = 0.25f;
+        p.extras().amount = 64; p.extras().lifetime = 1.5f; p.extras().one_shot = true; p.extras().additive = false; p.extras().spread = 90; p.extras().gravity = {0, -3, 1};
+        p.extras().damping_min = 0.5f; p.extras().damping_max = 2;
+        p.extras().color_end = 0x123456; p.extras().puff_size_end = 1.25f; p.extras().no_depth_test = true;
+        p.extras().particle_style = ParticleStyle::Water; p.extras().emission_shape = EmissionShape::Sphere; p.extras().emission_radius = 0.25f;
         const auto bytes = encode_pack(d, error);
         Description back;
-        check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes.back().amount == 64 && back.nodes.back().one_shot
-              && !back.nodes.back().additive && back.nodes.back().particle_style == ParticleStyle::Water
-              && back.nodes.back().emission_shape == EmissionShape::Sphere && back.nodes.back().emission_radius == 0.25f
-              && back.nodes.back().gravity.z == 1 && back.nodes.back().lifetime == 1.5f && back.nodes.back().damping_max == 2
-              && back.nodes.back().color_end == 0x123456 && back.nodes.back().puff_size_end == 1.25f && back.nodes.back().no_depth_test,
+        check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes.back().more().amount == 64 && back.nodes.back().more().one_shot
+              && !back.nodes.back().more().additive && back.nodes.back().more().particle_style == ParticleStyle::Water
+              && back.nodes.back().more().emission_shape == EmissionShape::Sphere && back.nodes.back().more().emission_radius == 0.25f
+              && back.nodes.back().more().gravity.z == 1 && back.nodes.back().more().lifetime == 1.5f && back.nodes.back().more().damping_max == 2
+              && back.nodes.back().more().color_end == 0x123456 && back.nodes.back().more().puff_size_end == 1.25f && back.nodes.back().more().no_depth_test,
               "pack keeps the particle fields");
         Description bad = d;
-        bad.nodes.back().amount = 0;
+        bad.nodes.back().extras().amount = 0;
         Runtime r;
         check(!r.load(bad, error), "particles: amount 0 is rejected");
     }
@@ -1123,7 +1127,7 @@ void sprite_tests() {
     Description d;
     d.nodes.push_back(node(1, -1, NodeType::Node3D, "World"));
     auto camera = node(2, 0, NodeType::Camera3D, "Camera3D");
-    camera.position = {0, 0, 3}; camera.current = true;
+    camera.position = {0, 0, 3}; camera.extras().current = true;
     d.nodes.push_back(camera);
     auto sprite = node(3, 0, NodeType::Sprite3D, "Sprite3D");
     sprite.texture = 0; sprite.hframes = 2; sprite.pixel_size = 0.5f; sprite.color = 0xffffff;
@@ -1152,6 +1156,32 @@ void sprite_tests() {
           && back.nodes[2].flip_h && back.nodes[2].pixel_size == 0.5f, "the package keeps the Sprite3D fields");
 }
 
+// Only the node types that use them get the extra fields and the body state.
+void memory_tests() {
+    std::string error;
+    Description d = floor_scene();
+    add_body(d, 10, NodeType::RigidBody3D, "Ball", {0, 3, 0}, shape(0, 0, CollisionKind::Sphere));
+    auto camera = node(30, 0, NodeType::Camera3D, "Camera3D");
+    camera.position = {0, 2, 8}; camera.extras().current = true;
+    d.nodes.push_back(camera);
+    for (uint32_t i = 0; i < 20; ++i) {
+        const std::string name = "Cube" + std::to_string(i);
+        auto cube = node(40 + i, 0, i % 2 ? NodeType::MeshInstance3D : NodeType::Sprite3D, name.c_str());
+        cube.position = {float(i) - 10, 1, 0};
+        d.nodes.push_back(cube);
+    }
+    // Through a package, as on the device.
+    const auto bytes = encode_pack(d, error);
+    Runtime r;
+    std::vector<ScriptDiagnostic> diagnostics;
+    check(r.load_pack(bytes.data(), bytes.size(), error) && r.start(diagnostics), "scene for the memory check starts");
+    for (int i = 0; i < 30; ++i) r.update(1.0f / 60);
+    r.render();
+    // Floor, ball, their shapes and the camera have extra fields; floor and ball are the bodies.
+    check(r.node_bytes() == r.node_count() * sizeof(Runtime::Live) + 5 * sizeof(NodeExtras) + 2 * sizeof(Runtime::Motion),
+          "meshes and sprites keep no extra fields or body state");
+}
+
 int main(int argc, char** argv) {
     std::string error;
     bytecode_tests();
@@ -1161,6 +1191,7 @@ int main(int argc, char** argv) {
     particle_tests();
     scene_tests();
     sprite_tests();
+    memory_tests();
     Runtime runtime;
     const Description base = scene();
     check(runtime.load(base, error), "valid scene loads");
@@ -1418,5 +1449,5 @@ int main(int argc, char** argv) {
     }
 
     if (failures) { std::cerr << failures << " runtime test(s) failed\n"; return 1; }
-    std::cout << "PASS: hierarchy, Godot transforms, validation, picking, scripts, input, queue_free, errors, bytecode, textures, materials, sky, OBJ import, quantization, Quad/Torus, reflections, 2D nodes, draw order, resolution, physics, particles, input map, scenes, autoloads, Sprite3D, plain Control, pack v14\n";
+    std::cout << "PASS: hierarchy, Godot transforms, validation, picking, scripts, input, queue_free, errors, bytecode, textures, materials, sky, OBJ import, quantization, Quad/Torus, reflections, 2D nodes, draw order, resolution, physics, particles, input map, scenes, autoloads, Sprite3D, plain Control, slim nodes, pack v14\n";
 }

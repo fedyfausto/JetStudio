@@ -132,7 +132,7 @@ std::vector<uint8_t> encode_pack(const Description& d, std::string& error) {
         w.u16(uint16_t(t.palette.size()));
         for (uint16_t c : t.palette) w.u16(c);
         if (t.palette.empty()) for (uint16_t c : t.pixels) w.u16(c);
-        else w.out.insert(w.out.end(), t.indices.begin(), t.indices.end());
+        else w.out.insert(w.out.end(), t.index_data(), t.index_data() + size_t(t.width) * t.height);
     }
     w.u32(uint32_t(d.meshes.size()));
     for (const auto& m : d.meshes) {
@@ -148,24 +148,24 @@ std::vector<uint8_t> encode_pack(const Description& d, std::string& error) {
             w.u32(n.id); w.u32(uint32_t(n.parent)); w.u8(uint8_t(n.type)); w.str(n.name);
             w.vec(n.position); w.vec(n.rotation); w.vec(n.scale); w.u8(n.visible ? 1 : 0);
             w.u8(uint8_t(n.shape)); w.u32(n.color); w.u8(uint8_t(n.shading)); w.u16(n.segments);
-            w.f32(n.fov); w.f32(n.near); w.f32(n.far); w.u8(n.current ? 1 : 0);
-            w.u32(n.light_color); w.f32(n.energy); w.u32(n.background); w.u32(n.ambient);
+            w.f32(n.more().fov); w.f32(n.more().near); w.f32(n.more().far); w.u8(n.more().current ? 1 : 0);
+            w.u32(n.more().light_color); w.f32(n.more().energy); w.u32(n.more().background); w.u32(n.more().ambient);
             w.u32(uint32_t(n.texture)); w.f32(n.uv_scale[0]); w.f32(n.uv_scale[1]); w.f32(n.uv_offset[0]); w.f32(n.uv_offset[1]);
             w.u8(uint8_t((n.bilinear ? 1 : 0) | (n.repeat ? 2 : 0) | (n.perspective ? 4 : 0) | (n.billboard ? 8 : 0) | (n.reflection ? 16 : 0)));
             w.f32(n.alpha); w.f32(n.specular); w.u8(n.shininess); w.u8(uint8_t(n.cull)); w.u8(uint8_t(n.draw_order));
-            w.u8(uint8_t(n.background_mode)); w.u32(n.sky_top); w.u32(n.sky_horizon); w.u32(n.ground_horizon); w.u32(n.ground_bottom);
-            w.u32(uint32_t(n.sky_texture));
-            w.f32(n.diffuse); w.u32(uint32_t(n.mesh)); w.str(n.text); w.vec(n.size); w.u8(n.text_scale);
-            w.u8(uint8_t(n.collision)); w.vec(n.box_size); w.f32(n.radius); w.f32(n.height);
-            w.u8(uint8_t((n.disabled ? 1 : 0) | (n.freeze ? 2 : 0) | (n.monitoring ? 4 : 0)));
-            w.u32(n.collision_layer); w.u32(n.collision_mask);
-            w.f32(n.mass); w.f32(n.gravity_scale); w.f32(n.linear_damp); w.f32(n.angular_damp); w.f32(n.friction); w.f32(n.bounce);
-            w.vec(n.linear_velocity); w.vec(n.angular_velocity); w.f32(n.floor_max_angle);
-            w.u8(uint8_t((n.emitting ? 1 : 0) | (n.one_shot ? 2 : 0) | (n.additive ? 4 : 0) | (n.no_depth_test ? 8 : 0))); w.u16(n.amount);
-            w.f32(n.lifetime); w.f32(n.lifetime_randomness); w.f32(n.explosiveness); w.vec(n.direction); w.f32(n.spread);
-            w.f32(n.velocity_min); w.f32(n.velocity_max); w.f32(n.damping_min); w.f32(n.damping_max); w.vec(n.gravity);
-            w.u8(uint8_t(n.particle_style)); w.u8(uint8_t(n.emission_shape)); w.f32(n.emission_radius); w.vec(n.emission_box);
-            w.u32(n.color_end); w.f32(n.puff_size); w.f32(n.puff_size_end);
+            w.u8(uint8_t(n.more().background_mode)); w.u32(n.more().sky_top); w.u32(n.more().sky_horizon); w.u32(n.more().ground_horizon); w.u32(n.more().ground_bottom);
+            w.u32(uint32_t(n.more().sky_texture));
+            w.f32(n.diffuse); w.u32(uint32_t(n.mesh)); w.str(n.more().text); w.vec(n.more().size); w.u8(n.more().text_scale);
+            w.u8(uint8_t(n.more().collision)); w.vec(n.more().box_size); w.f32(n.more().radius); w.f32(n.more().height);
+            w.u8(uint8_t((n.more().disabled ? 1 : 0) | (n.more().freeze ? 2 : 0) | (n.more().monitoring ? 4 : 0)));
+            w.u32(n.more().collision_layer); w.u32(n.more().collision_mask);
+            w.f32(n.more().mass); w.f32(n.more().gravity_scale); w.f32(n.more().linear_damp); w.f32(n.more().angular_damp); w.f32(n.more().friction); w.f32(n.more().bounce);
+            w.vec(n.more().linear_velocity); w.vec(n.more().angular_velocity); w.f32(n.more().floor_max_angle);
+            w.u8(uint8_t((n.more().emitting ? 1 : 0) | (n.more().one_shot ? 2 : 0) | (n.more().additive ? 4 : 0) | (n.more().no_depth_test ? 8 : 0))); w.u16(n.more().amount);
+            w.f32(n.more().lifetime); w.f32(n.more().lifetime_randomness); w.f32(n.more().explosiveness); w.vec(n.more().direction); w.f32(n.more().spread);
+            w.f32(n.more().velocity_min); w.f32(n.more().velocity_max); w.f32(n.more().damping_min); w.f32(n.more().damping_max); w.vec(n.more().gravity);
+            w.u8(uint8_t(n.more().particle_style)); w.u8(uint8_t(n.more().emission_shape)); w.f32(n.more().emission_radius); w.vec(n.more().emission_box);
+            w.u32(n.more().color_end); w.f32(n.more().puff_size); w.f32(n.more().puff_size_end);
             w.u16(n.hframes); w.u16(n.vframes); w.u16(n.frame); w.u8(uint8_t((n.flip_h ? 1 : 0) | (n.flip_v ? 2 : 0))); w.f32(n.pixel_size);
             w.u32(uint32_t(n.script));
             w.u32(uint32_t(n.overrides.size()));
@@ -195,9 +195,10 @@ std::vector<uint8_t> encode_pack(const Description& d, std::string& error) {
 static bool read_nodes(Reader& r, std::vector<NodeDesc>& nodes, std::string& error) {
     const uint32_t count = r.u32();
     if (count > MaxNodes) { error = "Too many nodes in the package."; return false; }
-    nodes.reserve(count); // a NodeDesc is ~440 bytes on the device: no doubling
+    nodes.reserve(count); // no doubling: a whole scene's nodes at once
     for (uint32_t i = 0; i < count && r.ok; ++i) {
         NodeDesc n;
+        NodeExtras e; // kept only by the node types that use it
         n.id = r.u32(); n.parent = int32_t(r.u32());
         const uint8_t type = r.u8();
         n.name = r.str(256);
@@ -207,37 +208,37 @@ static bool read_nodes(Reader& r, std::vector<NodeDesc>& nodes, std::string& err
         n.color = r.u32();
         const uint8_t shading = r.u8();
         n.segments = r.u16();
-        n.fov = r.f32(); n.near = r.f32(); n.far = r.f32();
+        e.fov = r.f32(); e.near = r.f32(); e.far = r.f32();
         const uint8_t current = r.u8();
-        n.light_color = r.u32(); n.energy = r.f32(); n.background = r.u32(); n.ambient = r.u32();
+        e.light_color = r.u32(); e.energy = r.f32(); e.background = r.u32(); e.ambient = r.u32();
         n.texture = int32_t(r.u32()); n.uv_scale[0] = r.f32(); n.uv_scale[1] = r.f32(); n.uv_offset[0] = r.f32(); n.uv_offset[1] = r.f32();
         const uint8_t flags = r.u8();
         n.bilinear = flags & 1; n.repeat = (flags & 2) != 0; n.perspective = (flags & 4) != 0; n.billboard = (flags & 8) != 0;
         n.alpha = r.f32(); n.specular = r.f32(); n.shininess = r.u8();
         const uint8_t cull = r.u8(), draw_order = r.u8(), background = r.u8();
-        n.sky_top = r.u32(); n.sky_horizon = r.u32(); n.ground_horizon = r.u32(); n.ground_bottom = r.u32();
-        n.sky_texture = int32_t(r.u32());
-        n.diffuse = r.f32(); n.mesh = int32_t(r.u32()); n.text = r.str(MaxText); n.size = r.vec(); n.text_scale = r.u8();
+        e.sky_top = r.u32(); e.sky_horizon = r.u32(); e.ground_horizon = r.u32(); e.ground_bottom = r.u32();
+        e.sky_texture = int32_t(r.u32());
+        n.diffuse = r.f32(); n.mesh = int32_t(r.u32()); e.text = r.str(MaxText); e.size = r.vec(); e.text_scale = r.u8();
         const uint8_t collision = r.u8();
-        n.box_size = r.vec(); n.radius = r.f32(); n.height = r.f32();
+        e.box_size = r.vec(); e.radius = r.f32(); e.height = r.f32();
         const uint8_t physics_flags = r.u8();
-        n.disabled = physics_flags & 1; n.freeze = (physics_flags & 2) != 0; n.monitoring = (physics_flags & 4) != 0;
-        n.collision_layer = r.u32(); n.collision_mask = r.u32();
-        n.mass = r.f32(); n.gravity_scale = r.f32(); n.linear_damp = r.f32(); n.angular_damp = r.f32(); n.friction = r.f32(); n.bounce = r.f32();
-        n.linear_velocity = r.vec(); n.angular_velocity = r.vec(); n.floor_max_angle = r.f32();
+        e.disabled = physics_flags & 1; e.freeze = (physics_flags & 2) != 0; e.monitoring = (physics_flags & 4) != 0;
+        e.collision_layer = r.u32(); e.collision_mask = r.u32();
+        e.mass = r.f32(); e.gravity_scale = r.f32(); e.linear_damp = r.f32(); e.angular_damp = r.f32(); e.friction = r.f32(); e.bounce = r.f32();
+        e.linear_velocity = r.vec(); e.angular_velocity = r.vec(); e.floor_max_angle = r.f32();
         if (collision > uint8_t(CollisionKind::Capsule) || physics_flags > 7) r.ok = false;
-        n.collision = CollisionKind(collision);
+        e.collision = CollisionKind(collision);
         const uint8_t particle_flags = r.u8();
-        n.emitting = particle_flags & 1; n.one_shot = (particle_flags & 2) != 0; n.additive = (particle_flags & 4) != 0;
-        n.no_depth_test = (particle_flags & 8) != 0;
-        n.amount = r.u16();
-        n.lifetime = r.f32(); n.lifetime_randomness = r.f32(); n.explosiveness = r.f32(); n.direction = r.vec(); n.spread = r.f32();
-        n.velocity_min = r.f32(); n.velocity_max = r.f32(); n.damping_min = r.f32(); n.damping_max = r.f32(); n.gravity = r.vec();
+        e.emitting = particle_flags & 1; e.one_shot = (particle_flags & 2) != 0; e.additive = (particle_flags & 4) != 0;
+        e.no_depth_test = (particle_flags & 8) != 0;
+        e.amount = r.u16();
+        e.lifetime = r.f32(); e.lifetime_randomness = r.f32(); e.explosiveness = r.f32(); e.direction = r.vec(); e.spread = r.f32();
+        e.velocity_min = r.f32(); e.velocity_max = r.f32(); e.damping_min = r.f32(); e.damping_max = r.f32(); e.gravity = r.vec();
         const uint8_t style = r.u8(), emission = r.u8();
-        n.emission_radius = r.f32(); n.emission_box = r.vec();
-        n.color_end = r.u32(); n.puff_size = r.f32(); n.puff_size_end = r.f32();
+        e.emission_radius = r.f32(); e.emission_box = r.vec();
+        e.color_end = r.u32(); e.puff_size = r.f32(); e.puff_size_end = r.f32();
         if (particle_flags > 15 || style > uint8_t(ParticleStyle::Puff) || emission > uint8_t(EmissionShape::Box)) r.ok = false;
-        n.particle_style = ParticleStyle(style); n.emission_shape = EmissionShape(emission);
+        e.particle_style = ParticleStyle(style); e.emission_shape = EmissionShape(emission);
         n.reflection = (flags & 16) != 0;
         n.hframes = r.u16(); n.vframes = r.u16(); n.frame = r.u16();
         const uint8_t sprite_flags = r.u8();
@@ -251,20 +252,21 @@ static bool read_nodes(Reader& r, std::vector<NodeDesc>& nodes, std::string& err
             || background > uint8_t(Background::Panorama) || flags > 31
             || visible > 1 || current > 1 || overrides > 256) { error = "Invalid node in the package."; return false; }
         n.type = NodeType(type); n.shape = Shape(shape); n.shading = Shading(shading);
-        n.cull = CullMode(cull); n.draw_order = DrawOrder(draw_order); n.background_mode = Background(background);
-        n.visible = visible == 1; n.current = current == 1;
+        n.cull = CullMode(cull); n.draw_order = DrawOrder(draw_order); e.background_mode = Background(background);
+        n.visible = visible == 1; e.current = current == 1;
         for (uint32_t j = 0; j < overrides && r.ok; ++j) {
             ScriptOverride o;
             o.name = r.str(80);
             o.value = r.value();
             n.overrides.push_back(std::move(o));
         }
+        if (uses_extras(n.type)) n.extras() = std::move(e);
         nodes.push_back(std::move(n));
     }
     return true;
 }
 
-bool decode_pack(const uint8_t* data, size_t size, Description& out, std::string& error) {
+bool decode_pack(const uint8_t* data, size_t size, Description& out, std::string& error, bool textures_in_place) {
     error.clear();
     if (!data || size < 12) { error = "Truncated package."; return false; }
     Reader r{data, size};
@@ -311,7 +313,8 @@ bool decode_pack(const uint8_t* data, size_t size, Description& out, std::string
         for (uint16_t k = 0; k < colors && r.ok; ++k) t.palette.push_back(r.u16());
         if (colors) {
             if (!r.take(count)) break;
-            t.indices.assign(r.p, r.p + count);
+            if (textures_in_place) t.packed_indices = r.p;
+            else t.indices.assign(r.p, r.p + count);
             r.p += count; r.remaining -= count;
         } else {
             t.pixels.resize(count);

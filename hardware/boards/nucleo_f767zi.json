@@ -14,6 +14,7 @@
       19
     ],
     "mosi": [
+      7,
       21
     ]
   },
@@ -61,6 +62,10 @@
     [
       "D10 · PD14",
       62
+    ],
+    [
+      "D11 · PA7",
+      7
     ],
     [
       "D12 · PA6",
@@ -117,6 +122,10 @@
     [
       "A5 · PF10",
       90
+    ],
+    [
+      "B1 USER · PC13",
+      45
     ]
   ],
   "display_pins": {
@@ -129,5 +138,8 @@
   },
   "upload": "stlink",
   "verified": false,
-  "notes": "Display on SPI1: SCK D13 (PA5) or D23 (PB3), MOSI D22 (PB5): D11 (PA7) is wired to Ethernet. Other pins, such as D12, work as software SPI, about as fast. Flash and log through the ST-LINK USB port."
+  "notes": "Display on SPI1: SCK D13 (PA5) or D23 (PB3), MOSI D11 (PA7) once jumper JP6 is removed (it wires PA7 to the Ethernet), or D22 (PB5). SPI1 sends with DMA in the background, up to 54 MHz; other pins, such as D12, work as software SPI, much slower. The blue B1 USER button (PC13) can be an Input Map button. Flash and log through the ST-LINK USB port.",
+  "active_high": [
+    45
+  ]
 }

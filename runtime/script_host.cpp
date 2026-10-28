@@ -236,32 +236,32 @@ Status ScriptHost::get_property(ObjectId id, int p, Value& out, std::string& err
     if (p < 0 || p >= PropertyCount || !has_property(d.type, p)) return Status::NotFound;
     switch (p) {
     case Name: out = Value(d.name); break;
-    case Velocity: case LinearVelocity: out = Value(from_vec(live.velocity)); break;
-    case AngularVelocity: out = Value(from_vec(live.angular)); break;
-    case Mass: out = Value(d.mass); break;
-    case GravityScale: out = Value(d.gravity_scale); break;
-    case Freeze: out = Value(d.freeze); break;
-    case Sleeping: out = Value(live.sleeping); break;
-    case FloorMaxAngle: out = Value(radians(d.floor_max_angle)); break; // Godot: radians
-    case Monitoring: out = Value(d.monitoring); break;
-    case Disabled: out = Value(d.disabled); break;
-    case CollisionLayer: out = Value(jetscript::Int(d.collision_layer)); break;
-    case CollisionMask: out = Value(jetscript::Int(d.collision_mask)); break;
-    case Friction: out = Value(d.friction); break;
-    case Bounce: out = Value(d.bounce); break;
-    case Emitting: out = Value(d.emitting); break;
-    case Amount: out = Value(jetscript::Int(d.amount)); break;
-    case Lifetime: out = Value(d.lifetime); break;
-    case OneShot: out = Value(d.one_shot); break;
-    case Explosiveness: out = Value(d.explosiveness); break;
-    case LifetimeRandomness: out = Value(d.lifetime_randomness); break;
-    case Direction: out = Value(from_vec(d.direction)); break;
-    case Spread: out = Value(d.spread); break;
-    case Gravity: out = Value(from_vec(d.gravity)); break;
-    case InitialVelocityMin: out = Value(d.velocity_min); break;
-    case InitialVelocityMax: out = Value(d.velocity_max); break;
-    case DampingMin: out = Value(d.damping_min); break;
-    case DampingMax: out = Value(d.damping_max); break;
+    case Velocity: case LinearVelocity: out = Value(from_vec(live.motion().velocity)); break;
+    case AngularVelocity: out = Value(from_vec(live.motion().angular)); break;
+    case Mass: out = Value(d.more().mass); break;
+    case GravityScale: out = Value(d.more().gravity_scale); break;
+    case Freeze: out = Value(d.more().freeze); break;
+    case Sleeping: out = Value(live.motion().sleeping); break;
+    case FloorMaxAngle: out = Value(radians(d.more().floor_max_angle)); break; // Godot: radians
+    case Monitoring: out = Value(d.more().monitoring); break;
+    case Disabled: out = Value(d.more().disabled); break;
+    case CollisionLayer: out = Value(jetscript::Int(d.more().collision_layer)); break;
+    case CollisionMask: out = Value(jetscript::Int(d.more().collision_mask)); break;
+    case Friction: out = Value(d.more().friction); break;
+    case Bounce: out = Value(d.more().bounce); break;
+    case Emitting: out = Value(d.more().emitting); break;
+    case Amount: out = Value(jetscript::Int(d.more().amount)); break;
+    case Lifetime: out = Value(d.more().lifetime); break;
+    case OneShot: out = Value(d.more().one_shot); break;
+    case Explosiveness: out = Value(d.more().explosiveness); break;
+    case LifetimeRandomness: out = Value(d.more().lifetime_randomness); break;
+    case Direction: out = Value(from_vec(d.more().direction)); break;
+    case Spread: out = Value(d.more().spread); break;
+    case Gravity: out = Value(from_vec(d.more().gravity)); break;
+    case InitialVelocityMin: out = Value(d.more().velocity_min); break;
+    case InitialVelocityMax: out = Value(d.more().velocity_max); break;
+    case DampingMin: out = Value(d.more().damping_min); break;
+    case DampingMax: out = Value(d.more().damping_max); break;
     case Position: out = Value(from_vec(d.position)); break;
     case Rotation: out = Value(jetscript::Vector3{radians(d.rotation.x), radians(d.rotation.y), radians(d.rotation.z)}); break;
     case RotationDegrees: out = Value(from_vec(d.rotation)); break;
@@ -269,21 +269,21 @@ Status ScriptHost::get_property(ObjectId id, int p, Value& out, std::string& err
     case Visible: out = Value(d.visible); break;
     case GlobalPosition: out = Value(from_vec(global_of(runtime_->nodes_, index).origin)); break;
     case MeshColor: out = Value(to_color(d.color)); break;
-    case Fov: out = Value(d.fov); break;
-    case Near: out = Value(d.near); break;
-    case Far: out = Value(d.far); break;
-    case Current: out = Value(d.current); break;
-    case LightColor: out = Value(to_color(d.light_color)); break;
-    case LightEnergy: out = Value(d.energy); break;
-    case BackgroundColor: out = Value(to_color(d.background)); break;
-    case AmbientColor: out = Value(to_color(d.ambient)); break;
+    case Fov: out = Value(d.more().fov); break;
+    case Near: out = Value(d.more().near); break;
+    case Far: out = Value(d.more().far); break;
+    case Current: out = Value(d.more().current); break;
+    case LightColor: out = Value(to_color(d.more().light_color)); break;
+    case LightEnergy: out = Value(d.more().energy); break;
+    case BackgroundColor: out = Value(to_color(d.more().background)); break;
+    case AmbientColor: out = Value(to_color(d.more().ambient)); break;
     case MeshAlpha: out = Value(d.alpha); break;
     case UvOffset: out = Value(jetscript::Vector3{d.uv_offset[0], d.uv_offset[1], 0}); break;
     case UvScale: out = Value(jetscript::Vector3{d.uv_scale[0], d.uv_scale[1], 1}); break;
     case PerspectiveCorrect: out = Value(d.perspective); break;
     case TextureFilter: out = Value(jetscript::Int(d.bilinear ? 1 : 0)); break; // Godot: 0 nearest, 1 linear
-    case Text: out = Value(d.text); break;
-    case Size: out = Value(from_vec(d.size)); break;
+    case Text: out = Value(d.more().text); break;
+    case Size: out = Value(from_vec(d.more().size)); break;
     case Frame: out = Value(jetscript::Int(d.frame)); break;
     case Hframes: out = Value(jetscript::Int(d.hframes)); break;
     case Vframes: out = Value(jetscript::Int(d.vframes)); break;
@@ -336,48 +336,48 @@ Status ScriptHost::set_property(ObjectId id, int p, const Value& v, std::string&
     bool ok = true;
     switch (p) {
     case Name: error = "Property 'name' is read-only in JetScript."; return Status::Error;
-    case Velocity: ok = vector(live.velocity, 1000); break;
-    case LinearVelocity: ok = vector(live.velocity, 1000); if (ok) runtime_->wake(live); break;
-    case AngularVelocity: ok = vector(live.angular, 1000); if (ok) runtime_->wake(live); break;
-    case Mass: ok = number(d.mass, 0.001f, 100000); break;
-    case GravityScale: ok = number(d.gravity_scale, -100, 100); break;
-    case Freeze: ok = expect(Type::Bool); if (ok) { d.freeze = v.truthy(); runtime_->wake(live); } break;
-    case Sleeping: ok = expect(Type::Bool); if (ok) { live.sleeping = v.truthy(); live.still_time = 0; } break;
+    case Velocity: ok = vector(live.edit_motion().velocity, 1000); break;
+    case LinearVelocity: ok = vector(live.edit_motion().velocity, 1000); if (ok) runtime_->wake(live); break;
+    case AngularVelocity: ok = vector(live.edit_motion().angular, 1000); if (ok) runtime_->wake(live); break;
+    case Mass: ok = number(d.extras().mass, 0.001f, 100000); break;
+    case GravityScale: ok = number(d.extras().gravity_scale, -100, 100); break;
+    case Freeze: ok = expect(Type::Bool); if (ok) { d.extras().freeze = v.truthy(); runtime_->wake(live); } break;
+    case Sleeping: ok = expect(Type::Bool); if (ok) { live.edit_motion().sleeping = v.truthy(); live.edit_motion().still_time = 0; } break;
     case FloorMaxAngle: {
         float angle = 0;
         ok = number(angle, 0, radians(89));
-        if (ok) d.floor_max_angle = degrees(angle);
+        if (ok) d.extras().floor_max_angle = degrees(angle);
         break;
     }
-    case Monitoring: ok = expect(Type::Bool); if (ok) d.monitoring = v.truthy(); break;
-    case Disabled: ok = expect(Type::Bool); if (ok) d.disabled = v.truthy(); runtime_->physics_->built = false; break;
-    case CollisionLayer: ok = layers(d.collision_layer); runtime_->physics_->built = false; break;
-    case CollisionMask: ok = layers(d.collision_mask); runtime_->physics_->built = false; break;
-    case Friction: ok = number(d.friction, 0, 100); break;
-    case Bounce: ok = number(d.bounce, 0, 1); break;
+    case Monitoring: ok = expect(Type::Bool); if (ok) d.extras().monitoring = v.truthy(); break;
+    case Disabled: ok = expect(Type::Bool); if (ok) d.extras().disabled = v.truthy(); runtime_->physics_->built = false; break;
+    case CollisionLayer: ok = layers(d.extras().collision_layer); runtime_->physics_->built = false; break;
+    case CollisionMask: ok = layers(d.extras().collision_mask); runtime_->physics_->built = false; break;
+    case Friction: ok = number(d.extras().friction, 0, 100); break;
+    case Bounce: ok = number(d.extras().bounce, 0, 1); break;
     case Emitting:
         ok = expect(Type::Bool);
-        if (ok && v.truthy() && !d.emitting) { live.cycle = 0; live.emitted = 0; } // a new cycle, as in Godot
-        if (ok) d.emitting = v.truthy();
+        if (ok && v.truthy() && !d.more().emitting) { live.cycle = 0; live.emitted = 0; } // a new cycle, as in Godot
+        if (ok) d.extras().emitting = v.truthy();
         break;
     case Amount:
         if (v.type() != Type::Int || v.as_int() < 1 || v.as_int() > MaxParticles) {
             error = "'amount' must be an int between 1 and 200 (Jet's particle pool)."; ok = false;
         } else {
-            d.amount = uint16_t(v.as_int());
+            d.extras().amount = uint16_t(v.as_int());
         }
         break;
-    case Lifetime: ok = number(d.lifetime, 0.01f, 600); break;
-    case OneShot: ok = expect(Type::Bool); if (ok) d.one_shot = v.truthy(); break;
-    case Explosiveness: ok = number(d.explosiveness, 0, 1); break;
-    case LifetimeRandomness: ok = number(d.lifetime_randomness, 0, 1); break;
-    case Direction: ok = vector(d.direction, 1000); break;
-    case Spread: ok = number(d.spread, 0, 180); break;
-    case Gravity: ok = vector(d.gravity, 1000); break;
-    case InitialVelocityMin: ok = number(d.velocity_min, 0, 1000); break;
-    case InitialVelocityMax: ok = number(d.velocity_max, 0, 1000); break;
-    case DampingMin: ok = number(d.damping_min, 0, 1000); break;
-    case DampingMax: ok = number(d.damping_max, 0, 1000); break;
+    case Lifetime: ok = number(d.extras().lifetime, 0.01f, 600); break;
+    case OneShot: ok = expect(Type::Bool); if (ok) d.extras().one_shot = v.truthy(); break;
+    case Explosiveness: ok = number(d.extras().explosiveness, 0, 1); break;
+    case LifetimeRandomness: ok = number(d.extras().lifetime_randomness, 0, 1); break;
+    case Direction: ok = vector(d.extras().direction, 1000); break;
+    case Spread: ok = number(d.extras().spread, 0, 180); break;
+    case Gravity: ok = vector(d.extras().gravity, 1000); break;
+    case InitialVelocityMin: ok = number(d.extras().velocity_min, 0, 1000); break;
+    case InitialVelocityMax: ok = number(d.extras().velocity_max, 0, 1000); break;
+    case DampingMin: ok = number(d.extras().damping_min, 0, 1000); break;
+    case DampingMax: ok = number(d.extras().damping_max, 0, 1000); break;
     case Position: ok = vector(d.position, 10000); break;
     case Rotation: ok = vector(d.rotation, 1e6f, 180.0f / Pi); break;
     case RotationDegrees: ok = vector(d.rotation, 1e6f); break;
@@ -398,18 +398,18 @@ Status ScriptHost::set_property(ObjectId id, int p, const Value& v, std::string&
         break;
     }
     case MeshColor: ok = expect(Type::Color); if (ok) d.color = from_color(v.as_color()); break;
-    case Fov: ok = number(d.fov, 1, 179); break;
-    case Near: ok = number(d.near, 0.001f, d.far * 0.999f); break;
-    case Far: ok = number(d.far, d.near * 1.001f, 10000); break;
+    case Fov: ok = number(d.extras().fov, 1, 179); break;
+    case Near: ok = number(d.extras().near, 0.001f, d.extras().far * 0.999f); break;
+    case Far: ok = number(d.extras().far, d.extras().near * 1.001f, 10000); break;
     case Current:
         ok = expect(Type::Bool);
-        if (ok && v.truthy()) for (auto& n : runtime_->nodes_) if (n.d.type == NodeType::Camera3D) n.d.current = false;
-        if (ok) d.current = v.truthy();
+        if (ok && v.truthy()) for (auto& n : runtime_->nodes_) if (n.d.type == NodeType::Camera3D) n.d.extras().current = false;
+        if (ok) d.extras().current = v.truthy();
         break;
-    case LightColor: ok = expect(Type::Color); if (ok) d.light_color = from_color(v.as_color()); break;
-    case LightEnergy: ok = number(d.energy, 0, 16); break;
-    case BackgroundColor: ok = expect(Type::Color); if (ok) d.background = from_color(v.as_color()); break;
-    case AmbientColor: ok = expect(Type::Color); if (ok) d.ambient = from_color(v.as_color()); break;
+    case LightColor: ok = expect(Type::Color); if (ok) d.extras().light_color = from_color(v.as_color()); break;
+    case LightEnergy: ok = number(d.extras().energy, 0, 16); break;
+    case BackgroundColor: ok = expect(Type::Color); if (ok) d.extras().background = from_color(v.as_color()); break;
+    case AmbientColor: ok = expect(Type::Color); if (ok) d.extras().ambient = from_color(v.as_color()); break;
     case MeshAlpha: ok = number(d.alpha, 0, 1); break;
     case UvOffset: case UvScale: {
         // Only x and y are used. Godot's uv1_offset/uv1_scale are Vector3 too.
@@ -423,13 +423,13 @@ Status ScriptHost::set_property(ObjectId id, int p, const Value& v, std::string&
     case Text:
         ok = expect(Type::String);
         if (ok && v.as_string().size() > MaxText) { error = "Label text is limited to 512 bytes."; ok = false; }
-        if (ok) d.text = std::string(v.as_string());
+        if (ok) d.extras().text = std::string(v.as_string());
         break;
     case Size: {
         Vec3 size;
         ok = vector(size, 4096);
         if (ok && (size.x < 0 || size.y < 0)) { error = "Size must not be negative."; ok = false; }
-        if (ok) d.size = size;
+        if (ok) d.extras().size = size;
         break;
     }
     case TextureFilter:
@@ -647,33 +647,33 @@ Status ScriptHost::call_method(ObjectId id, int m, const Value* args, int count,
         return Status::Ok;
     }
     case MakeCurrent:
-        for (auto& n : nodes) if (n.d.type == NodeType::Camera3D) n.d.current = false;
-        node.d.current = true;
+        for (auto& n : nodes) if (n.d.type == NodeType::Camera3D) n.d.extras().current = false;
+        node.d.extras().current = true;
         return Status::Ok;
     case MoveAndSlide: result = Value(runtime_->move_and_slide(index)); return Status::Ok;
-    case IsOnFloor: result = Value(node.on_floor); return Status::Ok;
-    case IsOnWall: result = Value(node.on_wall); return Status::Ok;
-    case IsOnCeiling: result = Value(node.on_ceiling); return Status::Ok;
-    case GetFloorNormal: result = Value(from_vec(node.on_floor ? node.floor_normal : Vec3{})); return Status::Ok;
+    case IsOnFloor: result = Value(node.motion().on_floor); return Status::Ok;
+    case IsOnWall: result = Value(node.motion().on_wall); return Status::Ok;
+    case IsOnCeiling: result = Value(node.motion().on_ceiling); return Status::Ok;
+    case GetFloorNormal: result = Value(from_vec(node.motion().on_floor ? node.motion().floor_normal : Vec3{})); return Status::Ok;
     case ApplyCentralImpulse: case ApplyImpulse: case ApplyCentralForce: {
         if (args[0].type() != Type::Vector3 || !to_vec(args[0].as_vector3()).finite()) {
             error = std::string("Invalid argument for '") + method_names[m] + "': expected Vector3.";
             return Status::Error;
         }
         const Vec3 value = to_vec(args[0].as_vector3());
-        if (m == ApplyCentralForce) node.force = node.force + value;
-        else node.velocity = node.velocity + value * (1.0f / std::max(node.d.mass, 0.001f)); // arcade: no torque
+        if (m == ApplyCentralForce) node.edit_motion().force = node.edit_motion().force + value;
+        else node.edit_motion().velocity = node.edit_motion().velocity + value * (1.0f / std::max(node.d.more().mass, 0.001f)); // arcade: no torque
         runtime_->wake(node);
         return Status::Ok;
     }
     case GetOverlappingBodies:
         result = Value::new_array();
-        for (uint32_t body : node.overlaps) result.array_push(Value::object(body));
+        for (uint32_t body : node.motion().overlaps) result.array_push(Value::object(body));
         return Status::Ok;
-    case HasOverlappingBodies: result = Value(!node.overlaps.empty()); return Status::Ok;
+    case HasOverlappingBodies: result = Value(!node.motion().overlaps.empty()); return Status::Ok;
     case OverlapsBody: {
         if (args[0].type() != Type::Object) { error = "Invalid argument for 'overlaps_body': expected a body."; return Status::Error; }
-        result = Value(std::find(node.overlaps.begin(), node.overlaps.end(), args[0].as_object()) != node.overlaps.end());
+        result = Value(std::find(node.motion().overlaps.begin(), node.motion().overlaps.end(), args[0].as_object()) != node.motion().overlaps.end());
         return Status::Ok;
     }
     case Restart: runtime_->restart_particles(node); return Status::Ok;

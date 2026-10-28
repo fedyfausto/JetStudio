@@ -4,27 +4,36 @@
 // Panel/bus setup adapted from board_3d / JetExamples (MIT, see hardware/LICENSE.JetExamples).
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
-#define JET_SOFT_SPI 1
-#include "soft_spi.hpp"
+#define JET_SOFT_SPI 0
+#include <SPI.h>
 
 namespace Board {
 constexpr const char* name = "ST Nucleo-F746ZG + ILI9341 2.4\"/2.8\" 240×320";
 constexpr int screenWidth = 320, screenHeight = 240, rotation = 1;
-// Pins are STM32 PinName values (port * 16 + pin). SCK/MOSI aren't on the SPI peripheral: software SPI.
-constexpr int clock = 5, mosi = 6, dc = 63, cs = 62, reset = 92, backlight = -1;
+// Pins are STM32 PinName values (port * 16 + pin).
+constexpr int clock = 5, mosi = 7, dc = 63, cs = 62, reset = 92, backlight = -1;
 constexpr int spiMode = 0;
-constexpr int writeHz = 40000000;
-constexpr const char* port = "software SPI";
-inline void begin_spi() {}
+constexpr int writeHz = 54000000;
+constexpr const char* port = "SPI1";
+inline SPI_TypeDef* spi() { return SPI1; }
+inline void begin_spi() {
+    SPI.setSCLK(PinName(clock));
+    SPI.setMOSI(PinName(mosi));
+    SPI.begin();
+}
 }
 
 class LGFX : public lgfx::LGFX_Device {
     lgfx::Panel_ILI9341 panel;
-    SoftSpiBus bus;
+    lgfx::Bus_SPI bus;
 public:
-    SoftSpiBus& panel_bus() { return bus; }
+    lgfx::Bus_SPI& panel_bus() { return bus; }
     LGFX() {
         auto b = bus.config();
+        b.spi_port = SPI1;
+        b.spi_mode = Board::spiMode;
+        b.freq_write = Board::writeHz;
+        b.freq_read = 8000000;
         b.pin_sclk = Board::clock;
         b.pin_mosi = Board::mosi;
         b.pin_miso = -1;

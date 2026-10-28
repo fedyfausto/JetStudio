@@ -210,44 +210,44 @@ struct Flattener {
                 && choice(node, "cull_mode", n.cull, {"Back", "Front", "Disabled"}) && flag(node, "billboard", n.billboard)
                 && choice(node, "draw_order", n.draw_order, {"Default", "Background", "On Top"})
                 && real(node, "diffuse", n.diffuse) && flag(node, "reflection", n.reflection)
-                && vec(node, "size", n.size)
-                && choice(node, "background_mode", n.background_mode, {"Color", "Gradient", "Panorama"})
-                && integer(node, "sky_top_color", n.sky_top, 0xffffff) && integer(node, "sky_horizon_color", n.sky_horizon, 0xffffff)
-                && integer(node, "ground_horizon_color", n.ground_horizon, 0xffffff)
-                && integer(node, "ground_bottom_color", n.ground_bottom, 0xffffff)
-                && real(node, "fov", n.fov) && real(node, "near", n.near) && real(node, "far", n.far) && flag(node, "current", n.current)
-                && integer(node, "light_color", n.light_color, 0xffffff) && real(node, "light_energy", n.energy)
-                && integer(node, "background_color", n.background, 0xffffff) && integer(node, "ambient_color", n.ambient, 0xffffff);
+                && vec(node, "size", n.extras().size)
+                && choice(node, "background_mode", n.extras().background_mode, {"Color", "Gradient", "Panorama"})
+                && integer(node, "sky_top_color", n.extras().sky_top, 0xffffff) && integer(node, "sky_horizon_color", n.extras().sky_horizon, 0xffffff)
+                && integer(node, "ground_horizon_color", n.extras().ground_horizon, 0xffffff)
+                && integer(node, "ground_bottom_color", n.extras().ground_bottom, 0xffffff)
+                && real(node, "fov", n.extras().fov) && real(node, "near", n.extras().near) && real(node, "far", n.extras().far) && flag(node, "current", n.extras().current)
+                && integer(node, "light_color", n.extras().light_color, 0xffffff) && real(node, "light_energy", n.extras().energy)
+                && integer(node, "background_color", n.extras().background, 0xffffff) && integer(node, "ambient_color", n.extras().ambient, 0xffffff);
             // Physics bodies and shapes.
-            uint32_t layer = n.collision_layer, mask = n.collision_mask;
-            ok = ok && choice(node, "shape", n.collision, {"Box", "Sphere", "Capsule"}) && real(node, "radius", n.radius)
-                && real(node, "height", n.height) && flag(node, "disabled", n.disabled)
+            uint32_t layer = n.more().collision_layer, mask = n.more().collision_mask;
+            ok = ok && choice(node, "shape", n.extras().collision, {"Box", "Sphere", "Capsule"}) && real(node, "radius", n.extras().radius)
+                && real(node, "height", n.extras().height) && flag(node, "disabled", n.extras().disabled)
                 && integer(node, "collision_layer", layer, 0xffffffffu) && integer(node, "collision_mask", mask, 0xffffffffu)
-                && real(node, "mass", n.mass) && real(node, "gravity_scale", n.gravity_scale) && real(node, "linear_damp", n.linear_damp)
-                && real(node, "angular_damp", n.angular_damp) && real(node, "friction", n.friction) && real(node, "bounce", n.bounce)
-                && vec(node, "linear_velocity", n.linear_velocity) && vec(node, "angular_velocity", n.angular_velocity)
-                && flag(node, "freeze", n.freeze) && real(node, "floor_max_angle", n.floor_max_angle) && flag(node, "monitoring", n.monitoring);
-            n.collision_layer = layer;
-            n.collision_mask = mask;
+                && real(node, "mass", n.extras().mass) && real(node, "gravity_scale", n.extras().gravity_scale) && real(node, "linear_damp", n.extras().linear_damp)
+                && real(node, "angular_damp", n.extras().angular_damp) && real(node, "friction", n.extras().friction) && real(node, "bounce", n.extras().bounce)
+                && vec(node, "linear_velocity", n.extras().linear_velocity) && vec(node, "angular_velocity", n.extras().angular_velocity)
+                && flag(node, "freeze", n.extras().freeze) && real(node, "floor_max_angle", n.extras().floor_max_angle) && flag(node, "monitoring", n.extras().monitoring);
+            n.extras().collision_layer = layer;
+            n.extras().collision_mask = mask;
             // CPUParticles3D, same property names as Godot.
-            uint32_t amount = n.amount;
-            ok = ok && flag(node, "emitting", n.emitting) && flag(node, "one_shot", n.one_shot) && flag(node, "additive", n.additive)
-                && flag(node, "no_depth_test", n.no_depth_test)
-                && integer(node, "amount", amount, jetstudio::MaxParticles) && real(node, "lifetime", n.lifetime)
-                && real(node, "lifetime_randomness", n.lifetime_randomness) && real(node, "explosiveness", n.explosiveness)
-                && vec(node, "direction", n.direction) && real(node, "spread", n.spread) && vec(node, "gravity", n.gravity)
-                && real(node, "initial_velocity_min", n.velocity_min) && real(node, "initial_velocity_max", n.velocity_max)
-                && real(node, "damping_min", n.damping_min) && real(node, "damping_max", n.damping_max)
-                && choice(node, "particle_style", n.particle_style, {"Sparks", "Water", "Puff"})
-                && integer(node, "color_end", n.color_end, 0xffffff) && real(node, "puff_size", n.puff_size)
-                && real(node, "puff_size_end", n.puff_size_end)
-                && choice(node, "emission_shape", n.emission_shape, {"Point", "Sphere", "Box"})
-                && real(node, "emission_sphere_radius", n.emission_radius) && vec(node, "emission_box_extents", n.emission_box);
-            n.amount = uint16_t(amount);
+            uint32_t amount = n.more().amount;
+            ok = ok && flag(node, "emitting", n.extras().emitting) && flag(node, "one_shot", n.extras().one_shot) && flag(node, "additive", n.extras().additive)
+                && flag(node, "no_depth_test", n.extras().no_depth_test)
+                && integer(node, "amount", amount, jetstudio::MaxParticles) && real(node, "lifetime", n.extras().lifetime)
+                && real(node, "lifetime_randomness", n.extras().lifetime_randomness) && real(node, "explosiveness", n.extras().explosiveness)
+                && vec(node, "direction", n.extras().direction) && real(node, "spread", n.extras().spread) && vec(node, "gravity", n.extras().gravity)
+                && real(node, "initial_velocity_min", n.extras().velocity_min) && real(node, "initial_velocity_max", n.extras().velocity_max)
+                && real(node, "damping_min", n.extras().damping_min) && real(node, "damping_max", n.extras().damping_max)
+                && choice(node, "particle_style", n.extras().particle_style, {"Sparks", "Water", "Puff"})
+                && integer(node, "color_end", n.extras().color_end, 0xffffff) && real(node, "puff_size", n.extras().puff_size)
+                && real(node, "puff_size_end", n.extras().puff_size_end)
+                && choice(node, "emission_shape", n.extras().emission_shape, {"Point", "Sphere", "Box"})
+                && real(node, "emission_sphere_radius", n.extras().emission_radius) && vec(node, "emission_box_extents", n.extras().emission_box);
+            n.extras().amount = uint16_t(amount);
             // "size" is in pixels on Controls; on a CollisionShape3D it is the box size.
             if (n.type == NodeType::CollisionShape3D) {
-                n.box_size = n.size;
-                n.size = jetstudio::NodeDesc{}.size;
+                n.extras().box_size = n.extras().size;
+                n.extras().size = jetstudio::NodeDesc{}.extras().size;
             }
             // Sprite3D, Godot's names; modulate is the colour that tints the texture.
             uint32_t hframes = n.hframes, vframes = n.vframes, frame = n.frame;
@@ -260,13 +260,13 @@ struct Flattener {
                 n.color = 0xffffff; // Godot's default modulate: the texture as it is
                 ok = ok && integer(node, "modulate", n.color, 0xffffff);
             }
-            uint32_t segments = n.segments, text_scale = n.text_scale;
+            uint32_t segments = n.segments, text_scale = n.more().text_scale;
             ok = ok && integer(node, "segments", segments, 64) && integer(node, "text_scale", text_scale, 8);
             n.segments = uint16_t(segments);
-            n.text_scale = uint8_t(text_scale);
+            n.extras().text_scale = uint8_t(text_scale);
             if (node.has("text")) {
                 if (node["text"].get_type() != Variant::STRING) ok = false;
-                else n.text = utf8(node["text"]);
+                else n.extras().text = utf8(node["text"]);
             }
             if (!ok) { error = "Invalid property in node " + String(node["name"]) + "."; return false; }
             n.uv_scale[0] = uv_scale.x; n.uv_scale[1] = uv_scale.y; n.uv_offset[0] = uv_offset.x; n.uv_offset[1] = uv_offset.y;
@@ -274,10 +274,10 @@ struct Flattener {
             n.bilinear = filter == 1;
             if (n.type == NodeType::MeshInstance3D) n.texture = texture_index(node.get("albedo_texture", ""));
             if (n.type == NodeType::TextureRect || n.type == NodeType::Sprite3D) n.texture = texture_index(node.get("texture", ""));
-            if (n.type == NodeType::WorldEnvironment) n.sky_texture = texture_index(node.get("sky_texture", ""));
+            if (n.type == NodeType::WorldEnvironment) n.extras().sky_texture = texture_index(node.get("sky_texture", ""));
             if (n.type == NodeType::MeshInstance3D && n.shape == jetstudio::Shape::Mesh)
                 n.mesh = mesh_index(node.get("mesh_file", ""), node.get("mesh_part", ""));
-            if (n.texture == -2 || n.sky_texture == -2 || n.mesh == -2) return false;
+            if (n.texture == -2 || n.more().sky_texture == -2 || n.mesh == -2) return false;
             const String script = node.get("script", "");
             if (!script.is_empty()) {
                 n.script = script_index(script);

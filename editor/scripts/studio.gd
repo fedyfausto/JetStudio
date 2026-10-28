@@ -16,7 +16,7 @@ const SerialMonitor := preload("res://scripts/serial_monitor.gd")
 const ProjectSettingsDialog := preload("res://scripts/project_settings_dialog.gd")
 const Hardware := preload("res://scripts/hardware.gd")
 const Actions := preload("res://scripts/input_map.gd")
-const VERSION := "0.3.0"
+const VERSION := "0.3.1"
 const SETTINGS := "user://editor.cfg"
 
 enum Screen { VIEW_3D, SCRIPT, GAME }
@@ -2712,6 +2712,11 @@ func _run_smoke() -> void:
 	_check(Hardware.platform(stm32) == "stm32" and Hardware.pin_label(stm32, 0x05) == "D13 · PA5" and stm32_ok
 		and Hardware.problems(wrong_sck).is_empty() and Hardware.software_spi(wrong_sck) and not Hardware.software_spi(stm32),
 		"STM32 boards: pin labels, SPI pins and software SPI elsewhere")
+	var f746 := Hardware.settings({"hardware": {"board": "nucleo_f746zg", "pins": {"mosi": 7}}}) # D11, once JP6 is off
+	var active_high: Array = Hardware.boards["nucleo_f746zg"].get("active_high", []).map(func(pin): return int(pin))
+	_check(Hardware.pin_label(f746, 45) == "B1 USER · PC13" and active_high == [45]
+		and not Hardware.software_spi(f746) and Hardware.problems(f746).is_empty(),
+		"Nucleo-144: the B1 USER button (pressed = high) and MOSI on D11 through the SPI peripheral")
 	project.config.erase("hardware")
 	_apply_hardware()
 	_check(_frame().size() == 320 * 240 * 3, "default hardware is 320x240 again")

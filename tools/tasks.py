@@ -61,12 +61,15 @@ def generate_inputs(config, firmware, board):
     used = [p for p in pins if p >= 0]
     if len(used) != len(set(used)):
         raise RuntimeError("Two actions use the same pin")
-    content = ("#pragma once\n// Generated from the project's Input Map (project.jetproject). Do not edit.\n"
+    active_high = sum(1 << i for i, pin in enumerate(pins) if pin >= 0 and pin in board.get("active_high", []))
+    content = ("#pragma once\n#include <cstdint>\n// Generated from the project's Input Map (project.jetproject). Do not edit.\n"
                "// One pin per action, in package order (bit i = action i). -1 means no button.\n"
                "// ESP32: GPIO number. STM32: PinName (port * 16 + pin).\n"
                "// " + ", ".join(name for name, _ in actions) + "\n"
-               "// Buttons connect the pin to GND (internal pull-up).\n"
-               f"static constexpr int input_pins[{len(pins)}] = {{{', '.join(map(str, pins))}}};\n")
+               "// Buttons connect the pin to GND (internal pull-up). Bit i of input_active_high: the board's own button,\n"
+               "// pressed = high (it has its own pull-down).\n"
+               f"static constexpr int input_pins[{len(pins)}] = {{{', '.join(map(str, pins))}}};\n"
+               f"static constexpr uint32_t input_active_high = 0x{active_high:x};\n")
     hardware.write_if_changed(firmware / "src/generated_inputs.hpp", content)
     print("Buttons: " + (", ".join(f"{a}={hardware.pin_label(board, p)}" for a, p in actions if p >= 0) or "none"), flush=True)
     return [(a, p) for a, p in actions if p >= 0]
