@@ -9,10 +9,15 @@ firmware.
 
 ## Video Demo
 
-
-[![Physics Demo](http://img.youtube.com/vi/Qyh9KQlXAAA/0.jpg)](http://www.youtube.com/watch?v=Qyh9KQlXAAA) [![JetRun Demo](http://img.youtube.com/vi/o8o237eqnMw/0.jpg)](http://www.youtube.com/watch?v=o8o237eqnMw) 
-
-
+<!-- markdownlint-disable MD033 -->
+<table>
+  <tr>
+    <td align="center"><a href="https://www.youtube.com/watch?v=Qyh9KQlXAAA"><img src="https://img.youtube.com/vi/Qyh9KQlXAAA/mqdefault.jpg" width="240" alt="Physics demo"></a><br>Physics demo</td>
+    <td align="center"><a href="https://www.youtube.com/watch?v=o8o237eqnMw"><img src="https://img.youtube.com/vi/o8o237eqnMw/mqdefault.jpg" width="240" alt="JetRun demo"></a><br>JetRun</td>
+    <td align="center"><a href="https://www.youtube.com/watch?v=085BnOyN1vA"><img src="https://img.youtube.com/vi/085BnOyN1vA/mqdefault.jpg" width="240" alt="Jet Blaster demo"></a><br>Jet Blaster</td>
+  </tr>
+</table>
+<!-- markdownlint-enable MD033 -->
 
 ## Running
 
