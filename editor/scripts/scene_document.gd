@@ -3,16 +3,20 @@ extends RefCounted
 
 const VERSION := 2
 const TYPES := ["Node", "Node3D", "MeshInstance3D", "Sprite3D", "Camera3D", "DirectionalLight3D", "WorldEnvironment",
-	"Control", "Label", "TextureRect", "ColorRect", "StaticBody3D", "CharacterBody3D", "RigidBody3D", "Area3D", "CollisionShape3D",
-	"CPUParticles3D"]
+	"Node2D", "Sprite2D", "AnimatedSprite2D", "Camera2D", "StaticBody2D", "CharacterBody2D", "RigidBody2D", "Area2D", "CollisionShape2D", "Control", "Label", "TextureRect", "ColorRect", "StaticBody3D", "CharacterBody3D", "RigidBody3D", "Area3D", "CollisionShape3D",
+	"CPUParticles3D", "Timer"]
 const BASE := {"Node": "", "Node3D": "Node", "MeshInstance3D": "Node3D", "Camera3D": "Node3D",
 	"DirectionalLight3D": "Node3D", "WorldEnvironment": "Node", "Control": "Node", "Label": "Control",
 	"TextureRect": "Control", "ColorRect": "Control", "CollisionObject3D": "Node3D", "PhysicsBody3D": "CollisionObject3D",
 	"StaticBody3D": "PhysicsBody3D", "CharacterBody3D": "PhysicsBody3D", "RigidBody3D": "PhysicsBody3D",
-	"Area3D": "CollisionObject3D", "CollisionShape3D": "Node3D", "CPUParticles3D": "Node3D", "Sprite3D": "Node3D"}
+	"Area3D": "CollisionObject3D", "CollisionShape3D": "Node3D", "CPUParticles3D": "Node3D", "Sprite3D": "Node3D",
+	"Node2D": "Node", "Sprite2D": "Node2D", "AnimatedSprite2D": "Node2D", "Camera2D": "Node2D",
+	"CollisionObject2D": "Node2D", "PhysicsBody2D": "CollisionObject2D", "StaticBody2D": "PhysicsBody2D",
+	"CharacterBody2D": "PhysicsBody2D", "RigidBody2D": "PhysicsBody2D", "Area2D": "CollisionObject2D", "CollisionShape2D": "Node2D",
+	"Timer": "Node"}
 ## Base classes shown in the class tree but not instantiable.
-const ABSTRACT := ["CollisionObject3D", "PhysicsBody3D"]
-const BODIES := ["StaticBody3D", "CharacterBody3D", "RigidBody3D", "Area3D"]
+const ABSTRACT := ["CollisionObject3D", "PhysicsBody3D", "CollisionObject2D", "PhysicsBody2D"]
+const BODIES := ["StaticBody3D", "CharacterBody3D", "RigidBody3D", "Area3D", "StaticBody2D", "CharacterBody2D", "RigidBody2D", "Area2D"]
 const DESCRIPTIONS := {
 	"Node": "Base node. Useful to organize the scene or for global logic scripts.",
 	"Node3D": "3D object with a transform (position, rotation, scale). Base of all 3D nodes.",
@@ -21,6 +25,17 @@ const DESCRIPTIONS := {
 	"Camera3D": "The game's point of view. The 'current' camera is used in Play and on the device.",
 	"DirectionalLight3D": "Directional light (sun). Shines along its own -Z axis.",
 	"WorldEnvironment": "Background color and ambient light of the scene.",
+	"Node2D": "2D object with a position in canvas pixels (y down), a rotation and a scale. Base of the 2D game nodes; drawn over the 3D scene, under the Controls.",
+	"Sprite2D": "A PNG or one frame of a sprite sheet in the 2D world. z_index and the tree decide what is in front.",
+	"AnimatedSprite2D": "A sprite sheet with named animations (frame ranges and speed): play(\"run\") from scripts, or autoplay.",
+	"Camera2D": "Moves the 2D view: its position is shown at the screen centre, zoom scales. Without one, the canvas origin is the top-left corner.",
+	"CollisionObject2D": "Base of 2D bodies and areas: child collision shapes, layer and mask.",
+	"PhysicsBody2D": "Base of the 2D physics bodies that collide with each other.",
+	"StaticBody2D": "Static 2D body (ground, walls, platforms). Scripts can move it.",
+	"CharacterBody2D": "2D character moved by its script with velocity and move_and_slide(): slides along walls, knows when it is on the floor (y down, gravity is up to the script).",
+	"RigidBody2D": "2D physics body: gravity (980 px/s²), mass, bounce, friction, collisions (arcade: rectangles don't tip over, circles roll).",
+	"Area2D": "2D region that detects bodies and other areas: the body_entered and area_entered signals (or _on_body_entered(body) in its script), get_overlapping_bodies().",
+	"CollisionShape2D": "Collision shape (Rectangle, Circle, Capsule) of a 2D body or area: add it as a child. One Way makes a platform you can jump through.",
 	"Control": "Base of the 2D nodes drawn over the 3D scene, in screen pixels (320×240). On its own it groups a HUD: children are placed relative to it, hidden and faded with it.",
 	"Label": "Text in the runtime's bitmap font (titles, scores, HUD). Can be changed from scripts.",
 	"TextureRect": "PNG image drawn over the scene, with integer scaling and transparency.",
@@ -30,9 +45,10 @@ const DESCRIPTIONS := {
 	"StaticBody3D": "Static body (floors, walls, platforms). Scripts can move it.",
 	"CharacterBody3D": "Character moved by its script with velocity and move_and_slide(): slides along walls, knows when it is on the floor.",
 	"RigidBody3D": "Physics body: gravity, mass, bounce, friction, collisions (arcade physics: boxes don't tip over, spheres roll).",
-	"Area3D": "Region that detects bodies: get_overlapping_bodies(), _on_body_entered(body), _on_body_exited(body).",
+	"Area3D": "Region that detects bodies and areas: the body_entered and body_exited signals (or _on_body_entered(body) in its script), get_overlapping_bodies().",
 	"CollisionShape3D": "Collision shape (Box, Sphere, Capsule) of a body or an area: add it as a child.",
 	"CPUParticles3D": "Emits particles (sparks, splashes, fountains) drawn by Jet's particle system. Visible in Play.",
+	"Timer": "Counts down Wait Time and emits timeout: connect it in the Signals dock, or in a script ($Timer.timeout.connect(_on_timeout)). One Shot stops after the first time.",
 }
 const MESHES := ["Box", "Sphere", "Plane", "Pyramid", "Cylinder", "Capsule", "Quad", "Torus", "File"]
 const MESH_ICONS := {"Box": "BoxMesh", "Sphere": "SphereMesh", "Plane": "PlaneMesh", "Pyramid": "PrismMesh",
@@ -204,10 +220,56 @@ const PROPERTIES := {
 			"visible_if": {"shape": ["Capsule"]}, "tooltip": "Total height of the capsule (caps included), as in Godot."},
 		{"key": "disabled", "type": "bool", "default": false},
 	],
+	"CollisionObject2D": [
+		{"key": "collision_layer", "label": "Layer", "type": "int", "default": 1, "min": 0, "max": 2147483647, "group": "Collision",
+			"tooltip": "Layers it belongs to (bits: 1 = layer 1, 2 = layer 2, 4 = layer 3; 3 = layers 1 and 2)."},
+		{"key": "collision_mask", "label": "Mask", "type": "int", "default": 1, "min": 0, "max": 2147483647, "group": "Collision",
+			"tooltip": "Layers it detects or collides with (same bits as Layer)."},
+	],
+	"StaticBody2D": [
+		{"key": "friction", "type": "float", "default": 1.0, "min": 0.0, "max": 10.0, "step": 0.01, "group": "Physics Material"},
+		{"key": "bounce", "type": "float", "default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01, "group": "Physics Material"},
+	],
+	"CharacterBody2D": [
+		{"key": "floor_max_angle", "label": "Floor Max Angle", "type": "float", "default": 45.0, "min": 0.0, "max": 89.0, "step": 0.1, "suffix": "°",
+			"group": "Floor", "tooltip": "Steepest slope still treated as floor (anything steeper is a wall to slide along)."},
+	],
+	"RigidBody2D": [
+		{"key": "mass", "type": "float", "default": 1.0, "min": 0.001, "max": 10000.0, "step": 0.01, "suffix": "kg", "group": "Mass"},
+		{"key": "gravity_scale", "type": "float", "default": 1.0, "min": -10.0, "max": 10.0, "step": 0.01, "group": "Mass"},
+		{"key": "friction", "type": "float", "default": 1.0, "min": 0.0, "max": 10.0, "step": 0.01, "group": "Physics Material"},
+		{"key": "bounce", "type": "float", "default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01, "group": "Physics Material"},
+		{"key": "linear_velocity", "type": "vector2", "default": [0.0, 0.0], "step": 1.0, "suffix": "px/s", "group": "Linear"},
+		{"key": "linear_damp", "type": "float", "default": 0.0, "min": 0.0, "max": 100.0, "step": 0.01, "group": "Linear"},
+		{"key": "angular_velocity", "type": "float", "default": 0.0, "min": -100.0, "max": 100.0, "step": 0.01, "suffix": "rad/s", "group": "Angular"},
+		{"key": "angular_damp", "type": "float", "default": 0.0, "min": 0.0, "max": 100.0, "step": 0.01, "group": "Angular"},
+		{"key": "freeze", "type": "bool", "default": false, "group": "Deactivation", "tooltip": "Frozen: the body does not move while this is on."},
+	],
+	"Area2D": [
+		{"key": "monitoring", "type": "bool", "default": true, "tooltip": "Detects bodies and areas entering and exiting."},
+	],
+	"CollisionShape2D": [
+		{"key": "shape", "type": "enum", "default": "Rectangle", "options": ["Rectangle", "Circle", "Capsule"], "group": "Shape"},
+		{"key": "size", "type": "vector2", "default": [20.0, 20.0], "step": 1.0, "min": 0.1, "max": 100000.0, "suffix": "px", "group": "Shape",
+			"visible_if": {"shape": ["Rectangle"]}},
+		{"key": "radius", "type": "float", "default": 10.0, "min": 0.1, "max": 100000.0, "step": 1.0, "suffix": "px", "group": "Shape",
+			"visible_if": {"shape": ["Circle", "Capsule"]}},
+		{"key": "height", "type": "float", "default": 30.0, "min": 0.1, "max": 100000.0, "step": 1.0, "suffix": "px", "group": "Shape",
+			"visible_if": {"shape": ["Capsule"]}, "tooltip": "Total height of the capsule (caps included), as in Godot."},
+		{"key": "one_way_collision", "label": "One Way Collision", "type": "bool", "default": false,
+			"tooltip": "Bodies only land on it from above (its -y side) and pass through from below: jump-through platforms."},
+		{"key": "disabled", "type": "bool", "default": false},
+	],
+	"Timer": [
+		{"key": "wait_time", "type": "float", "default": 1.0, "min": 0.001, "max": 100000.0, "step": 0.001, "suffix": "s",
+			"tooltip": "Seconds between start() (or Autostart) and the timeout signal."},
+		{"key": "one_shot", "type": "bool", "default": false, "tooltip": "Stops after the first timeout; otherwise it starts again."},
+		{"key": "autostart", "type": "bool", "default": false, "tooltip": "Starts when the scene starts (or when the node enters the tree)."},
+	],
 	"CPUParticles3D": [
 		{"key": "emitting", "type": "bool", "default": true, "tooltip": "Emits particles (with One Shot, turns false at the end of the cycle)."},
 		{"key": "amount", "type": "int", "default": 8, "min": 1, "max": 200,
-			"tooltip": "Particles per cycle (Lifetime). At most 200: the fixed pool of Jet's particle system."},
+			"tooltip": "Particles per cycle (Lifetime), at most 200. Each takes about 40 bytes of RAM."},
 		{"key": "lifetime", "type": "float", "default": 1.0, "min": 0.01, "max": 600.0, "step": 0.01, "suffix": "s", "group": "Time"},
 		{"key": "one_shot", "type": "bool", "default": false, "group": "Time", "tooltip": "A single cycle, then Emitting turns false (restart() to repeat)."},
 		{"key": "explosiveness", "type": "float", "default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01, "group": "Time",
@@ -246,6 +308,51 @@ const PROPERTIES := {
 			"visible_if": {"particle_style": ["Puff"]}, "tooltip": "Diameter when emitted."},
 		{"key": "puff_size_end", "label": "Size End", "type": "float", "default": 0.6, "min": 0.0, "max": 100.0, "step": 0.01, "suffix": "m", "group": "Drawing",
 			"visible_if": {"particle_style": ["Puff"]}, "tooltip": "Diameter at the end of life: the smoke spreads out."},
+	],
+	"Node2D": [
+		{"key": "position", "type": "vector2", "default": [0.0, 0.0], "step": 1.0, "suffix": "px", "group": "Transform",
+			"tooltip": "Position in canvas pixels, relative to a 2D parent (y grows downwards)."},
+		{"key": "rotation_degrees", "label": "Rotation", "type": "float", "default": 0.0, "min": -360.0, "max": 360.0, "step": 0.1, "suffix": "°",
+			"group": "Transform", "tooltip": "Clockwise on the screen, as in Godot (scripts use rotation in radians)."},
+		{"key": "scale", "type": "vector2", "default": [1.0, 1.0], "step": 0.01, "group": "Transform", "tooltip": "Negative values flip."},
+		{"key": "z_index", "label": "Z Index", "type": "int", "default": 0, "min": -4096, "max": 4096, "group": "Ordering",
+			"tooltip": "Higher is drawn in front, added to the parent's. Same z: the later node in the tree is in front."},
+		{"key": "visible", "type": "bool", "default": true, "group": "Visibility"},
+		{"key": "modulate", "type": "color", "default": 0xffffff, "group": "Visibility", "tooltip": "Color that multiplies the texture."},
+		{"key": "alpha", "label": "Opacity", "type": "float", "default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01, "group": "Visibility",
+			"tooltip": "Opacity, inherited by the 2D children (Godot's modulate.a)."},
+	],
+	"Sprite2D": [
+		{"key": "texture", "type": "texture", "default": "", "group": "Sprite",
+			"tooltip": "PNG image or sprite sheet. Transparent pixels are not drawn."},
+		{"key": "centered", "type": "bool", "default": true, "group": "Sprite", "tooltip": "The frame's centre on the position; off: its top-left corner."},
+		{"key": "offset", "type": "vector2", "default": [0.0, 0.0], "step": 1.0, "suffix": "px", "group": "Sprite"},
+		{"key": "flip_h", "label": "Flip H", "type": "bool", "default": false, "group": "Sprite"},
+		{"key": "flip_v", "label": "Flip V", "type": "bool", "default": false, "group": "Sprite"},
+		{"key": "hframes", "type": "int", "default": 1, "min": 1, "max": 256, "group": "Animation", "tooltip": "Columns of the sprite sheet."},
+		{"key": "vframes", "type": "int", "default": 1, "min": 1, "max": 256, "group": "Animation", "tooltip": "Rows of the sprite sheet."},
+		{"key": "frame", "type": "int", "default": 0, "min": 0, "max": 65535, "group": "Animation",
+			"tooltip": "Frame shown, left to right then top to bottom."},
+	],
+	"AnimatedSprite2D": [
+		{"key": "texture", "type": "texture", "default": "", "group": "Sprite Sheet", "tooltip": "The sprite sheet with every frame."},
+		{"key": "hframes", "type": "int", "default": 1, "min": 1, "max": 256, "group": "Sprite Sheet", "tooltip": "Columns of the sprite sheet."},
+		{"key": "vframes", "type": "int", "default": 1, "min": 1, "max": 256, "group": "Sprite Sheet", "tooltip": "Rows of the sprite sheet."},
+		{"key": "animations", "type": "text", "default": "", "group": "Animation",
+			"tooltip": "One per line or comma: name, frames, frames per second, \"once\" if it doesn't loop.\nidle 0-3 8\nrun 4-9 12\ndie 10-14 10 once"},
+		{"key": "animation", "type": "text", "default": "", "group": "Animation", "tooltip": "Animation shown at the start (empty: the first)."},
+		{"key": "autoplay", "type": "bool", "default": true, "group": "Animation"},
+		{"key": "speed_scale", "label": "Speed Scale", "type": "float", "default": 1.0, "min": -10.0, "max": 10.0, "step": 0.1, "group": "Animation"},
+		{"key": "frame", "type": "int", "default": 0, "min": 0, "max": 65535, "group": "Animation"},
+		{"key": "centered", "type": "bool", "default": true, "group": "Offset"},
+		{"key": "offset", "type": "vector2", "default": [0.0, 0.0], "step": 1.0, "suffix": "px", "group": "Offset"},
+		{"key": "flip_h", "label": "Flip H", "type": "bool", "default": false, "group": "Offset"},
+		{"key": "flip_v", "label": "Flip V", "type": "bool", "default": false, "group": "Offset"},
+	],
+	"Camera2D": [
+		{"key": "enabled", "type": "bool", "default": true, "tooltip": "The first enabled Camera2D in the tree is the current one."},
+		{"key": "offset", "type": "vector2", "default": [0.0, 0.0], "step": 1.0, "suffix": "px", "tooltip": "Added to the position: shakes, look-ahead."},
+		{"key": "zoom", "type": "vector2", "default": [1.0, 1.0], "step": 0.1, "min": 0.01, "max": 100.0, "tooltip": "2 = everything twice as big."},
 	],
 	"Control": [
 		{"key": "position", "type": "vector2", "default": [0.0, 0.0], "group": "Layout", "step": 1.0, "suffix": "px",
@@ -306,6 +413,9 @@ static func inherits(type: String, base: String) -> bool:
 
 static func is_3d(type: String) -> bool:
 	return inherits(type, "Node3D")
+
+static func is_2d(type: String) -> bool:
+	return inherits(type, "Node2D")
 
 static func is_control(type: String) -> bool:
 	return inherits(type, "Control")
@@ -405,28 +515,31 @@ static func new_node(type: String, id: int, node_name: String = "") -> Dictionar
 static func configuration_warnings(root: Dictionary, node: Dictionary) -> PackedStringArray:
 	var out := PackedStringArray()
 	var type := str(node.type)
+	var dimension := "2D" if is_2d(type) else "3D"
 	if type in BODIES and not _has_own_shape(node):
 		out.append("This node has no shape, so it can't collide or interact with other objects.\n"
-			+ "Consider adding a CollisionShape3D as a child to define its shape.")
-	elif type == "CollisionShape3D":
+			+ "Consider adding a CollisionShape%s as a child to define its shape." % dimension)
+	elif type in ["CollisionShape3D", "CollisionShape2D"]:
+		# Its owner: the nearest body or area above it of the same kind (2D or 3D).
 		var owner_found := false
 		var parent := parent_of(root, int(node.id))
 		while not parent.is_empty():
-			if str(parent.type) in BODIES:
+			if str(parent.type) in BODIES and is_2d(str(parent.type)) == is_2d(type):
 				owner_found = true
 				break
 			parent = parent_of(root, int(parent.id))
 		if not owner_found:
-			out.append("CollisionShape3D only gives a shape to a body or an area: use it as a child of\n"
-				+ "StaticBody3D, CharacterBody3D, RigidBody3D or Area3D.")
+			out.append("%s only gives a shape to a body or an area: use it as a child of\n" % type
+				+ "StaticBody{0}, CharacterBody{0}, RigidBody{0} or Area{0}.".format([dimension]))
 	return out
 
-## A CollisionShape3D below `body` that belongs to it (not to a nested body).
+## A collision shape below `body` that belongs to it (not to a nested body), 2D for 2D bodies.
 static func _has_own_shape(body: Dictionary) -> bool:
+	var shape := "CollisionShape2D" if is_2d(str(body.type)) else "CollisionShape3D"
 	var stack: Array = children(body).duplicate()
 	while not stack.is_empty():
 		var n: Dictionary = stack.pop_back()
-		if str(n.type) == "CollisionShape3D": return true
+		if str(n.type) == shape: return true
 		if not str(n.type) in BODIES: stack.append_array(children(n))
 	return false
 
@@ -606,8 +719,8 @@ static func validate(doc: Variant) -> String:
 		elif n.has("children") and not n.children is Array: problem[0] = "Invalid children in %s." % n.name
 		else:
 			ids[int(n.id)] = true
-			var size := 2 if is_control(str(n.type)) else 3
-			for key in ["position", "rotation", "scale", "size"]:
+			var size := 2 if is_control(str(n.type)) or is_2d(str(n.type)) else 3
+			for key in ["position", "rotation", "scale", "size", "offset", "zoom"]:
 				if n.has(key) and not _vector(n[key], size): problem[0] = "Invalid %s vector in %s." % [key, n.name]
 			for child in n.get("children", []):
 				if not child is Dictionary: problem[0] = "Invalid child in %s." % n.name)
@@ -617,7 +730,7 @@ static func validate(doc: Variant) -> String:
 static func normalize(doc: Dictionary) -> void:
 	walk(doc.root, func(n, _p, _d):
 		for key in ["id", "color", "segments", "light_color", "background_color", "ambient_color", "shininess", "text_scale",
-				"collision_layer", "collision_mask", "amount", "color_end",
+				"collision_layer", "collision_mask", "amount", "color_end", "z_index", "hframes", "vframes", "frame", "modulate",
 				"sky_top_color", "sky_horizon_color", "ground_horizon_color", "ground_bottom_color"]:
 			if n.has(key) and (n[key] is float): n[key] = int(n[key])
 		for type_name in class_chain(str(n.type)):
@@ -687,3 +800,68 @@ static func migrate_v1(old: Dictionary) -> Array:
 			notes.append("%s: SpinBehaviour (%.0f°/s) no longer exists, use a JetScript script." % [node.name, float(item.spin)])
 		root.children.append(node)
 	return [doc, notes]
+
+# ------------------------------------------------------------------ signal connections
+
+## The signal connections made in the editor, Godot's [connection] entries: {from, signal, to, method, flags}, nodes by id.
+static func connections(doc: Dictionary) -> Array:
+	if not doc.get("connections") is Array: doc.connections = []
+	return doc.connections
+
+## Drops the connections of nodes that are no longer in the scene.
+static func prune_connections(doc: Dictionary) -> void:
+	var ids := {}
+	walk(doc.root, func(n, _p, _d): ids[int(n.id)] = true)
+	doc.connections = connections(doc).filter(func(c): return ids.has(int(c.from)) and ids.has(int(c.to)))
+
+static func find_connection(doc: Dictionary, from: int, signal_name: String, to: int, method: String) -> int:
+	var list := connections(doc)
+	for i in list.size():
+		var c: Dictionary = list[i]
+		if int(c.from) == from and str(c["signal"]) == signal_name and int(c.to) == to and str(c.method) == method: return i
+	return -1
+
+## Godot's default method names: _on_<node>_<signal>, or _on_<signal> when a node connects to itself.
+static func callback_name(source: Dictionary, target: Dictionary, signal_name: String) -> String:
+	if int(source.id) == int(target.id): return "_on_" + signal_name
+	var node_name := ""
+	for c in str(source.name).to_snake_case():
+		node_name += c if c == "_" or c.is_valid_identifier() or c.is_valid_int() else "_"
+	return "_on_%s_%s" % [node_name, signal_name]
+
+## A 2D node's transform on the canvas, through its 2D parents (a 2D node under anything else starts a canvas).
+static func canvas_transform(root: Dictionary, id: int) -> Transform2D:
+	var t := Transform2D.IDENTITY
+	for node in lineage(root, id):
+		if not is_2d(str(node.type)):
+			t = Transform2D.IDENTITY
+			continue
+		var p: Array = node.get("position", [0.0, 0.0])
+		var s: Array = node.get("scale", [1.0, 1.0])
+		t = t * Transform2D(deg_to_rad(float(node.get("rotation_degrees", 0.0))), Vector2(float(s[0]), float(s[1])), 0.0,
+			Vector2(float(p[0]), float(p[1])))
+	return t
+
+## Whether a stored value suits a property definition (a node that changed type keeps only the ones that do).
+static func fits(prop: Dictionary, value: Variant) -> bool:
+	match str(prop.get("type", "")):
+		"vector2": return value is Array and value.size() == 2
+		"vector3": return value is Array and value.size() == 3
+		"float", "int", "color": return value is float or value is int
+		"bool": return value is bool
+		"enum": return value is String and value in prop.get("options", [])
+		"text", "texture", "model", "part": return value is String
+	return true
+
+## Godot's Change Type: the node keeps its id, name, children, script and the properties the new type has too;
+## the others take the new type's defaults.
+static func change_type(node: Dictionary, new_type: String) -> void:
+	var fresh := new_node(new_type, int(node.id), str(node.name))
+	for key in node.keys():
+		if key in ["id", "name", "type", "children", "script", "script_properties"]: continue
+		var prop := property_def(new_type, key)
+		if prop.is_empty(): node.erase(key)
+		elif not fits(prop, node[key]): node[key] = fresh[key]
+	for key in fresh:
+		if not node.has(key): node[key] = fresh[key]
+	node.type = new_type

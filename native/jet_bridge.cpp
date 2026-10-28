@@ -1,8 +1,10 @@
 #include "jet_bridge.hpp"
+#include "physics.hpp"
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <chrono>
+#include <unordered_map>
 #include <unordered_set>
 
 using namespace godot;
@@ -59,6 +61,7 @@ jetscript::Value to_value(const Variant& v, int depth = 0) {
     case Variant::FLOAT: return jetscript::Value(double(v));
     case Variant::STRING: case Variant::STRING_NAME: return jetscript::Value(utf8(v));
     case Variant::VECTOR3: { const godot::Vector3 x = v; return jetscript::Value(jetscript::Vector3{float(x.x), float(x.y), float(x.z)}); }
+    case Variant::VECTOR2: { const godot::Vector2 x = v; return jetscript::Value(jetscript::Vector2{float(x.x), float(x.y)}); }
     case Variant::COLOR: { const godot::Color c = v; return jetscript::Value(jetscript::Color{c.r, c.g, c.b}); }
     case Variant::ARRAY: {
         auto out = jetscript::Value::new_array();
@@ -78,6 +81,7 @@ Variant to_variant(const jetscript::Value& v, int depth = 0) {
     case Type::Float: return double(v.as_real());
     case Type::String: return gd(v.as_string());
     case Type::Vector3: { const auto x = v.as_vector3(); return godot::Vector3(x.x, x.y, x.z); }
+    case Type::Vector2: { const auto x = v.as_vector2(); return godot::Vector2(x.x, x.y); }
     case Type::Color: { const auto c = v.as_color(); return godot::Color(c.r, c.g, c.b); }
     case Type::Array: {
         Array a;
@@ -192,7 +196,9 @@ struct Flattener {
             n.name = utf8(node["name"]);
             if (!choice(node, "type", n.type, {"Node", "Node3D", "MeshInstance3D", "Camera3D", "DirectionalLight3D", "WorldEnvironment",
                                                "Label", "TextureRect", "ColorRect", "StaticBody3D", "CharacterBody3D",
-                                               "RigidBody3D", "Area3D", "CollisionShape3D", "CPUParticles3D", "Sprite3D", "Control"})) {
+                                               "RigidBody3D", "Area3D", "CollisionShape3D", "CPUParticles3D", "Sprite3D", "Control",
+                                               "Node2D", "Sprite2D", "AnimatedSprite2D", "Camera2D", "StaticBody2D", "CharacterBody2D",
+                                               "RigidBody2D", "Area2D", "CollisionShape2D", "Timer"})) {
                 error = "Unsupported node type: " + String(node["type"]); return false;
             }
             jetstudio::Vec3 uv_scale{n.uv_scale[0], n.uv_scale[1], 1}, uv_offset{};
@@ -218,14 +224,18 @@ struct Flattener {
                 && real(node, "fov", n.extras().fov) && real(node, "near", n.extras().near) && real(node, "far", n.extras().far) && flag(node, "current", n.extras().current)
                 && integer(node, "light_color", n.extras().light_color, 0xffffff) && real(node, "light_energy", n.extras().energy)
                 && integer(node, "background_color", n.extras().background, 0xffffff) && integer(node, "ambient_color", n.extras().ambient, 0xffffff);
-            // Physics bodies and shapes.
+            // Physics bodies and shapes; 2D ones have Godot's 2D shape names and one angular velocity.
+            const bool flat = jetstudio::physics::is_flat(n.type);
             uint32_t layer = n.more().collision_layer, mask = n.more().collision_mask;
-            ok = ok && choice(node, "shape", n.extras().collision, {"Box", "Sphere", "Capsule"}) && real(node, "radius", n.extras().radius)
+            ok = ok && (flat ? choice(node, "shape", n.extras().collision, {"Rectangle", "Circle", "Capsule"})
+                             : choice(node, "shape", n.extras().collision, {"Box", "Sphere", "Capsule"}))
+                && flag(node, "one_way_collision", n.extras().one_way) && real(node, "radius", n.extras().radius)
                 && real(node, "height", n.extras().height) && flag(node, "disabled", n.extras().disabled)
                 && integer(node, "collision_layer", layer, 0xffffffffu) && integer(node, "collision_mask", mask, 0xffffffffu)
                 && real(node, "mass", n.extras().mass) && real(node, "gravity_scale", n.extras().gravity_scale) && real(node, "linear_damp", n.extras().linear_damp)
                 && real(node, "angular_damp", n.extras().angular_damp) && real(node, "friction", n.extras().friction) && real(node, "bounce", n.extras().bounce)
-                && vec(node, "linear_velocity", n.extras().linear_velocity) && vec(node, "angular_velocity", n.extras().angular_velocity)
+                && vec(node, "linear_velocity", n.extras().linear_velocity)
+                && (flat ? real(node, "angular_velocity", n.extras().angular_velocity.z) : vec(node, "angular_velocity", n.extras().angular_velocity))
                 && flag(node, "freeze", n.extras().freeze) && real(node, "floor_max_angle", n.extras().floor_max_angle) && flag(node, "monitoring", n.extras().monitoring);
             n.extras().collision_layer = layer;
             n.extras().collision_mask = mask;
@@ -244,8 +254,13 @@ struct Flattener {
                 && choice(node, "emission_shape", n.extras().emission_shape, {"Point", "Sphere", "Box"})
                 && real(node, "emission_sphere_radius", n.extras().emission_radius) && vec(node, "emission_box_extents", n.extras().emission_box);
             n.extras().amount = uint16_t(amount);
-            // "size" is in pixels on Controls; on a CollisionShape3D it is the box size.
-            if (n.type == NodeType::CollisionShape3D) {
+            // Timer: wait_time and autostart are kept in lifetime and autoplay; Godot doesn't autostart by default.
+            if (n.type == NodeType::Timer) {
+                n.extras().autoplay = false;
+                ok = ok && real(node, "wait_time", n.extras().lifetime) && flag(node, "autostart", n.extras().autoplay);
+            }
+            // "size" is in pixels on Controls; on a collision shape it is the box (rectangle) size.
+            if (jetstudio::physics::is_collision_shape(n.type)) {
                 n.extras().box_size = n.extras().size;
                 n.extras().size = jetstudio::NodeDesc{}.extras().size;
             }
@@ -256,9 +271,31 @@ struct Flattener {
             n.hframes = uint16_t(std::max<uint32_t>(1, hframes));
             n.vframes = uint16_t(std::max<uint32_t>(1, vframes));
             n.frame = uint16_t(frame);
-            if (n.type == NodeType::Sprite3D) {
+            if (n.type == NodeType::Sprite3D || jetstudio::is_node2d(n.type)) {
                 n.color = 0xffffff; // Godot's default modulate: the texture as it is
                 ok = ok && integer(node, "modulate", n.color, 0xffffff);
+            }
+            if (jetstudio::is_node2d(n.type)) {
+                // 2D: one rotation in degrees, clockwise; z_index may be negative.
+                ok = ok && real(node, "rotation_degrees", n.rotation.z) && flag(node, "centered", n.centered);
+                if (!node.has("scale")) n.scale = {1, 1, 1};
+                jetstudio::Vec3 offset{}, zoom{1, 1, 0};
+                ok = ok && vec(node, "offset", offset) && vec(node, "zoom", zoom) && flag(node, "enabled", n.extras().current);
+                n.offset[0] = offset.x;
+                n.offset[1] = offset.y;
+                n.extras().zoom[0] = zoom.x;
+                n.extras().zoom[1] = zoom.y;
+                if (node.has("z_index")) {
+                    if (!number(node["z_index"])) ok = false;
+                    else n.z_index = int16_t(std::clamp(int64_t(node["z_index"]), int64_t(-4096), int64_t(4096)));
+                }
+                if (n.type == NodeType::Camera2D && !node.has("enabled")) n.extras().current = true; // Godot's default
+                ok = ok && flag(node, "autoplay", n.extras().autoplay) && real(node, "speed_scale", n.extras().speed_scale);
+                for (const char* key : {"animations", "animation"}) {
+                    if (!node.has(key)) continue;
+                    if (node[key].get_type() != Variant::STRING) ok = false;
+                    else (std::string_view(key) == "animations" ? n.extras().animations : n.extras().animation) = utf8(node[key]);
+                }
             }
             uint32_t segments = n.segments, text_scale = n.more().text_scale;
             ok = ok && integer(node, "segments", segments, 64) && integer(node, "text_scale", text_scale, 8);
@@ -273,7 +310,9 @@ struct Flattener {
             n.shininess = uint8_t(shininess);
             n.bilinear = filter == 1;
             if (n.type == NodeType::MeshInstance3D) n.texture = texture_index(node.get("albedo_texture", ""));
-            if (n.type == NodeType::TextureRect || n.type == NodeType::Sprite3D) n.texture = texture_index(node.get("texture", ""));
+            if (n.type == NodeType::TextureRect || n.type == NodeType::Sprite3D || n.type == NodeType::Sprite2D
+                || n.type == NodeType::AnimatedSprite2D)
+                n.texture = texture_index(node.get("texture", ""));
             if (n.type == NodeType::WorldEnvironment) n.extras().sky_texture = texture_index(node.get("sky_texture", ""));
             if (n.type == NodeType::MeshInstance3D && n.shape == jetstudio::Shape::Mesh)
                 n.mesh = mesh_index(node.get("mesh_file", ""), node.get("mesh_part", ""));
@@ -316,6 +355,7 @@ void JetBridge::_bind_methods() {
     ClassDB::bind_method(D_METHOD("texture_info", "image", "palette"), &JetBridge::texture_info);
     ClassDB::bind_method(D_METHOD("set_editor_camera", "position", "rotation", "fov"), &JetBridge::set_editor_camera);
     ClassDB::bind_method(D_METHOD("use_editor_camera", "enabled"), &JetBridge::use_editor_camera);
+    ClassDB::bind_method(D_METHOD("set_editor_canvas", "enabled", "zoom", "origin"), &JetBridge::set_editor_canvas);
     ClassDB::bind_method(D_METHOD("update", "delta"), &JetBridge::update);
     ClassDB::bind_method(D_METHOD("render_frame"), &JetBridge::render_frame);
     ClassDB::bind_method(D_METHOD("play_start"), &JetBridge::play_start);
@@ -324,6 +364,9 @@ void JetBridge::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_input", "mask"), &JetBridge::set_input);
     ClassDB::bind_method(D_METHOD("take_log"), &JetBridge::take_log);
     ClassDB::bind_method(D_METHOD("pick", "x", "y"), &JetBridge::pick);
+    ClassDB::bind_method(D_METHOD("drawn_rect", "id"), &JetBridge::drawn_rect);
+    ClassDB::bind_method(D_METHOD("memory_estimate", "textures_in_place"), &JetBridge::memory_estimate);
+    ClassDB::bind_method(D_METHOD("shape_outline", "id"), &JetBridge::shape_outline);
     ClassDB::bind_method(D_METHOD("compile_script", "source", "path"), &JetBridge::compile_script);
     ClassDB::bind_method(D_METHOD("class_db"), &JetBridge::class_db);
     ClassDB::bind_method(D_METHOD("node_state", "id"), &JetBridge::node_state);
@@ -338,6 +381,29 @@ void JetBridge::_bind_methods() {
 
 JetBridge::JetBridge() { rgb_.resize(jetstudio::DefaultWidth * jetstudio::DefaultHeight * 3); }
 
+// The document's signal connections ({from, signal, to, method, flags} by node id) by index in the flattened nodes.
+// Ones whose nodes are gone are left out.
+static std::vector<jetstudio::SceneConnection> connections_of(const Dictionary& document, const std::vector<jetstudio::NodeDesc>& nodes) {
+    std::unordered_map<uint32_t, int32_t> index;
+    for (size_t i = 0; i < nodes.size(); ++i) index[nodes[i].id] = int32_t(i);
+    std::vector<jetstudio::SceneConnection> out;
+    const Array list = document.get("connections", Array());
+    for (int i = 0; i < list.size(); ++i) {
+        if (list[i].get_type() != Variant::DICTIONARY) continue;
+        const Dictionary entry = list[i];
+        const auto from = index.find(uint32_t(int64_t(entry.get("from", 0)))), to = index.find(uint32_t(int64_t(entry.get("to", 0))));
+        if (from == index.end() || to == index.end()) continue;
+        jetstudio::SceneConnection c;
+        c.from = from->second;
+        c.to = to->second;
+        c.signal = utf8(entry.get("signal", ""));
+        c.method = utf8(entry.get("method", ""));
+        c.flags = uint32_t(int64_t(entry.get("flags", 0))) & 4u;
+        out.push_back(std::move(c));
+    }
+    return out;
+}
+
 String JetBridge::load_scene(const Dictionary& document, const Dictionary& scripts, const Dictionary& assets) {
     if (int(document.get("version", 0)) != 2 || document.get("root", Variant()).get_type() != Variant::DICTIONARY)
         return "Invalid scene document (expected jetscene version 2).";
@@ -349,6 +415,7 @@ String JetBridge::load_scene(const Dictionary& document, const Dictionary& scrip
     if (!flat.run(document["root"])) return flat.error;
     flat.d.name = flat.d.nodes.front().name;
     flat.d.path = utf8(scene_path_);
+    std::vector<jetstudio::SceneConnection> main_connections = connections_of(document, flat.d.nodes);
     std::vector<jetstudio::NodeDesc> main = std::move(flat.d.nodes);
     const Array paths = other_scenes_.keys();
     for (int i = 0; i < paths.size(); ++i) {
@@ -357,9 +424,11 @@ String JetBridge::load_scene(const Dictionary& document, const Dictionary& scrip
             return "Invalid scene document: " + String(paths[i]);
         flat.d.nodes.clear();
         if (!flat.run(other["root"])) return flat.error + " (" + String(paths[i]) + ")";
-        flat.d.scenes.push_back({utf8(paths[i]), std::move(flat.d.nodes)});
+        std::vector<jetstudio::SceneConnection> links = connections_of(other, flat.d.nodes);
+        flat.d.scenes.push_back({utf8(paths[i]), std::move(flat.d.nodes), std::move(links)});
     }
     flat.d.nodes = std::move(main);
+    flat.d.connections = std::move(main_connections);
     for (int i = 0; i < autoloads_.size(); ++i) {
         const Dictionary entry = autoloads_[i];
         const int script = flat.script_index(entry.get("path", ""));
@@ -460,6 +529,9 @@ void JetBridge::set_editor_camera(const godot::Vector3& p, const godot::Vector3&
     runtime_.set_editor_camera({float(p.x), float(p.y), float(p.z)}, {float(r.x), float(r.y), float(r.z)}, float(fov));
 }
 void JetBridge::use_editor_camera(bool enabled) { runtime_.use_editor_camera(enabled); }
+void JetBridge::set_editor_canvas(bool enabled, double zoom, const godot::Vector2& origin) {
+    runtime_.set_editor_canvas(enabled, float(zoom), {float(origin.x), float(origin.y), 0});
+}
 
 void JetBridge::update(double delta) {
     const auto start = std::chrono::steady_clock::now();
@@ -514,6 +586,47 @@ Array JetBridge::take_log() {
 
 int JetBridge::pick(int x, int y) { return runtime_.pick(x, y); }
 
+// RAM on a board for the loaded description, in bytes (see jetstudio::MemoryReport).
+// A CollisionShape2D's outline in Jet pixels, as last placed (empty for other nodes).
+godot::PackedVector2Array JetBridge::shape_outline(int id) const {
+    godot::PackedVector2Array out;
+    if (id <= 0) return out;
+    const auto points = runtime_.shape_outline(uint32_t(id));
+    for (size_t i = 0; i + 1 < points.size(); i += 2) out.push_back(godot::Vector2(points[i], points[i + 1]));
+    return out;
+}
+
+Dictionary JetBridge::memory_estimate(bool textures_in_place) const {
+    const auto report = runtime_.estimate_memory(textures_in_place);
+    Dictionary out;
+    out["engine"] = int64_t(report.engine);
+    out["frames"] = int64_t(report.frames);
+    out["field"] = int64_t(report.field);
+    out["textures"] = int64_t(report.textures);
+    out["scripts"] = int64_t(report.scripts);
+    Array scenes;
+    for (const auto& s : report.scenes) {
+        Dictionary d;
+        d["scene"] = gd(s.scene);
+        d["nodes"] = int64_t(s.nodes);
+        d["meshes"] = int64_t(s.meshes);
+        d["particles"] = int64_t(s.particles);
+        d["triangles"] = int64_t(s.triangles);
+        d["loading"] = int64_t(s.loading);
+        d["total"] = int64_t(s.total());
+        scenes.push_back(d);
+    }
+    out["scenes"] = scenes;
+    return out;
+}
+
+// Where a 2D node or Control was last drawn, in Jet pixels; empty when it wasn't.
+Rect2i JetBridge::drawn_rect(int id) const {
+    int x = 0, y = 0, w = 0, h = 0;
+    if (id <= 0 || !runtime_.drawn_rect(uint32_t(id), x, y, w, h)) return {};
+    return Rect2i(x, y, w, h);
+}
+
 Dictionary JetBridge::compile_script(const String& source, const String& path) const {
     const auto result = jetscript::compile(utf8(source), utf8(path), compile_host_);
     Dictionary out;
@@ -544,7 +657,15 @@ Dictionary JetBridge::compile_script(const String& source, const String& path) c
         item["name"] = gd(f.name); item["line"] = f.line; item["arguments"] = args;
         functions.push_back(item);
     }
-    out["exports"] = exports; out["members"] = members; out["functions"] = functions;
+    Array signals;
+    for (const auto& sig : script.signals()) {
+        Dictionary item;
+        Array args;
+        for (const auto& a : sig.arguments) args.push_back(gd(a));
+        item["name"] = gd(sig.name); item["arguments"] = args;
+        signals.push_back(item);
+    }
+    out["exports"] = exports; out["members"] = members; out["functions"] = functions; out["signals"] = signals;
     return out;
 }
 
@@ -563,7 +684,16 @@ Array JetBridge::class_db() const {
             method["name"] = gd(m.name); method["min_args"] = m.min_args; method["max_args"] = m.max_args;
             methods.push_back(method);
         }
+        Array signals;
+        for (const auto& sig : c.signals) {
+            Dictionary signal;
+            Array args;
+            for (const auto& a : sig.arguments) args.push_back(gd(a));
+            signal["name"] = gd(sig.name); signal["arguments"] = args;
+            signals.push_back(signal);
+        }
         item["name"] = gd(c.name); item["base"] = gd(c.base); item["properties"] = properties; item["methods"] = methods;
+        item["signals"] = signals;
         out.push_back(item);
     }
     return out;
@@ -577,6 +707,7 @@ Dictionary JetBridge::node_state(int id) const {
     out["rotation"] = godot::Vector3(n.rotation.x, n.rotation.y, n.rotation.z);
     out["scale"] = godot::Vector3(n.scale.x, n.scale.y, n.scale.z);
     out["visible"] = n.visible;
+    out["frame"] = n.frame;
     return out;
 }
 

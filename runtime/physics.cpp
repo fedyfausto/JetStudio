@@ -148,9 +148,18 @@ bool box_box(const Shape& a, const Shape& b, Contact& out) {
 } // namespace
 
 bool is_body(NodeType type) {
-    return type == NodeType::StaticBody3D || type == NodeType::CharacterBody3D || type == NodeType::RigidBody3D;
+    return type == NodeType::StaticBody3D || type == NodeType::CharacterBody3D || type == NodeType::RigidBody3D
+        || type == NodeType::StaticBody2D || type == NodeType::CharacterBody2D || type == NodeType::RigidBody2D;
 }
-bool is_collision_object(NodeType type) { return is_body(type) || type == NodeType::Area3D; }
+bool is_collision_object(NodeType type) { return is_body(type) || is_area(type); }
+bool is_area(NodeType type) { return type == NodeType::Area3D || type == NodeType::Area2D; }
+bool is_rigid(NodeType type) { return type == NodeType::RigidBody3D || type == NodeType::RigidBody2D; }
+bool is_character(NodeType type) { return type == NodeType::CharacterBody3D || type == NodeType::CharacterBody2D; }
+bool is_collision_shape(NodeType type) { return type == NodeType::CollisionShape3D || type == NodeType::CollisionShape2D; }
+bool is_flat(NodeType type) {
+    return type == NodeType::StaticBody2D || type == NodeType::CharacterBody2D || type == NodeType::RigidBody2D
+        || type == NodeType::Area2D || type == NodeType::CollisionShape2D;
+}
 
 void place(Shape& s, const Transform& world) {
     s.placed = world;
@@ -158,15 +167,18 @@ void place(Shape& s, const Transform& world) {
     const Vec3 scale{sx.length(), sy.length(), sz.length()};
     s.axes = world.basis.orthonormalized();
     s.center = world.origin;
+
+    // 2D: only x and y scale; a rectangle is deep enough that z never gives the least overlap.
+    constexpr float FlatDepth = 1e6f;
     switch (s.kind) {
     case CollisionKind::Box:
-        s.half = {s.size.x * 0.5f * scale.x, s.size.y * 0.5f * scale.y, s.size.z * 0.5f * scale.z};
+        s.half = {s.size.x * 0.5f * scale.x, s.size.y * 0.5f * scale.y, s.flat ? FlatDepth : s.size.z * 0.5f * scale.z};
         break;
     case CollisionKind::Sphere:
-        s.radius = s.authored_radius * std::max({scale.x, scale.y, scale.z});
+        s.radius = s.authored_radius * (s.flat ? std::max(scale.x, scale.y) : std::max({scale.x, scale.y, scale.z}));
         break;
     case CollisionKind::Capsule:
-        s.radius = s.authored_radius * std::max(scale.x, scale.z);
+        s.radius = s.authored_radius * (s.flat ? scale.x : std::max(scale.x, scale.z));
         s.half_segment = std::max(0.0f, s.authored_height * 0.5f * scale.y - s.radius);
         break;
     }
@@ -236,6 +248,8 @@ void Runtime::physics_begin() {
         shape.size = n.d.more().box_size;
         shape.authored_radius = n.d.more().radius;
         shape.authored_height = n.d.more().height;
+        shape.flat = physics::is_flat(n.d.type);
+        shape.one_way = shape.flat && n.d.more().one_way;
         shape.body = body;
         shape.node = int(i);
         const NodeDesc& owner = nodes_[size_t(body)].d;
@@ -255,13 +269,14 @@ void Runtime::move_body(int index, const Transform& world, bool rotated) {
     n.world = world;
     for (auto& s : physics_->shapes)
         if (s.body == index) physics::place(s, world * s.local);
-    const bool nested = n.parent >= 0 && is_node3d(nodes_[size_t(n.parent)].d.type);
+    const bool flat = is_node2d(n.d.type);
+    const bool nested = n.parent >= 0 && (flat ? is_node2d(nodes_[size_t(n.parent)].d.type) : is_node3d(nodes_[size_t(n.parent)].d.type));
     const Transform local = nested ? nodes_[size_t(n.parent)].world.inverse() * world : world;
     n.d.position = local.origin;
     if (rotated) {
         Vec3 scale;
         const Vec3 e = local.basis.orthonormalized(&scale).euler();
-        n.d.rotation = {degrees(e.x), degrees(e.y), degrees(e.z)};
+        n.d.rotation = flat ? Vec3{0, 0, degrees(e.z)} : Vec3{degrees(e.x), degrees(e.y), degrees(e.z)};
     }
     // Exact transform for update_transforms(), no Euler round trip.
     n.local = local;
@@ -276,20 +291,30 @@ void Runtime::wake(Live& n) {
     n.edit_motion().still_time = 0;
 }
 
-bool Runtime::deepest_contact(int index, physics::Contact& best, int& other) const {
+namespace {
+// A one-way shape stops only what comes down onto its up side (local -y), no deeper than it just moved:
+// a body jumping up through it, or already inside it, passes.
+bool one_way_blocks(const physics::Shape& platform, const physics::Contact& c, Vec3 motion) {
+    const Vec3 up = -platform.axes.column(1);
+    const float down = -motion.dot(up);
+    return c.normal.dot(up) > 0.5f && down >= 0 && c.depth <= down + 1;
+}
+} // namespace
+
+bool Runtime::deepest_contact(int index, Vec3 motion, physics::Contact& best, int& other) const {
     best.depth = 0;
     other = -1;
     const auto& shapes = physics_->shapes;
     for (const auto& a : shapes) {
         if (a.body != index) continue;
         for (const auto& b : shapes) {
-            if (b.body == index || b.owner == NodeType::Area3D || !physics::masks_match(a, b) || !physics::overlap_bounds(a, b)
+            if (b.body == index || physics::is_area(b.owner) || !physics::masks_match(a, b) || !physics::overlap_bounds(a, b)
                 || nodes_[size_t(b.body)].freed) continue;
             physics::Contact c;
-            if (physics::collide(a, b, c) && c.depth > best.depth) {
-                best = c;
-                other = b.body;
-            }
+            if (!physics::collide(a, b, c) || c.depth <= best.depth) continue;
+            if (b.one_way && !one_way_blocks(b, c, motion)) continue;
+            best = c;
+            other = b.body;
         }
     }
     return other >= 0;
@@ -299,7 +324,9 @@ bool Runtime::deepest_contact(int index, physics::Contact& best, int& other) con
 bool Runtime::move_and_slide(int index) {
     if (!physics_->valid) physics_begin();
     Live& c = nodes_[size_t(index)];
-    const Vec3 up{0, 1, 0};
+    const physics::Space& space = physics::space_of(c.d.type);
+    const Vec3 up = space.up;
+    const float skin = 0.0005f * space.unit;
     const float floor_cos = std::cos(radians(std::clamp(c.d.more().floor_max_angle, 0.0f, 89.0f)));
     const bool was_on_floor = c.motion().on_floor;
     c.edit_motion().on_floor = c.edit_motion().on_wall = c.edit_motion().on_ceiling = false;
@@ -323,11 +350,11 @@ bool Runtime::move_and_slide(int index) {
     }
     c.edit_motion().floor_body = -1;
     bool collided = false;
-    auto resolve = [&]() {
+    auto resolve = [&](Vec3 moved) {
         for (int iteration = 0; iteration < 4; ++iteration) {
             physics::Contact contact;
             int other;
-            if (!deepest_contact(index, contact, other)) return;
+            if (!deepest_contact(index, moved, contact, other)) return;
             collided = true;
             const Vec3 moving = c.motion().velocity; // before the contact removes its push into the surface
             const float facing = contact.normal.dot(up);
@@ -336,39 +363,42 @@ bool Runtime::move_and_slide(int index) {
                 c.edit_motion().on_floor = true;
                 c.edit_motion().floor_normal = contact.normal;
                 c.edit_motion().floor_body = other;
-                world.origin.y += contact.depth / std::max(facing, 0.3f) + 0.0005f;
-                if (c.edit_motion().velocity.y < 0) c.edit_motion().velocity.y = 0;
+                world.origin = world.origin + up * (contact.depth / std::max(facing, 0.3f) + skin);
+                const float falling = c.motion().velocity.dot(up);
+                if (falling < 0) c.edit_motion().velocity = c.edit_motion().velocity - up * falling;
             } else {
                 if (facing < -floor_cos) c.edit_motion().on_ceiling = true; else c.edit_motion().on_wall = true;
-                world.origin = world.origin + contact.normal * (contact.depth + 0.0005f);
+                world.origin = world.origin + contact.normal * (contact.depth + skin);
                 const float into = c.motion().velocity.dot(contact.normal);
                 if (into < 0) c.edit_motion().velocity = c.edit_motion().velocity - contact.normal * into;
             }
             Live& o = nodes_[size_t(other)];
-            if (o.d.type == NodeType::RigidBody3D && !o.d.more().freeze) {
+            if (physics::is_rigid(o.d.type) && !o.d.more().freeze) {
                 const Vec3 push = -contact.normal;
                 const float wanted = std::max(0.0f, moving.dot(push));
                 const float current = o.motion().velocity.dot(push);
-                if (wanted > current) o.edit_motion().velocity = o.edit_motion().velocity + push * ((wanted - current) * 0.8f + 0.2f);
+                if (wanted > current) o.edit_motion().velocity = o.edit_motion().velocity + push * ((wanted - current) * 0.8f + 0.2f * space.unit);
                 wake(o);
             }
             move_body(index, world, false);
+            moved = {}; // pushed out: what's left is no longer a fall onto one-way shapes
         }
     };
     const Vec3 motion = c.motion().velocity * physics_delta_;
-    const int steps = std::clamp(int(std::ceil(motion.length() / std::max(0.02f, smallest * 0.5f))), 1, 8);
+    const int steps = std::clamp(int(std::ceil(motion.length() / std::max(0.02f * space.unit, smallest * 0.5f))), 1, 8);
+    const Vec3 step = motion * (1.0f / float(steps));
     for (int s = 0; s < steps; ++s) {
-        world.origin = world.origin + motion * (1.0f / float(steps));
+        world.origin = world.origin + step;
         move_body(index, world, false);
-        resolve();
+        resolve(step);
     }
     // Snap to the floor when walking down slopes and steps (not while jumping).
-    if (was_on_floor && !c.motion().on_floor && c.motion().velocity.dot(up) <= 0.01f) {
+    if (was_on_floor && !c.motion().on_floor && c.motion().velocity.dot(up) <= 0.01f * space.unit) {
         const Transform before = world;
         const bool wall = c.motion().on_wall, ceiling = c.motion().on_ceiling;
-        world.origin.y -= 0.2f;
+        world.origin = world.origin - up * space.snap;
         move_body(index, world, false);
-        resolve();
+        resolve(-up * space.snap);
         if (!c.motion().on_floor) {
             world = before;
             move_body(index, world, false);
@@ -382,11 +412,11 @@ bool Runtime::move_and_slide(int index) {
 // Rigid bodies: integrate, then resolve contacts (positions and velocities).
 void Runtime::physics_step(float dt) {
     if (!physics_->valid) physics_begin();
-    const Vec3 gravity{0, -physics::Gravity, 0};
     for (size_t i = 0; i < nodes_.size(); ++i) {
         Live& r = nodes_[i];
-        if (r.freed || r.d.type != NodeType::RigidBody3D || r.d.more().freeze) continue;
+        if (r.freed || !r.in_tree || !physics::is_rigid(r.d.type) || r.d.more().freeze) continue;
         if (r.motion().sleeping && r.motion().force.dot(r.motion().force) == 0) continue;
+        const Vec3 gravity = physics::space_of(r.d.type).gravity;
         const float inv_mass = 1.0f / std::max(r.d.more().mass, 0.001f);
         r.edit_motion().velocity = r.edit_motion().velocity + (gravity * r.d.more().gravity_scale + r.edit_motion().force * inv_mass) * dt;
         r.edit_motion().force = {};
@@ -402,20 +432,23 @@ void Runtime::physics_step(float dt) {
     for (int iteration = 0; iteration < 4; ++iteration) {
         for (size_t k = 0; k < shapes.size(); ++k) {
             const physics::Shape& a = shapes[k];
-            if (a.owner != NodeType::RigidBody3D) continue;
+            if (!physics::is_rigid(a.owner)) continue;
             const size_t i = size_t(a.body);
             Live& r = nodes_[i];
-            if (r.freed || r.d.more().freeze || r.motion().sleeping) continue;
+            if (r.freed || !r.in_tree || r.d.more().freeze || r.motion().sleeping) continue;
+            const physics::Space& space = physics::space_of(a.owner);
+            const float unit = space.unit;
             for (size_t m = 0; m < shapes.size(); ++m) {
                 const physics::Shape& b = shapes[m];
-                if (b.body == int(i) || b.owner == NodeType::Area3D || !physics::masks_match(a, b) || !physics::overlap_bounds(a, b)) continue;
+                if (b.body == int(i) || physics::is_area(b.owner) || !physics::masks_match(a, b) || !physics::overlap_bounds(a, b)) continue;
                 Live& o = nodes_[size_t(b.body)];
                 if (o.freed) continue;
                 physics::Contact c;
                 if (!physics::collide(a, b, c)) continue;
-                const bool dynamic = o.d.type == NodeType::RigidBody3D && !o.d.more().freeze;
+                if (b.one_way && !one_way_blocks(b, c, r.motion().velocity * dt)) continue;
+                const bool dynamic = physics::is_rigid(o.d.type) && !o.d.more().freeze;
                 const float inv_a = 1.0f / std::max(r.d.more().mass, 0.001f), inv_b = dynamic ? 1.0f / std::max(o.d.more().mass, 0.001f) : 0;
-                const float correction = std::max(c.depth - 0.002f, 0.0f) * 0.8f / (inv_a + inv_b);
+                const float correction = std::max(c.depth - 0.002f * unit, 0.0f) * 0.8f / (inv_a + inv_b);
                 Transform wa = r.world;
                 wa.origin = wa.origin + c.normal * (correction * inv_a);
                 move_body(int(i), wa, false);
@@ -424,22 +457,22 @@ void Runtime::physics_step(float dt) {
                     wb.origin = wb.origin - c.normal * (correction * inv_b);
                     move_body(b.body, wb, false);
                     // Only a moving body or a real overlap wakes the other one, so resting stacks can sleep.
-                    if (o.motion().sleeping && (r.motion().velocity.dot(r.motion().velocity) > 0.0025f || c.depth > 0.01f)) wake(o);
+                    if (o.motion().sleeping && (r.motion().velocity.dot(r.motion().velocity) > 0.0025f * unit * unit || c.depth > 0.01f * unit)) wake(o);
                 }
                 // Kinematic characters push with their velocity; static bodies are still.
-                const Vec3 other_velocity = dynamic || o.d.type == NodeType::CharacterBody3D ? o.motion().velocity : Vec3{};
+                const Vec3 other_velocity = dynamic || physics::is_character(o.d.type) ? o.motion().velocity : Vec3{};
                 const Vec3 relative = r.motion().velocity - other_velocity;
                 const float vn = relative.dot(c.normal);
                 if (vn < 0) {
                     // Godot's PhysicsMaterial combine: bounces add up to at most 1, friction takes the smaller one.
                     float e = std::min(1.0f, r.d.more().bounce + o.d.more().bounce);
-                    if (-vn < 0.6f) e = 0; // resting contact: no jitter
+                    if (-vn < 0.6f * unit) e = 0; // resting contact: no jitter
                     const float j = -(1 + e) * vn / (inv_a + inv_b);
                     r.edit_motion().velocity = r.edit_motion().velocity + c.normal * (j * inv_a);
                     if (dynamic) o.edit_motion().velocity = o.edit_motion().velocity - c.normal * (j * inv_b);
                     const Vec3 tangent = relative - c.normal * vn;
                     const float slip = tangent.length();
-                    if (slip > 1e-4f) {
+                    if (slip > 1e-4f * unit) {
                         const float mu = std::max(0.0f, std::min(r.d.more().friction, o.d.more().friction));
                         const float jt = std::min(slip / (inv_a + inv_b), mu * j);
                         const Vec3 t = tangent * (1.0f / slip);
@@ -447,16 +480,17 @@ void Runtime::physics_step(float dt) {
                         if (dynamic) o.edit_motion().velocity = o.edit_motion().velocity + t * (jt * inv_b);
                     }
                 }
-                // Spheres roll on what they stand on (no slipping).
-                if (a.kind == CollisionKind::Sphere && c.normal.y > 0.5f && a.radius > 0)
+                // Spheres (circles) roll on what they stand on (no slipping).
+                if (a.kind == CollisionKind::Sphere && c.normal.dot(space.up) > 0.5f && a.radius > 0)
                     r.edit_motion().angular = c.normal.cross(r.edit_motion().velocity - other_velocity) * (1.0f / a.radius);
             }
         }
     }
     // Sleep after half a second (almost) at rest.
     for (auto& r : nodes_) {
-        if (r.freed || r.d.type != NodeType::RigidBody3D || r.d.more().freeze || r.motion().sleeping) continue;
-        if (r.motion().velocity.dot(r.motion().velocity) < 0.0025f && r.motion().angular.dot(r.motion().angular) < 0.01f) {
+        if (r.freed || !r.in_tree || !physics::is_rigid(r.d.type) || r.d.more().freeze || r.motion().sleeping) continue;
+        const float unit = physics::space_of(r.d.type).unit;
+        if (r.motion().velocity.dot(r.motion().velocity) < 0.0025f * unit * unit && r.motion().angular.dot(r.motion().angular) < 0.01f) {
             r.edit_motion().still_time += dt;
             if (r.motion().still_time > 0.5f) {
                 r.edit_motion().sleeping = true;
@@ -469,38 +503,49 @@ void Runtime::physics_step(float dt) {
     update_areas();
 }
 
-// Calls _on_body_entered/_on_body_exited on the area's script, Godot's default names for connected signals.
+// Emits body_entered/body_exited and area_entered/area_exited, and calls the area script's _on_body_entered...
+// (Godot's default names for connected signals) unless that same method is connected.
 void Runtime::update_areas() {
     const auto& shapes = physics_->shapes;
     for (size_t i = 0; i < nodes_.size(); ++i) {
         Live& area = nodes_[i];
-        if (area.freed || area.d.type != NodeType::Area3D) continue;
-        std::vector<uint32_t> inside;
+        if (area.freed || !area.in_tree || !physics::is_area(area.d.type)) continue;
+        std::vector<uint32_t> bodies, areas;
         if (area.d.more().monitoring) {
             for (const auto& a : shapes) {
                 if (a.body != int(i)) continue;
                 for (const auto& b : shapes) {
-                    if (b.body == int(i) || !physics::is_body(b.owner) || !(a.mask & b.layer) || !physics::overlap_bounds(a, b)) continue;
-                    const Live& body = nodes_[size_t(b.body)];
-                    if (body.freed || std::find(inside.begin(), inside.end(), body.d.id) != inside.end()) continue;
+                    if (b.body == int(i) || a.flat != b.flat || !(a.mask & b.layer) || !physics::overlap_bounds(a, b)) continue;
+                    const Live& other = nodes_[size_t(b.body)];
+                    auto& inside = physics::is_area(b.owner) ? areas : bodies;
+                    if (other.freed || std::find(inside.begin(), inside.end(), other.d.id) != inside.end()) continue;
                     physics::Contact c;
-                    if (physics::collide(a, b, c)) inside.push_back(body.d.id);
+                    if (physics::collide(a, b, c)) inside.push_back(other.d.id);
                 }
             }
         }
-        const std::vector<uint32_t> before = area.motion().overlaps;
-        area.edit_motion().overlaps = inside;
-        if (!playing_ || !vm_->has_instance(area.d.id)) continue;
-        for (uint32_t id : inside)
-            if (std::find(before.begin(), before.end(), id) == before.end()) {
-                const jetscript::Value body = jetscript::Value::object(id);
-                vm_->call(area.d.id, "_on_body_entered", &body, 1);
-            }
-        for (uint32_t id : before)
-            if (std::find(inside.begin(), inside.end(), id) == inside.end()) {
-                const jetscript::Value body = jetscript::Value::object(id);
-                vm_->call(area.d.id, "_on_body_exited", &body, 1);
-            }
+        const std::vector<uint32_t> bodies_before = area.motion().overlaps, areas_before = area.motion().areas;
+        area.edit_motion().overlaps = bodies;
+        area.edit_motion().areas = areas;
+        // The callbacks may add nodes, which can move nodes_: from here on, only the area's id.
+        const uint32_t area_id = area.d.id;
+        if (!playing_) continue;
+        const bool scripted = vm_->has_instance(area_id), connected = vm_->has_connections(area_id);
+        if (!scripted && !connected) continue;
+        auto send = [&](uint32_t id, const char* signal) {
+            const jetscript::Value other = jetscript::Value::object(id);
+            const std::string callback = std::string("_on_") + signal;
+            if (scripted && !(connected && vm_->is_connected(area_id, signal, area_id, callback))) vm_->call(area_id, callback, &other, 1);
+            if (connected) vm_->emit_signal(area_id, signal, &other, 1);
+        };
+        auto notify = [&](const std::vector<uint32_t>& now, const std::vector<uint32_t>& before, const char* entered, const char* exited) {
+            for (uint32_t id : now)
+                if (std::find(before.begin(), before.end(), id) == before.end()) send(id, entered);
+            for (uint32_t id : before)
+                if (std::find(now.begin(), now.end(), id) == now.end()) send(id, exited);
+        };
+        notify(bodies, bodies_before, "body_entered", "body_exited");
+        notify(areas, areas_before, "area_entered", "area_exited");
     }
 }
 
@@ -514,8 +559,12 @@ void Runtime::physics_tick(float dt) {
         physics_begin();
     }
     const jetscript::Value delta(dt);
-    for (auto& n : nodes_)
-        if (!n.freed && n.d.script >= 0 && vm_->has_instance(n.d.id)) vm_->call(n.d.id, "_physics_process", &delta, 1);
+    for (size_t i = 0; i < nodes_.size(); ++i) {
+        const Live& n = nodes_[i];
+        if (n.freed || !n.in_tree || n.d.script < 0) continue;
+        const uint32_t id = n.d.id;
+        if (vm_->has_instance(id)) vm_->call(id, "_physics_process", &delta, 1);
+    }
     flush_script_errors();
     if (has_physics_) {
         // Scripts may have moved bodies through their properties.

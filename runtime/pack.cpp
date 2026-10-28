@@ -6,7 +6,7 @@
 // Scripts travel as bytecode so devices only need the VM. Everything is validated again after decoding.
 namespace jetstudio {
 namespace {
-constexpr uint32_t Magic = 0x5054454a, Version = 14;
+constexpr uint32_t Magic = 0x5054454a, Version = 16;
 
 struct Writer {
     std::vector<uint8_t> out;
@@ -28,6 +28,7 @@ struct Writer {
         case Type::Float: f32(v.as_real()); return true;
         case Type::String: str(v.as_string()); return true;
         case Type::Vector3: { const auto x = v.as_vector3(); f32(x.x); f32(x.y); f32(x.z); return true; }
+        case Type::Vector2: { const auto x = v.as_vector2(); f32(x.x); f32(x.y); return true; }
         case Type::Color: { const auto c = v.as_color(); f32(c.r); f32(c.g); f32(c.b); return true; }
         case Type::Array:
             u32(uint32_t(v.array_size()));
@@ -83,6 +84,7 @@ struct Reader {
         case Type::Float: return jetscript::Value(f32());
         case Type::String: return jetscript::Value(str(4096));
         case Type::Vector3: { const auto v = vec(); return jetscript::Value(jetscript::Vector3{v.x, v.y, v.z}); }
+        case Type::Vector2: { const float x = f32(); return jetscript::Value(jetscript::Vector2{x, f32()}); }
         case Type::Color: { const auto v = vec(); return jetscript::Value(jetscript::Color{v.x, v.y, v.z}); }
         case Type::Array: {
             const uint32_t n = u32();
@@ -142,7 +144,7 @@ std::vector<uint8_t> encode_pack(const Description& d, std::string& error) {
         w.u32(uint32_t(m.indices.size()));
         for (uint16_t i : m.indices) w.u16(i);
     }
-    auto write_nodes = [&](const std::vector<NodeDesc>& nodes) {
+    auto write_nodes = [&](const std::vector<NodeDesc>& nodes, const std::vector<SceneConnection>& connections) {
         w.u32(uint32_t(nodes.size()));
         for (const auto& n : nodes) {
             w.u32(n.id); w.u32(uint32_t(n.parent)); w.u8(uint8_t(n.type)); w.str(n.name);
@@ -157,7 +159,7 @@ std::vector<uint8_t> encode_pack(const Description& d, std::string& error) {
             w.u32(uint32_t(n.more().sky_texture));
             w.f32(n.diffuse); w.u32(uint32_t(n.mesh)); w.str(n.more().text); w.vec(n.more().size); w.u8(n.more().text_scale);
             w.u8(uint8_t(n.more().collision)); w.vec(n.more().box_size); w.f32(n.more().radius); w.f32(n.more().height);
-            w.u8(uint8_t((n.more().disabled ? 1 : 0) | (n.more().freeze ? 2 : 0) | (n.more().monitoring ? 4 : 0)));
+            w.u8(uint8_t((n.more().disabled ? 1 : 0) | (n.more().freeze ? 2 : 0) | (n.more().monitoring ? 4 : 0) | (n.more().one_way ? 8 : 0)));
             w.u32(n.more().collision_layer); w.u32(n.more().collision_mask);
             w.f32(n.more().mass); w.f32(n.more().gravity_scale); w.f32(n.more().linear_damp); w.f32(n.more().angular_damp); w.f32(n.more().friction); w.f32(n.more().bounce);
             w.vec(n.more().linear_velocity); w.vec(n.more().angular_velocity); w.f32(n.more().floor_max_angle);
@@ -167,6 +169,9 @@ std::vector<uint8_t> encode_pack(const Description& d, std::string& error) {
             w.u8(uint8_t(n.more().particle_style)); w.u8(uint8_t(n.more().emission_shape)); w.f32(n.more().emission_radius); w.vec(n.more().emission_box);
             w.u32(n.more().color_end); w.f32(n.more().puff_size); w.f32(n.more().puff_size_end);
             w.u16(n.hframes); w.u16(n.vframes); w.u16(n.frame); w.u8(uint8_t((n.flip_h ? 1 : 0) | (n.flip_v ? 2 : 0))); w.f32(n.pixel_size);
+            w.u16(uint16_t(n.z_index)); w.u8(n.centered ? 1 : 0); w.f32(n.offset[0]); w.f32(n.offset[1]);
+            w.str(n.more().animations); w.str(n.more().animation); w.f32(n.more().speed_scale); w.u8(n.more().autoplay ? 1 : 0);
+            w.f32(n.more().zoom[0]); w.f32(n.more().zoom[1]);
             w.u32(uint32_t(n.script));
             w.u32(uint32_t(n.overrides.size()));
             for (const auto& o : n.overrides) {
@@ -174,14 +179,18 @@ std::vector<uint8_t> encode_pack(const Description& d, std::string& error) {
                 if (!w.value(o.value)) { error = "Value not exportable in " + n.name + "." + o.name; return false; }
             }
         }
+        w.u32(uint32_t(connections.size()));
+        for (const auto& c : connections) {
+            w.u32(uint32_t(c.from)); w.u32(uint32_t(c.to)); w.str(c.signal); w.str(c.method); w.u32(c.flags);
+        }
         return true;
     };
     w.str(d.path);
-    if (!write_nodes(d.nodes)) return {};
+    if (!write_nodes(d.nodes, d.connections)) return {};
     w.u32(uint32_t(d.scenes.size()));
     for (const auto& scene : d.scenes) {
         w.str(scene.path);
-        if (!write_nodes(scene.nodes)) return {};
+        if (!write_nodes(scene.nodes, scene.connections)) return {};
     }
     w.u8(uint8_t(d.autoloads.size()));
     for (const auto& a : d.autoloads) {
@@ -192,7 +201,7 @@ std::vector<uint8_t> encode_pack(const Description& d, std::string& error) {
 }
 #endif
 
-static bool read_nodes(Reader& r, std::vector<NodeDesc>& nodes, std::string& error) {
+static bool read_nodes(Reader& r, std::vector<NodeDesc>& nodes, std::vector<SceneConnection>& connections, std::string& error) {
     const uint32_t count = r.u32();
     if (count > MaxNodes) { error = "Too many nodes in the package."; return false; }
     nodes.reserve(count); // no doubling: a whole scene's nodes at once
@@ -223,10 +232,11 @@ static bool read_nodes(Reader& r, std::vector<NodeDesc>& nodes, std::string& err
         e.box_size = r.vec(); e.radius = r.f32(); e.height = r.f32();
         const uint8_t physics_flags = r.u8();
         e.disabled = physics_flags & 1; e.freeze = (physics_flags & 2) != 0; e.monitoring = (physics_flags & 4) != 0;
+        e.one_way = (physics_flags & 8) != 0;
         e.collision_layer = r.u32(); e.collision_mask = r.u32();
         e.mass = r.f32(); e.gravity_scale = r.f32(); e.linear_damp = r.f32(); e.angular_damp = r.f32(); e.friction = r.f32(); e.bounce = r.f32();
         e.linear_velocity = r.vec(); e.angular_velocity = r.vec(); e.floor_max_angle = r.f32();
-        if (collision > uint8_t(CollisionKind::Capsule) || physics_flags > 7) r.ok = false;
+        if (collision > uint8_t(CollisionKind::Capsule) || physics_flags > 15) r.ok = false;
         e.collision = CollisionKind(collision);
         const uint8_t particle_flags = r.u8();
         e.emitting = particle_flags & 1; e.one_shot = (particle_flags & 2) != 0; e.additive = (particle_flags & 4) != 0;
@@ -245,9 +255,18 @@ static bool read_nodes(Reader& r, std::vector<NodeDesc>& nodes, std::string& err
         n.flip_h = sprite_flags & 1; n.flip_v = (sprite_flags & 2) != 0;
         n.pixel_size = r.f32();
         if (sprite_flags > 3) r.ok = false;
+        n.z_index = int16_t(r.u16());
+        const uint8_t centered = r.u8();
+        n.centered = centered == 1;
+        n.offset[0] = r.f32(); n.offset[1] = r.f32();
+        e.animations = r.str(MaxText); e.animation = r.str(256); e.speed_scale = r.f32();
+        const uint8_t autoplay = r.u8();
+        e.autoplay = autoplay == 1;
+        e.zoom[0] = r.f32(); e.zoom[1] = r.f32();
+        if (centered > 1 || autoplay > 1) r.ok = false;
         n.script = int32_t(r.u32());
         const uint32_t overrides = r.u32();
-        if (type > uint8_t(NodeType::Control) || shape > uint8_t(Shape::Mesh) || shading > uint8_t(Shading::Water)
+        if (type > uint8_t(NodeType::Timer) || shape > uint8_t(Shape::Mesh) || shading > uint8_t(Shading::Water)
             || cull > uint8_t(CullMode::Disabled) || draw_order > uint8_t(DrawOrder::OnTop)
             || background > uint8_t(Background::Panorama) || flags > 31
             || visible > 1 || current > 1 || overrides > 256) { error = "Invalid node in the package."; return false; }
@@ -263,6 +282,17 @@ static bool read_nodes(Reader& r, std::vector<NodeDesc>& nodes, std::string& err
         if (uses_extras(n.type)) n.extras() = std::move(e);
         nodes.push_back(std::move(n));
     }
+    const uint32_t links = r.u32();
+    if (links > MaxConnections) { error = "Too many signal connections in a scene."; return false; }
+    connections.clear();
+    connections.reserve(links);
+    for (uint32_t i = 0; i < links && r.ok; ++i) {
+        SceneConnection c;
+        c.from = int32_t(r.u32()); c.to = int32_t(r.u32());
+        c.signal = r.str(80); c.method = r.str(80);
+        c.flags = r.u32();
+        connections.push_back(std::move(c));
+    }
     return true;
 }
 
@@ -270,7 +300,7 @@ bool decode_pack(const uint8_t* data, size_t size, Description& out, std::string
     error.clear();
     if (!data || size < 12) { error = "Truncated package."; return false; }
     Reader r{data, size};
-    if (r.u32() != Magic || r.u32() != Version) { error = "Unsupported JETP format (expected version 14): export the project again."; return false; }
+    if (r.u32() != Magic || r.u32() != Version) { error = "Unsupported JETP format (expected version 16): export the project again."; return false; }
     Description d;
     d.name = r.str(256);
     d.width = r.u16();
@@ -341,14 +371,14 @@ bool decode_pack(const uint8_t* data, size_t size, Description& out, std::string
     }
     d.path = r.str(512);
     d.nodes_offset = uint32_t(r.p - data);
-    if (!read_nodes(r, d.nodes, error)) return false;
+    if (!read_nodes(r, d.nodes, d.connections, error)) return false;
     const uint32_t scenes = r.u32();
     if (scenes > MaxScenes) { error = "Too many scenes in the package."; return false; }
     for (uint32_t i = 0; i < scenes && r.ok; ++i) {
         SceneDesc scene;
         scene.path = r.str(512);
         scene.offset = uint32_t(r.p - data);
-        if (!read_nodes(r, scene.nodes, error)) return false;
+        if (!read_nodes(r, scene.nodes, scene.connections, error)) return false;
         d.scenes.push_back(std::move(scene));
     }
     const uint8_t autoloads = r.u8();
@@ -376,12 +406,13 @@ bool pack_resolution(const uint8_t* data, size_t size, int& width, int& height) 
     return r.ok;
 }
 
-bool decode_nodes(const uint8_t* data, size_t size, uint32_t offset, std::vector<NodeDesc>& nodes, std::string& error) {
+bool decode_nodes(const uint8_t* data, size_t size, uint32_t offset, std::vector<NodeDesc>& nodes,
+                  std::vector<SceneConnection>& connections, std::string& error) {
     error.clear();
     nodes.clear();
     if (!data || offset >= size) { error = "Truncated package."; return false; }
     Reader r{data + offset, size - offset};
-    if (!read_nodes(r, nodes, error)) return false;
+    if (!read_nodes(r, nodes, connections, error)) return false;
     if (!r.ok) { error = "Truncated package."; return false; }
     return true;
 }

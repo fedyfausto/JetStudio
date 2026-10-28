@@ -125,6 +125,11 @@ public:
                           {"current", Type::Bool, false}};
         cam.methods = {{"make_current", 0, 0, Type::Nil}};
         classes["Camera3D"] = cam;
+        ClassInfo timer;
+        timer.name = "Timer";
+        timer.base = "Node";
+        timer.signals = {{"timeout", {}}};
+        classes["Timer"] = timer;
         ClassInfo in;
         in.name = "Input";
         in.methods = {{"is_action_pressed", 1, 1, Type::Bool},
@@ -744,6 +749,34 @@ static void test_operators(Fixture& fx) {
     CHECK_EQ(evs(fx, "Color(0.5, 0.5, 0.5) * 2"), std::string("(1, 1, 1, 1)"));
     CHECK_EQ(evs(fx, "Color(1, 1, 1) - Color(0.5, 0, 0.25)"), std::string("(0.5, 1, 0.75, 1)"));
     CHECK(ev(fx, "Vector3(1, 2, 3) == Vector3(1, 2, 3)").as_bool());
+
+    // Vector2: Godot's 2D conventions (y down)
+    CHECK_EQ(evs(fx, "Vector2(1, 2) + Vector2(3, 4)"), std::string("(4.0, 6.0)"));
+    CHECK_EQ(evs(fx, "Vector2(1, 2) * 2"), std::string("(2.0, 4.0)"));
+    CHECK_EQ(evs(fx, "2 * Vector2(1, 2)"), std::string("(2.0, 4.0)"));
+    CHECK_EQ(evs(fx, "Vector2(4, 2) / Vector2(2, 2)"), std::string("(2.0, 1.0)"));
+    CHECK_EQ(evs(fx, "-Vector2(1, -2)"), std::string("(-1.0, 2.0)"));
+    CHECK_EQ(evs(fx, "Vector2.UP"), std::string("(0.0, -1.0)"));
+    CHECK_EQ(evs(fx, "Vector2()"), std::string("(0.0, 0.0)"));
+    CHECK_EQ(evs(fx, "typeof(Vector2(1, 2))"), std::string("Vector2"));
+    CHECK_EQ(evs(fx, "Vector2(3, 4).normalized()"), std::string("(0.6, 0.8)"));
+    CHECK(ev(fx, "Vector2.RIGHT.rotated(PI / 2).is_equal_approx(Vector2.DOWN)").as_bool());
+    CHECK_EQ(evs(fx, "Vector2(1, 2).orthogonal()"), std::string("(2.0, -1.0)"));
+    CHECK_EQ(evs(fx, "Vector2(0, 0).move_toward(Vector2(10, 0), 3)"), std::string("(3.0, 0.0)"));
+    CHECK_EQ(evs(fx, "clamp(Vector2(5, -5), Vector2(0, 0), Vector2(2, 2))"), std::string("(2.0, 0.0)"));
+    CHECK_EQ(evs(fx, "lerp(Vector2(0, 0), Vector2(2, 4), 0.5)"), std::string("(1.0, 2.0)"));
+    CHECK_EQ(evs(fx, "abs(Vector2(-1, 2))"), std::string("(1.0, 2.0)"));
+    CHECK(std::fabs(ev(fx, "Vector2(3, 4).length()").as_real() - 5) < 1e-5f);
+    CHECK(std::fabs(ev(fx, "Vector2(0, 1).angle()").as_real() - 3.14159265f / 2) < 1e-5f);
+    CHECK(std::fabs(ev(fx, "Vector2(1, 0).angle_to(Vector2(0, 1))").as_real() - 3.14159265f / 2) < 1e-5f);
+    CHECK(std::fabs(ev(fx, "Vector2(1, 0).dot(Vector2(0, 1))").as_real()) < 1e-6f);
+    CHECK(ev(fx, "Vector2(1, 2) == Vector2(1, 2)").as_bool());
+    CHECK(!ev(fx, "Vector2(1, 2) == Vector3(1, 2, 0)").as_bool());
+    CHECK(ev(fx, "Vector2(1, 2) is Vector2").as_bool());
+    CHECK_EQ(run_body(fx, "var v := Vector2(1, 2)\nv.x += 5\nv[1] = 7\nreturn v").to_string(), std::string("(6.0, 7.0)"));
+    CHECK_EQ(run_body(fx, "var v := Vector2(1, 2)\nreturn v.y").to_string(), std::string("2.0"));
+    CHECK_EQ(run_body(fx, "const V := Vector2(2, 3) * 2\nreturn V.x + V.y").to_string(), std::string("10.0"));
+    CHECK_EQ(run_body(fx, "var d := {Vector2(1, 1): \"a\"}\nreturn d[Vector2(1, 1)]").to_string(), std::string("a"));
     CHECK(ev(fx, "[1, [2]] == [1, [2]]").as_bool());
     CHECK(ev(fx, "{\"a\": 1} == {\"a\": 1.0}").as_bool());
     CHECK(ev(fx, "1.0 / 0 == INF").as_bool());
@@ -1303,12 +1336,20 @@ static void test_compile_errors(Fixture& fx) {
         {"extends Node\nfunc f():\n\tif true:\n\tpass\n", 4, 2, "Expected indented block after \"if\"."},
         {"extends Node\nfunc f():\n\t\tpass\n\t  pass\n", 4, 1, "Mixed use of tabs and spaces"},
         {"extends Node\nfunc f():\n        pass\n    pass\n", 4, 5, "Unindent doesn't match the previous indentation level."},
-        {"extends Node\nsignal hit\n", 2, 1, "Signals (\"signal\") are not supported yet in JetScript."},
+        {"extends Node\nfunc f():\n\tsignal hit\n", 3, 2, "Signals can only be declared at the top level of the script."},
+        {"extends Node\nsignal hit\nfunc f():\n\thit()\n", 4, 2, "\"hit\" is a signal: emit it with \"hit.emit()\"."},
+        {"extends Node\nvar hit\nsignal hit\n", 3, 8, "The member \"hit\" already exists in this script"},
+        {"extends Node\nsignal hit(a = 1)\n", 2, 14, "Signal parameters can't have default values."},
+        {"extends Node\nsignal hit\nfunc f():\n\thit = 1\n", 4, 2, "Cannot assign a new value to a signal."},
+        {"extends Node\nsignal hit\nfunc f():\n\thit.call()\n", 4, 6, "Function \"call()\" not found in base Signal."},
+        {"extends Node\nfunc f():\n\tf.emit()\n", 3, 4, "Function \"emit()\" not found in base Callable."},
+        {"extends Node\nsignal hit\nfunc f():\n\thit.connect()\n", 4, 6, "Invalid call to function \"connect()\" in base Signal"},
+        {"extends Timer\nsignal timeout\n", 2, 8, "The signal \"timeout\" already exists in parent class Timer."},
         {"extends Node\nfunc f():\n\tawait g()\n", 3, 2, "\"await\" is not supported yet in JetScript."},
         {"extends Node\nclass_name Foo\n", 2, 1, "\"class_name\" is not supported yet in JetScript."},
         {"extends Node\nclass Inner:\n\tpass\n", 2, 1, "Inner classes (\"class\") are not supported yet in JetScript."},
         {"extends Node\nstatic func s():\n\tpass\n", 2, 1, "Static functions and variables (\"static\") are not supported yet"},
-        {"extends Node\nvar x = preload(\"res://a.jet\")\n", 2, 9, "\"preload\" is not supported yet in JetScript."},
+        {"extends Node\nvar x = preload\n", 2, 9, "\"preload\" needs a path: preload(\"res://scene.jetscene\")."},
         {"extends Node\nfunc f():\n\tvar l = func(): return 1\n", 3, 10, "Lambdas are not supported yet in JetScript."},
         {"extends Node\nfunc _ready():\n\tsuper()\n", 3, 2, "\"super\" is not supported yet in JetScript."},
         {"extends Node\nfunc f():\n\tbreakpoint\n", 3, 2, "\"breakpoint\" is not supported yet in JetScript."},
@@ -1332,7 +1373,7 @@ static void test_compile_errors(Fixture& fx) {
         {"extends Node\nfunc f():\n\t1 +\n", 3, 5, "Expected expression"},
         {"extends Node\nfunc f():\n\tposition.x = 1\n", 3, 2, "Identifier \"position\" not declared"},
         {"extends Node3D\nfunc f():\n\tvar c = Vector3.NOPE\n", 3, 18, "Cannot find member \"NOPE\" in base \"Vector3\"."},
-        {"extends Node\nfunc f():\n\tvar x = f\n", 3, 10, "Function references (Callables) are not supported yet"},
+        {"extends Node\nfunc f():\n\tvar x = print\n", 3, 10, "Built-in functions can't be used as Callables yet"},
         {"extends Node\nfunc f():\n\tvar x = 1\n\tx()\n", 4, 2, "\"x\" is a variable and can't be called"},
         {"extends Node\nfunc f(a = 1, b):\n\tpass\n", 2, 15, "Cannot have mandatory parameters after optional parameters."},
         {"extends Node\nenum E { A = \"x\" }\n", 2, 10, "Enum values must be constant integers"},
@@ -1688,6 +1729,150 @@ static const char* kFuzzSources[] = {
     "\tvar s = \"\"\"multi\nline\"\"\" + 'q\\n' + \"\\u00e9\"\n\treturn s if not a.is_empty() else null\n"),
 };
 
+static void test_signals(Fixture& fx) {
+    auto emitter = compile_ok(fx.host,
+                              "extends Node3D\n"
+                              "signal health_changed(old_value, new_value: int)\n"
+                              "signal died\n"
+                              "var health := 3\n"
+                              "func hit():\n"
+                              "\tvar old = health\n"
+                              "\thealth -= 1\n"
+                              "\thealth_changed.emit(old, health)\n"
+                              "\tif health == 0:\n"
+                              "\t\temit_signal(\"died\")\n",
+                              "res://emitter.jet");
+    auto listener = compile_ok(fx.host,
+                               "extends Node3D\n"
+                               "var log = []\n"
+                               "var player\n"
+                               "func _ready():\n"
+                               "\tplayer = $\"../Player\"\n"
+                               "\tplayer.health_changed.connect(_on_health)\n"
+                               "\tplayer.connect(\"died\", _on_died, CONNECT_ONE_SHOT)\n"
+                               "\t$\"../Timer\".timeout.connect(_on_timeout)\n"
+                               "func _on_health(a, b):\n"
+                               "\tlog.append([a, b])\n"
+                               "func _on_died():\n"
+                               "\tlog.append(\"died\")\n"
+                               "func _on_timeout():\n"
+                               "\tlog.append(\"tick\")\n"
+                               "func state():\n"
+                               "\treturn [player.is_connected(\"died\", _on_died), player.health_changed.is_connected(_on_health),\n"
+                               "\t\tplayer.has_signal(\"died\"), player.has_signal(\"nope\"), has_signal(\"died\")]\n"
+                               "func drop():\n"
+                               "\tplayer.health_changed.disconnect(_on_health)\n",
+                               "res://listener.jet");
+    if (!emitter || !listener) return;
+    CHECK_EQ(emitter->signals().size(), size_t(2));
+    CHECK(emitter->signals()[0].name == "health_changed" && emitter->signals()[0].arguments.size() == 2 &&
+          emitter->signals()[0].arguments[1] == "new_value");
+    const ObjectId timer = fx.host.create("Timer", "Timer", fx.world);
+    CHECK(fx.vm.attach(fx.player, emitter));
+    CHECK(fx.vm.attach(fx.target, listener));
+    CHECK(fx.vm.ready(fx.target));
+    CHECK(fx.vm.has_connections(fx.player) && fx.vm.has_connections(timer) && !fx.vm.has_connections(fx.target));
+    CHECK(fx.vm.is_connected(fx.player, "died", fx.target, "_on_died"));
+    for (int i = 0; i < 3; ++i) CHECK(fx.vm.call(fx.player, "hit"));
+    fx.vm.emit_signal(timer, "timeout");
+    Value log, state;
+    CHECK(fx.vm.get_member(fx.target, "log", log));
+    CHECK_EQ(log.to_string(), std::string("[[3, 2], [2, 1], [1, 0], \"died\", \"tick\"]"));
+    CHECK(fx.vm.call(fx.target, "state", nullptr, 0, &state));
+    CHECK_EQ(state.to_string(), std::string("[false, true, true, false, false]")); // one shot: gone after the first
+    CHECK(fx.vm.call(fx.target, "drop"));
+    CHECK(fx.vm.call(fx.player, "hit"));
+    CHECK(fx.vm.get_member(fx.target, "log", log) && log.array_size() == 5);
+    fx.vm.forget(fx.target);
+    CHECK(!fx.vm.has_connections(timer));
+    fx.vm.emit_signal(timer, "timeout");
+    CHECK(fx.vm.get_member(fx.target, "log", log) && log.array_size() == 5);
+    CHECK(fx.vm.take_errors().empty());
+
+    // The engine connects too; an error in one callee doesn't stop the others.
+    std::string error;
+    CHECK(fx.vm.connect(timer, "timeout", fx.target, "_on_timeout", 0, error));
+    CHECK(!fx.vm.connect(timer, "timeout", fx.target, "_on_timeout", 0, error) && contains(error, "already connected"));
+    CHECK(!fx.vm.connect(timer, "nope", fx.target, "_on_timeout", 0, error) && contains(error, "nonexistent signal 'nope'"));
+    CHECK(!fx.vm.connect(timer, "timeout", fx.target, "missing", 0, error) && contains(error, "has no method 'missing'"));
+    CHECK(fx.vm.connect(timer, "timeout", fx.target, "drop", 0, error)); // drop() fails: nothing is connected any more
+    CHECK(fx.vm.connect(timer, "timeout", fx.target, "queue_free", 0, error));
+    fx.vm.emit_signal(timer, "timeout");
+    auto errs = fx.vm.take_errors();
+    CHECK(errs.size() == 1 && contains(errs[0].message, "nonexistent connection"));
+    CHECK(fx.vm.get_member(fx.target, "log", log) && log.array_size() == 6);
+    CHECK(fx.host.obj(fx.target).queued);
+    fx.vm.detach(fx.player);
+    fx.vm.detach(fx.target);
+    fx.vm.clear();
+    CHECK(!fx.vm.has_connections(timer));
+
+    // Callables and Signals as values.
+    CHECK_EQ(evs(fx, "sum.call(1, 2, 3)"), std::string("6"));
+    CHECK_EQ(evs(fx, "Callable(self, \"sum\").callv([4, 5])"), std::string("9"));
+    CHECK_EQ(evs(fx, "[sum.get_method(), sum.get_object() == self, sum.is_valid(), sum.is_null(), sum is Callable]"),
+             std::string("[\"sum\", true, true, false, true]"));
+    CHECK_EQ(evs(fx, "[typeof(sum), sum == Callable(self, \"sum\"), sum != queue_free, str(sum)]"),
+             std::string("[\"Callable\", true, true, \"Player:<Node3D#5>::sum\"]"));
+    CHECK_EQ(evs(fx, "{sum: 1}.has(Callable(self, \"sum\"))"), std::string("true"));
+    CHECK_EQ(evs(fx, "Callable(self, \"nope\").is_valid()"), std::string("false"));
+    CHECK_EQ(run_body(fx, "return [hit.get_name(), hit.get_object() == self, hit is Signal, typeof(hit)]",
+                      "extends Node3D\nsignal hit\n").to_string(),
+             std::string("[\"hit\", true, true, \"Signal\"]"));
+    CHECK_EQ(run_body(fx, "return twice.call(4)", "extends Node3D\nfunc twice(x):\n\treturn x * 2\n").as_int(), Int(8));
+    CHECK_EQ(run_body(fx, "var c: Callable = twice\nvar s: Signal = hit\nreturn [c.call(1), s.get_name()]",
+                      "extends Node3D\nsignal hit\nfunc twice(x):\n\treturn x * 2\n").to_string(),
+             std::string("[2, \"hit\"]"));
+    CHECK_EQ(run_body(fx, "return $Label.queue_free.get_object() == $Label").to_string(), std::string("true"));
+
+    // Runtime errors.
+    auto err_of = [&](const std::string& body, const std::string& header = "extends Node3D\nsignal hit\n") {
+        std::string src = header + "func f():\n";
+        std::istringstream in(body);
+        std::string line;
+        while (std::getline(in, line)) src += "\t" + line + "\n";
+        fx.vm.forget(fx.player); // connections outlive the script instance, as they belong to the node
+        return run_error(fx, src).message;
+    };
+    CHECK(contains(err_of("emit_signal(\"nope\")"), "Can't emit non-existing signal \"nope\"."));
+    CHECK(contains(err_of("connect(\"hit\", f, CONNECT_DEFERRED)"), "CONNECT_DEFERRED is not supported yet"));
+    CHECK(contains(err_of("connect(\"hit\", f)\nconnect(\"hit\", f)"), "is already connected to given callable"));
+    CHECK(contains(err_of("hit.disconnect(f)"), "Attempt to disconnect a nonexistent connection"));
+    CHECK(contains(err_of("connect(\"hit\", 1)"), "Cannot convert argument 2 from int to Callable."));
+    CHECK(contains(err_of("var c = Callable(self, \"nope\")\nc.call()"), "Nonexistent function 'nope'"));
+    CHECK(contains(err_of("var s = hit\ns.call()"), "Nonexistent function 'call' in base 'Signal'"));
+    fx.vm.clear();
+
+    // A callee that emits again, and signals in saved bytecode.
+    auto chain = compile_ok(fx.host,
+                            "extends Node3D\n"
+                            "signal ping(n)\n"
+                            "var total = 0\n"
+                            "func _ready():\n"
+                            "\tping.connect(_on_ping)\n"
+                            "func _on_ping(n):\n"
+                            "\ttotal += n\n"
+                            "\tif n > 1:\n"
+                            "\t\tping.emit(n - 1)\n"
+                            "func start():\n"
+                            "\tping.emit(4)\n"
+                            "\treturn total\n",
+                            "res://chain.jet");
+    if (!chain) return;
+    std::vector<uint8_t> bytes = save_bytecode(*chain);
+    CompileResult loaded = load_bytecode(bytes.data(), bytes.size(), fx.host);
+    CHECK(loaded.script && loaded.errors.empty());
+    if (!loaded.script) return;
+    CHECK(loaded.script->signals().size() == 1 && loaded.script->signals()[0].arguments.size() == 1);
+    CHECK(fx.vm.attach(fx.cube, loaded.script) && fx.vm.ready(fx.cube));
+    Value total;
+    CHECK(fx.vm.call(fx.cube, "start", nullptr, 0, &total));
+    CHECK_EQ(total.as_int(), Int(10)); // 4 + 3 + 2 + 1
+    CHECK(fx.vm.take_errors().empty());
+    fx.vm.detach(fx.cube);
+    fx.vm.clear();
+}
+
 static void test_fuzz(Fixture& fx) {
     size_t compiled = 0;
     // every prefix of every sample
@@ -1945,6 +2130,10 @@ int main() {
         test_runtime_errors(fx);
         test_limits(fx);
         test_reentrancy(fx);
+    }
+    {
+        Fixture fx;
+        test_signals(fx);
     }
     {
         Fixture fx;

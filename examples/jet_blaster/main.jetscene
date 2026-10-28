@@ -1,0 +1,629 @@
+{
+	"format": "jetscene",
+	"version": 2,
+	"root": {
+		"id": 1,
+		"name": "Game",
+		"type": "Node2D",
+		"script": "res://scripts/game.jet",
+		"script_properties": {},
+		"children": [
+			{
+				"id": 32,
+				"name": "WorldEnvironment",
+				"type": "WorldEnvironment",
+				"background_color": 461594,
+				"children": []
+			},
+			{
+				"id": 33,
+				"name": "Camera2D",
+				"type": "Camera2D",
+				"position": [
+					160.0,
+					120.0
+				],
+				"children": []
+			},
+			{
+				"id": 34,
+				"name": "Stars",
+				"type": "Node2D",
+				"z_index": -10,
+				"script": "res://scripts/stars.jet",
+				"children": [
+					{
+						"id": 2,
+						"name": "Star0",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 0,
+						"position": [
+							76.14868066940524,
+							130.61501407102844
+						],
+						"children": []
+					},
+					{
+						"id": 3,
+						"name": "Star1",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 1,
+						"position": [
+							118.38565329538537,
+							144.94080926308666
+						],
+						"children": []
+					},
+					{
+						"id": 4,
+						"name": "Star2",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 2,
+						"position": [
+							200.2304973145773,
+							15.726926217555146
+						],
+						"children": []
+					},
+					{
+						"id": 5,
+						"name": "Star3",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 0,
+						"position": [
+							4.213757297559724,
+							200.9925797031504
+						],
+						"children": []
+					},
+					{
+						"id": 6,
+						"name": "Star4",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 1,
+						"position": [
+							82.99328458496245,
+							56.23943065120713
+						],
+						"children": []
+					},
+					{
+						"id": 7,
+						"name": "Star5",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 2,
+						"position": [
+							318.6063473633481,
+							112.8632418053875
+						],
+						"children": []
+					},
+					{
+						"id": 8,
+						"name": "Star6",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 0,
+						"position": [
+							267.6676644078044,
+							114.32477008784039
+						],
+						"children": []
+					},
+					{
+						"id": 9,
+						"name": "Star7",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 1,
+						"position": [
+							204.50180497413183,
+							36.14794176564574
+						],
+						"children": []
+					},
+					{
+						"id": 10,
+						"name": "Star8",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 2,
+						"position": [
+							203.1554106512603,
+							208.33087371439123
+						],
+						"children": []
+					},
+					{
+						"id": 11,
+						"name": "Star9",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 0,
+						"position": [
+							167.41798732265642,
+							177.90044548835766
+						],
+						"children": []
+					},
+					{
+						"id": 12,
+						"name": "Star10",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 1,
+						"position": [
+							214.85167211826962,
+							15.367545174479353
+						],
+						"children": []
+					},
+					{
+						"id": 13,
+						"name": "Star11",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 2,
+						"position": [
+							242.63367881178155,
+							141.86389990351623
+						],
+						"children": []
+					},
+					{
+						"id": 14,
+						"name": "Star12",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 0,
+						"position": [
+							96.40565104502795,
+							7.442820352739998
+						],
+						"children": []
+					},
+					{
+						"id": 15,
+						"name": "Star13",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 1,
+						"position": [
+							276.9687158332626,
+							113.45978127971205
+						],
+						"children": []
+					},
+					{
+						"id": 16,
+						"name": "Star14",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 2,
+						"position": [
+							230.02365570105698,
+							210.9150720613156
+						],
+						"children": []
+					},
+					{
+						"id": 17,
+						"name": "Star15",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 0,
+						"position": [
+							228.5214347555848,
+							221.06368022012987
+						],
+						"children": []
+					},
+					{
+						"id": 18,
+						"name": "Star16",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 1,
+						"position": [
+							126.38828928023806,
+							192.2181050364548
+						],
+						"children": []
+					},
+					{
+						"id": 19,
+						"name": "Star17",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 2,
+						"position": [
+							142.2787379362434,
+							224.54081320908506
+						],
+						"children": []
+					},
+					{
+						"id": 20,
+						"name": "Star18",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 0,
+						"position": [
+							281.23733130817334,
+							23.38903433541053
+						],
+						"children": []
+					},
+					{
+						"id": 21,
+						"name": "Star19",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 1,
+						"position": [
+							43.510035264214046,
+							52.07686589595296
+						],
+						"children": []
+					},
+					{
+						"id": 22,
+						"name": "Star20",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 2,
+						"position": [
+							308.95364444742495,
+							104.67884799058302
+						],
+						"children": []
+					},
+					{
+						"id": 23,
+						"name": "Star21",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 0,
+						"position": [
+							200.52745307737726,
+							72.24628762212129
+						],
+						"children": []
+					},
+					{
+						"id": 24,
+						"name": "Star22",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 1,
+						"position": [
+							162.31775482529906,
+							92.60790212277661
+						],
+						"children": []
+					},
+					{
+						"id": 25,
+						"name": "Star23",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 2,
+						"position": [
+							112.29135640645762,
+							140.41778577728724
+						],
+						"children": []
+					},
+					{
+						"id": 26,
+						"name": "Star24",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 0,
+						"position": [
+							186.96057375046365,
+							217.00842500346602
+						],
+						"children": []
+					},
+					{
+						"id": 27,
+						"name": "Star25",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 1,
+						"position": [
+							218.23428372318932,
+							222.9469442880041
+						],
+						"children": []
+					},
+					{
+						"id": 28,
+						"name": "Star26",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 2,
+						"position": [
+							274.0481812469618,
+							237.83751476851563
+						],
+						"children": []
+					},
+					{
+						"id": 29,
+						"name": "Star27",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 0,
+						"position": [
+							214.80753349200583,
+							39.14390927305674
+						],
+						"children": []
+					},
+					{
+						"id": 30,
+						"name": "Star28",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 1,
+						"position": [
+							275.40401059720585,
+							231.51190735417472
+						],
+						"children": []
+					},
+					{
+						"id": 31,
+						"name": "Star29",
+						"type": "Sprite2D",
+						"texture": "res://textures/stars.png",
+						"hframes": 3,
+						"frame": 2,
+						"position": [
+							289.5027150439157,
+							136.58580083383762
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"id": 35,
+				"name": "EnemyShots",
+				"type": "Node2D",
+				"z_index": 2,
+				"children": []
+			},
+			{
+				"id": 36,
+				"name": "Enemies",
+				"type": "Node2D",
+				"z_index": 1,
+				"children": []
+			},
+			{
+				"id": 37,
+				"name": "Bullets",
+				"type": "Node2D",
+				"z_index": 1,
+				"children": []
+			},
+			{
+				"id": 40,
+				"name": "Player",
+				"type": "Area2D",
+				"position": [
+					40.0,
+					120.0
+				],
+				"z_index": 3,
+				"collision_layer": 1,
+				"collision_mask": 12,
+				"script": "res://scripts/player.jet",
+				"children": [
+					{
+						"id": 38,
+						"name": "Ship",
+						"type": "AnimatedSprite2D",
+						"texture": "res://textures/ship.png",
+						"hframes": 6,
+						"animations": "fly 0-1 12, up 2-3 12, down 4-5 12",
+						"children": []
+					},
+					{
+						"id": 39,
+						"name": "Shape",
+						"type": "CollisionShape2D",
+						"shape": "Rectangle",
+						"size": [
+							16.0,
+							8.0
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"id": 41,
+				"name": "Effects",
+				"type": "Node2D",
+				"z_index": 4,
+				"children": []
+			},
+			{
+				"id": 42,
+				"name": "Title",
+				"type": "Label",
+				"text": "JET BLASTER",
+				"position": [
+					6.0,
+					50.0
+				],
+				"text_scale": 4,
+				"color": 4774907,
+				"visible": true,
+				"children": []
+			},
+			{
+				"id": 45,
+				"name": "Prompt",
+				"type": "Control",
+				"script": "res://scripts/blink.jet",
+				"children": [
+					{
+						"id": 43,
+						"name": "Press",
+						"type": "Label",
+						"text": "PRESS BUTTON",
+						"position": [
+							76.0,
+							150.0
+						],
+						"text_scale": 2,
+						"color": 16777215,
+						"visible": true,
+						"children": []
+					},
+					{
+						"id": 44,
+						"name": "ToStart",
+						"type": "Label",
+						"text": "TO START",
+						"position": [
+							104.0,
+							172.0
+						],
+						"text_scale": 2,
+						"color": 16777215,
+						"visible": true,
+						"children": []
+					}
+				]
+			},
+			{
+				"id": 49,
+				"name": "HUD",
+				"type": "Control",
+				"children": [
+					{
+						"id": 46,
+						"name": "Score",
+						"type": "Label",
+						"text": "SCORE 0",
+						"position": [
+							6.0,
+							4.0
+						],
+						"text_scale": 2,
+						"color": 16697943,
+						"visible": true,
+						"children": []
+					},
+					{
+						"id": 47,
+						"name": "Lives",
+						"type": "Label",
+						"text": "SHIPS 3",
+						"position": [
+							216.0,
+							4.0
+						],
+						"text_scale": 2,
+						"color": 16777215,
+						"visible": true,
+						"children": []
+					},
+					{
+						"id": 48,
+						"name": "Message",
+						"type": "Label",
+						"text": "GET READY",
+						"position": [
+							97.0,
+							104.0
+						],
+						"text_scale": 2,
+						"color": 8189951,
+						"visible": false,
+						"children": []
+					}
+				]
+			},
+			{
+				"id": 50,
+				"name": "WaveTimer",
+				"type": "Timer",
+				"one_shot": true,
+				"children": []
+			},
+			{
+				"id": 51,
+				"name": "MessageTimer",
+				"type": "Timer",
+				"wait_time": 1.5,
+				"one_shot": true,
+				"children": []
+			}
+		]
+	},
+	"connections": [
+		{
+			"from": 50,
+			"signal": "timeout",
+			"to": 1,
+			"method": "spawn_wave",
+			"flags": 0
+		},
+		{
+			"from": 51,
+			"signal": "timeout",
+			"to": 48,
+			"method": "hide",
+			"flags": 0
+		},
+		{
+			"from": 40,
+			"signal": "hit",
+			"to": 1,
+			"method": "player_hit",
+			"flags": 0
+		}
+	]
+}

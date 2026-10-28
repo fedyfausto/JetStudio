@@ -35,6 +35,8 @@ ProceduralSkyMaterial Sky StandardMaterial3D GuiToggleOn GuiToggleOff GuiRadioCh
 GuiCheckedDisabled GuiUncheckedDisabled Control CanvasItem Label TextureRect ColorRect QuadMesh TorusMesh ArrayMesh
 MeshItem Vector2 Font StaticBody3D CharacterBody3D RigidBody3D Area3D CollisionShape3D CPUParticles3D NodeWarning BoxShape3D SphereShape3D
 CapsuleShape3D CollisionObject3D PhysicsBody3D Sprite3D AnimatedSprite3D Node2D Sprite2D AnimatedSprite2D Camera2D
+StaticBody2D CharacterBody2D RigidBody2D Area2D CollisionShape2D CollisionObject2D PhysicsBody2D RectangleShape2D CircleShape2D CapsuleShape2D
+Timer Slot Signals
 """.split()
 
 

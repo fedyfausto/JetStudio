@@ -6,8 +6,8 @@ namespace {
 
 // Header: "JSBC", u32 format version, u32 fingerprint, u32 payload size, u32 CRC-32 of the payload. Little endian.
 constexpr uint32_t kMagic = 0x4342534a; // "JSBC"
-constexpr uint32_t kFormat = 1;
-constexpr uint32_t kTypeCount = uint32_t(Type::Object) + 1;
+constexpr uint32_t kFormat = 2;
+constexpr uint32_t kTypeCount = uint32_t(Type::Signal) + 1; // the last Type
 constexpr int kMaxValueDepth = 16;
 constexpr size_t kMaxText = 1u << 20;
 
@@ -60,6 +60,7 @@ struct Writer {
         case Type::Float: f32(Heap::f(v)); break;
         case Type::String: str(Heap::sv(v)); break;
         case Type::Vector3: case Type::Color: for (int k = 0; k < 3; ++k) f32(Heap::comp(v, k)); break;
+        case Type::Vector2: f32(Heap::comp(v, 0)); f32(Heap::comp(v, 1)); break;
         case Type::Array: {
             const ArrObj* a = Heap::arr(v);
             u8(a->read_only ? 1 : 0);
@@ -121,6 +122,7 @@ struct Reader {
         case Type::Float: return Value(f32());
         case Type::String: return Value(str());
         case Type::Vector3: { const Real x = f32(), y = f32(); return Value(Vector3{x, y, f32()}); }
+        case Type::Vector2: { const Real x = f32(); return Value(Vector2{x, f32()}); }
         case Type::Color: { const Real r = f32(), g = f32(); return Value(Color{r, g, f32()}); }
         case Type::Array: {
             const bool read_only = u8() == 1;
@@ -216,6 +218,9 @@ bool verify_function(const ScriptData& sd, const FunctionData& f, std::string& w
             break;
         }
         case Op::LtLocalJump: good = a < f.nlocals && w1 < nconst && target(pc, int32_t(w2)); break;
+        case Op::PushBound:
+            good = (a >> 1) < nconst && sd.constants[a >> 1].type() == Type::String && !sd.constants[a >> 1].as_string().empty();
+            break;
         default: break;
         }
         if (!good) return fail("operand out of range", pc);
@@ -234,8 +239,11 @@ bool verify(const ScriptData& sd, std::string& why) {
     for (size_t i = 0; i < sd.symbols.size(); ++i) {
         const SymEntry& s = sd.symbols[i];
         if (i > 0 && s.name < sd.symbols[i - 1].name) { why = "symbols not sorted"; return false; }
-        const size_t limit = s.kind == SymKind::Var ? sd.vars.size() : (s.kind == SymKind::Const ? sd.consts.size() : sd.funcs.size());
-        if (uint8_t(s.kind) > uint8_t(SymKind::Func) || s.index >= limit) { why = "invalid symbol " + s.name; return false; }
+        const size_t limit = s.kind == SymKind::Var     ? sd.vars.size()
+                           : s.kind == SymKind::Const   ? sd.consts.size()
+                           : s.kind == SymKind::Signal  ? sd.signals.size()
+                                                        : sd.funcs.size();
+        if (uint8_t(s.kind) > uint8_t(SymKind::Signal) || s.index >= limit) { why = "invalid symbol " + s.name; return false; }
     }
     for (const VarData& v : sd.vars)
         if (uint32_t(v.type) >= kTypeCount) { why = "invalid variable type"; return false; }
@@ -291,6 +299,11 @@ std::vector<uint8_t> save_bytecode(const Script& script) {
         w.str(f.name); w.i32(f.line); w.u32(uint32_t(f.arguments.size()));
         for (const std::string& a : f.arguments) w.str(a);
     }
+    w.u32(uint32_t(sd.signals.size()));
+    for (const SignalInfo& sig : sd.signals) {
+        w.str(sig.name); w.u32(uint32_t(sig.arguments.size()));
+        for (const std::string& a : sig.arguments) w.str(a);
+    }
     Writer file;
     file.u32(kMagic); file.u32(kFormat); file.u32(fingerprint());
     file.u32(uint32_t(w.out.size())); file.u32(crc32(w.out.data(), w.out.size()));
@@ -330,6 +343,7 @@ CompileResult load_bytecode(const uint8_t* data, size_t size, const Host& host) 
         e.mid = host.method_id(e.name);
         e.field = int8_t(find_builtin_field(e.name));
         e.bmethod = int16_t(find_builtin_method(e.name));
+        e.smethod = int8_t(find_signal_method(e.name));
         sd->names.push_back(std::move(e));
     }
     for (uint32_t i = 0, n = r.count(); i < n && r.ok; ++i) {
@@ -374,6 +388,12 @@ CompileResult load_bytecode(const uint8_t* data, size_t size, const Host& host) 
         f.name = r.str(); f.line = r.i32();
         for (uint32_t k = 0, m = r.count(); k < m && r.ok; ++k) f.arguments.push_back(r.str());
         sd->functions.push_back(std::move(f));
+    }
+    for (uint32_t i = 0, n = r.count(); i < n && r.ok; ++i) {
+        SignalInfo sig;
+        sig.name = r.str();
+        for (uint32_t k = 0, m = r.count(); k < m && r.ok; ++k) sig.arguments.push_back(r.str());
+        sd->signals.push_back(std::move(sig));
     }
     if (!r.ok || r.left) return fail("malformed payload.");
     std::string why;

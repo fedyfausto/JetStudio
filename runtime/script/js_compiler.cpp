@@ -62,7 +62,7 @@ struct EnumInfo {
     int line = 0;
 };
 
-enum class CS : uint8_t { Var, Const, Enum, Func };
+enum class CS : uint8_t { Var, Const, Enum, Func, Signal };
 struct ClassSym {
     CS kind;
     uint32_t index;
@@ -98,6 +98,8 @@ private:
     RType resolve_type(const TypeRef& t);
     const PropertyInfo* find_prop(const std::string& name) const;
     const MethodInfo* find_method(const std::string& name) const;
+    bool find_signal(const std::string& name) const;
+    void emit_bound(const std::string& name, bool signal);
     bool class_exists(const std::string& name) const;
     void build_metadata();
 
@@ -262,6 +264,18 @@ const MethodInfo* Compiler::find_method(const std::string& name) const {
     return nullptr;
 }
 
+bool Compiler::find_signal(const std::string& name) const {
+    for (const ClassInfo* c : chain_)
+        for (const SignalInfo& sig : c->signals)
+            if (sig.name == name) return true;
+    return false;
+}
+
+// A Callable or Signal of self: `_on_timeout`, `health_changed`, `queue_free`.
+void Compiler::emit_bound(const std::string& name, bool signal) {
+    emit(Op::PushBound, (add_const(Value(name)) << 1) | (signal ? 1u : 0u), 1);
+}
+
 bool Compiler::class_exists(const std::string& name) const { return host_.find_class(name) != nullptr; }
 
 void Compiler::register_symbols() {
@@ -290,6 +304,12 @@ void Compiler::register_symbols() {
         add(ast_.consts[i].name, CS::Const, uint32_t(consts_.size() - 1), ci.line, ci.col);
     }
     for (size_t i = 0; i < ast_.funcs.size(); ++i) add(ast_.funcs[i].name, CS::Func, uint32_t(i), ast_.funcs[i].line, ast_.funcs[i].col);
+    for (size_t i = 0; i < ast_.signals.size(); ++i) {
+        const SignalDecl& sig = ast_.signals[i];
+        if (find_signal(nm(sig.name)))
+            error(sig.line, sig.col, "The signal \"" + nm(sig.name) + "\" already exists in parent class " + sd_->base_class + ".");
+        add(sig.name, CS::Signal, uint32_t(i), sig.line, sig.col);
+    }
     // a named enum becomes one symbol, the values of an unnamed one become constants (resolved later)
     for (size_t i = 0; i < ast_.enums.size(); ++i) {
         const EnumDecl& e = ast_.enums[i];
@@ -570,6 +590,7 @@ uint32_t Compiler::name_entry(const std::string& name) {
     e.mid = host_.method_id(name);
     e.field = int8_t(find_builtin_field(name));
     e.bmethod = int16_t(find_builtin_method(name));
+    e.smethod = int8_t(find_signal_method(name));
     uint32_t id = uint32_t(sd_->names.size());
     sd_->names.push_back(std::move(e));
     name_entries_[name] = id;
@@ -694,7 +715,7 @@ int Compiler::const_static_member(Node* n, Value& out) {
 
 bool Compiler::const_field(Node* n, Value& base) {
     int f = find_builtin_field(nm(n->name));
-    if (base.type() == Type::Vector3 && f >= 0 && f <= 2) {
+    if ((base.type() == Type::Vector3 && f >= 0 && f <= 2) || (base.type() == Type::Vector2 && f >= 0 && f <= 1)) {
         base = Value(Heap::comp(base, f));
         return true;
     }
@@ -935,8 +956,8 @@ static SType binary_result(BinOp op, SType ta, SType tb) {
     case BinOp::Mul:
     case BinOp::Div:
     case BinOp::Pow: {
-        bool va = ta == SType(Type::Vector3) || ta == SType(Type::Color);
-        bool vb = tb == SType(Type::Vector3) || tb == SType(Type::Color);
+        bool va = ta == SType(Type::Vector3) || ta == SType(Type::Vector2) || ta == SType(Type::Color);
+        bool vb = tb == SType(Type::Vector3) || tb == SType(Type::Vector2) || tb == SType(Type::Color);
         if (va && (tb == ta || numeric_result(tb, tb) != kUnknown)) return ta;
         if (vb && numeric_result(ta, ta) != kUnknown && op == BinOp::Mul) return tb;
         return numeric_result(ta, tb);
@@ -1090,8 +1111,9 @@ bool Compiler::assign_simple(const Stmt* s) {
     auto it = syms_.find(name);
     if (it != syms_.end()) {
         if (it->second.kind != CS::Var) {
-            error(t->line, t->col, it->second.kind == CS::Func ? "Cannot assign a new value to a function."
-                                                                 : "Cannot assign a new value to a constant.");
+            error(t->line, t->col, it->second.kind == CS::Func     ? "Cannot assign a new value to a function."
+                                   : it->second.kind == CS::Signal ? "Cannot assign a new value to a signal."
+                                                                   : "Cannot assign a new value to a constant.");
             return true;
         }
         uint32_t idx = it->second.index;
@@ -1216,6 +1238,7 @@ SType Compiler::check_index(SType base, SType index, int line, int col) {
     case Type::Object: return kUnknown;
     case Type::String:
     case Type::Vector3:
+    case Type::Vector2:
     case Type::Color:
         if (known(index) && index != SType(Type::Int) && index != SType(Type::String)) {
             error(line, col, std::string("Invalid index type \"") + type_name(Type(index)) + "\" for a base of type \"" +
@@ -1238,6 +1261,19 @@ SType Compiler::check_method(Node* n, SType receiver) {
         error(n->line, n->col, "Cannot call method \"" + name + "()\" on a null value.");
         return kUnknown;
     }
+    if (t == Type::Callable || t == Type::Signal) {
+        int lo = 0, hi = 0;
+        SType ret = kUnknown;
+        if (!signal_method_info(find_signal_method(name), t, lo, hi, ret)) {
+            error(n->line, n->col, "Function \"" + name + "()\" not found in base " + type_name(t) + ".");
+            return kUnknown;
+        }
+        const int argc = int(n->list.size());
+        if (argc < lo || (hi >= 0 && argc > hi))
+            error(n->line, n->col, std::string("Invalid call to function \"") + name + "()\" in base " + type_name(t) + ". Expected " +
+                                       format_int(argc < lo ? lo : hi) + " arguments.");
+        return ret;
+    }
     int id = find_builtin_method(name);
     if (!builtin_method_exists(t, id)) {
         error(n->line, n->col, "Function \"" + name + "()\" not found in base " + type_name(t) + ".");
@@ -1250,9 +1286,9 @@ SType Compiler::check_field_set(Node* target, SType base, SType value, int op, i
     (void)op;
     if (!known(base)) return kUnknown;
     Type b = Type(base);
-    if (b == Type::Vector3 || b == Type::Color) {
+    if (b == Type::Vector3 || b == Type::Vector2 || b == Type::Color) {
         int f = find_builtin_field(nm(target->name));
-        bool ok = b == Type::Vector3 ? (f >= 0 && f <= 2) : f >= 3;
+        bool ok = b == Type::Vector3 ? (f >= 0 && f <= 2) : b == Type::Vector2 ? (f >= 0 && f <= 1) : f >= 3;
         if (!ok) return kUnknown; // reported by emit_get_named / runtime
         if (known(value) && value != SType(Type::Int) && value != SType(Type::Float))
             error(line, col, std::string("Cannot assign a value of type \"") + type_name(Type(value)) + "\" as \"float\".");
@@ -1273,6 +1309,7 @@ void Compiler::check_prop_assign(const PropertyInfo* p, SType value, int line, i
     case Type::Float:
     case Type::Bool: ok = v == Type::Int || v == Type::Float || v == Type::Bool; break;
     case Type::Object: ok = v == Type::Nil; break;
+    case Type::Vector2: ok = v == Type::Vector3; break; // x and y taken, for scripts written before Vector2
     default: ok = false; break;
     }
     if (!ok)
@@ -1659,10 +1696,11 @@ SType Compiler::compile_ident(Node* n) {
             emit_const(enums_[it->second.index].dict);
             return SType(Type::Dictionary);
         case CS::Func:
-            error(n->line, n->col, "Function references (Callables) are not supported yet in JetScript; call \"" + nm(name) +
-                                       "()\" instead.");
-            emit(Op::PushNil, 0, 1);
-            return kUnknown;
+            emit_bound(nm(name), false);
+            return SType(Type::Callable);
+        case CS::Signal:
+            emit_bound(nm(name), true);
+            return SType(Type::Signal);
         }
     }
     const std::string& s = nm(name);
@@ -1677,14 +1715,17 @@ SType Compiler::compile_ident(Node* n) {
         return p->type == Type::Nil ? kUnknown : SType(p->type);
     }
     if (find_method(s)) {
-        error(n->line, n->col, "Function references (Callables) are not supported yet in JetScript; call \"" + s + "()\" instead.");
-        emit(Op::PushNil, 0, 1);
-        return kUnknown;
+        emit_bound(s, false);
+        return SType(Type::Callable);
+    }
+    if (find_signal(s)) {
+        emit_bound(s, true);
+        return SType(Type::Signal);
     }
     Value cv;
     if (builtin_global_constant(s, cv)) {
         emit_const(cv);
-        return SType(Type::Float);
+        return stype_of(cv);
     }
     if (host_.singleton(s) != 0) {
         emit(Op::LoadSingleton, name_entry(s), 1);
@@ -1698,7 +1739,7 @@ SType Compiler::compile_ident(Node* n) {
         return kUnknown;
     }
     if (find_builtin_func(s) >= 0) {
-        error(n->line, n->col, "Function references (Callables) are not supported yet in JetScript; call \"" + s + "()\" instead.");
+        error(n->line, n->col, "Built-in functions can't be used as Callables yet in JetScript; call \"" + s + "()\" instead.");
         emit(Op::PushNil, 0, 1);
         return kUnknown;
     }
@@ -1736,11 +1777,10 @@ bool Compiler::member_static(Node* n, SType& type) {
                 return true;
             }
         }
-        if (find_method(mname)) {
-            error(n->line, n->col, "Function references (Callables) are not supported yet in JetScript; call \"" + mname +
-                                       "()\" instead.");
-            emit(Op::PushNil, 0, 1);
-            type = kUnknown;
+        if (find_method(mname) || find_signal(mname)) {
+            const bool signal = !find_method(mname);
+            emit_bound(mname, signal);
+            type = SType(signal ? Type::Signal : Type::Callable);
             return true;
         }
         return false;
@@ -1786,7 +1826,9 @@ SType Compiler::emit_get_named(Node* n, SType bt) {
     uint32_t ne = name_entry(mname);
     emit(Op::GetNamed, ne, 0);
     int f = sd_->names[ne].field;
-    if ((bt == SType(Type::Vector3) && f >= 0 && f <= 2) || (bt == SType(Type::Color) && f >= 3)) return SType(Type::Float);
+    if ((bt == SType(Type::Vector3) && f >= 0 && f <= 2) || (bt == SType(Type::Vector2) && f >= 0 && f <= 1) ||
+        (bt == SType(Type::Color) && f >= 3))
+        return SType(Type::Float);
     if (bt != kUnknown && bt != SType(Type::Object) && bt != SType(Type::Dictionary))
         error(n->line, n->col, "Cannot find member \"" + mname + "\" in base \"" + type_name(Type(bt)) + "\".");
     return kUnknown;
@@ -1824,11 +1866,15 @@ bool Compiler::plan_call(Node* n, uint32_t& word0, uint32_t& word1, SType& ret, 
         return true;
     };
     if (find_local(n->name)) {
-        error(n->line, n->col, "\"" + name + "\" is a variable and can't be called (callables are not supported yet in JetScript).");
+        error(n->line, n->col, "\"" + name + "\" is a variable and can't be called; a Callable is called with \"" + name + ".call()\".");
         return false;
     }
     auto it = syms_.find(n->name);
     if (it != syms_.end()) {
+        if (it->second.kind == CS::Signal) {
+            error(n->line, n->col, "\"" + name + "\" is a signal: emit it with \"" + name + ".emit()\".");
+            return false;
+        }
         if (it->second.kind != CS::Func) {
             error(n->line, n->col, "\"" + name + "\" is not a function and can't be called.");
             return false;
@@ -1839,6 +1885,16 @@ bool Compiler::plan_call(Node* n, uint32_t& word0, uint32_t& word1, SType& ret, 
         word1 = fi;
         const RType& r = func_ret_[fi];
         ret = r.typed() ? SType(r.type) : kUnknown;
+        return true;
+    }
+    // connect(), emit_signal()... run by the VM on any object
+    int lo = 0, hi = 0;
+    SType sret = kUnknown;
+    if (signal_method_info(find_signal_method(name), Type::Object, lo, hi, sret)) {
+        if (!arity(lo, hi)) return false;
+        word0 = enc(Op::CallSelf, uint32_t(argc));
+        word1 = name_entry(name);
+        ret = sret;
         return true;
     }
     if (const MethodInfo* m = find_method(name)) {
@@ -1866,10 +1922,6 @@ bool Compiler::plan_call(Node* n, uint32_t& word0, uint32_t& word1, SType& ret, 
         ret = bf.ret;
         retmode = (bf.flags & kRetFirst) ? (name == "lerp" ? 3 : 1) : ((bf.flags & kRetNumeric) ? 2 : 0);
         return true;
-    }
-    if (name == "preload" || name == "load") {
-        error(n->line, n->col, "\"" + name + "()\" is not supported yet in JetScript.");
-        return false;
     }
     if (class_exists(name)) {
         error(n->line, n->col, "Creating engine objects (\"" + name + "\") is not supported yet in JetScript.");
@@ -2098,7 +2150,7 @@ void Compiler::build_metadata() {
                 if (t == Type::Nil && constant) t = init.type();
                 ei.type = t;
                 bool exportable = t == Type::Bool || t == Type::Int || t == Type::Float || t == Type::String ||
-                                  t == Type::Vector3 || t == Type::Color;
+                                  t == Type::Vector3 || t == Type::Vector2 || t == Type::Color;
                 if (!exportable) {
                     if (t == Type::Nil)
                         error(v.line, v.col, "Cannot infer the type of exported variable \"" + mi.name +
@@ -2106,7 +2158,7 @@ void Compiler::build_metadata() {
                     else
                         error(v.line, v.col, std::string("Export type \"") +
                                                  (t == Type::Object && !rt.cls.empty() ? rt.cls : std::string(type_name(t))) +
-                                                 "\" is not supported (exportable: bool, int, float, String, Vector3, Color).");
+                                                 "\" is not supported (exportable: bool, int, float, String, Vector2, Vector3, Color).");
                 }
                 if (constant && convert_to(t, init)) ei.default_value = init;
                 else ei.default_value = type_default(t);
@@ -2172,6 +2224,7 @@ void Compiler::build_metadata() {
             sd_->functions.push_back(std::move(fi));
             break;
         }
+        case ItemKind::Signal: break; // below, in declaration order
         }
     }
 
@@ -2189,6 +2242,13 @@ void Compiler::build_metadata() {
     for (size_t i = 0; i < sd_->vars.size(); ++i) sd_->symbols.push_back(SymEntry{sd_->vars[i].name, SymKind::Var, uint32_t(i)});
     for (size_t i = 0; i < sd_->consts.size(); ++i) sd_->symbols.push_back(SymEntry{sd_->consts[i].first, SymKind::Const, uint32_t(i)});
     for (size_t i = 0; i < ast_.funcs.size(); ++i) sd_->symbols.push_back(SymEntry{nm(ast_.funcs[i].name), SymKind::Func, uint32_t(i)});
+    for (size_t i = 0; i < ast_.signals.size(); ++i) {
+        SignalInfo info;
+        info.name = nm(ast_.signals[i].name);
+        for (uint32_t a : ast_.signals[i].params) info.arguments.push_back(nm(a));
+        sd_->signals.push_back(std::move(info));
+        sd_->symbols.push_back(SymEntry{sd_->signals.back().name, SymKind::Signal, uint32_t(i)});
+    }
     std::sort(sd_->symbols.begin(), sd_->symbols.end(), [](const SymEntry& a, const SymEntry& b) { return a.name < b.name; });
 }
 

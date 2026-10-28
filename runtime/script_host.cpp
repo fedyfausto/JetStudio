@@ -19,7 +19,8 @@ enum Property : int {
     CollisionLayer, CollisionMask, Friction, Bounce,
     Emitting, Amount, Lifetime, OneShot, Explosiveness, LifetimeRandomness, Direction, Spread, Gravity,
     InitialVelocityMin, InitialVelocityMax, DampingMin, DampingMax, CurrentScene,
-    Frame, Hframes, Vframes, FlipH, FlipV, PixelSize, Modulate, PropertyCount
+    Frame, Hframes, Vframes, FlipH, FlipV, PixelSize, Modulate, ZIndex, Centered, Offset, Animation, SpeedScale, Zoom, Enabled,
+    OneWayCollision, WaitTime, Autostart, Paused, TimeLeft, PropertyCount
 };
 const char* const property_names[PropertyCount] = {
     "name", "position", "rotation", "rotation_degrees", "scale", "visible", "global_position",
@@ -29,7 +30,8 @@ const char* const property_names[PropertyCount] = {
     "disabled", "collision_layer", "collision_mask", "friction", "bounce",
     "emitting", "amount", "lifetime", "one_shot", "explosiveness", "lifetime_randomness", "direction", "spread", "gravity",
     "initial_velocity_min", "initial_velocity_max", "damping_min", "damping_max", "current_scene",
-    "frame", "hframes", "vframes", "flip_h", "flip_v", "pixel_size", "modulate"};
+    "frame", "hframes", "vframes", "flip_h", "flip_v", "pixel_size", "modulate", "z_index", "centered", "offset", "animation",
+    "speed_scale", "zoom", "enabled", "one_way_collision", "wait_time", "autostart", "paused", "time_left"};
 
 enum Method : int {
     GetNode, GetNodeOrNull, GetParent, GetChildren, GetChild, GetChildCount, FindChild, QueueFree,
@@ -37,6 +39,8 @@ enum Method : int {
     IsActionPressed, IsActionJustPressed, IsActionJustReleased, GetAxis,
     MoveAndSlide, IsOnFloor, IsOnWall, IsOnCeiling, GetFloorNormal, ApplyCentralImpulse, ApplyImpulse, ApplyCentralForce,
     GetOverlappingBodies, HasOverlappingBodies, OverlapsBody, Restart, GetTree, ChangeSceneToFile, ReloadCurrentScene,
+    AddChild, RemoveChild, Instantiate, Rotate, Play, Stop, IsPlaying, GetOverlappingAreas, HasOverlappingAreas, OverlapsArea,
+    Start, IsStopped,
     MethodCount
 };
 const char* const method_names[MethodCount] = {
@@ -45,60 +49,111 @@ const char* const method_names[MethodCount] = {
     "is_action_pressed", "is_action_just_pressed", "is_action_just_released", "get_axis",
     "move_and_slide", "is_on_floor", "is_on_wall", "is_on_ceiling", "get_floor_normal", "apply_central_impulse", "apply_impulse",
     "apply_central_force", "get_overlapping_bodies", "has_overlapping_bodies", "overlaps_body", "restart", "get_tree",
-    "change_scene_to_file", "reload_current_scene"};
+    "change_scene_to_file", "reload_current_scene", "add_child", "remove_child", "instantiate", "rotate", "play", "stop", "is_playing",
+    "get_overlapping_areas", "has_overlapping_areas", "overlaps_area", "start", "is_stopped"};
 
 const std::vector<ClassInfo>& class_list() {
     static const std::vector<ClassInfo> classes = [] {
         std::vector<ClassInfo> c;
-        c.push_back({"Node", "", {{"name", Type::String, true}},
+        auto add = [&](const char* name, const char* base, std::vector<jetscript::PropertyInfo> properties,
+                       std::vector<jetscript::MethodInfo> methods, std::vector<jetscript::SignalInfo> signals = {}) {
+            c.push_back({name, base, std::move(properties), std::move(methods), std::move(signals)});
+        };
+        const std::vector<jetscript::SignalInfo> area_signals = {
+            {"body_entered", {"body"}}, {"body_exited", {"body"}}, {"area_entered", {"area"}}, {"area_exited", {"area"}}};
+        add("Node", "", {{"name", Type::String, true}},
             {{"get_node", 1, 1, Type::Object}, {"get_node_or_null", 1, 1, Type::Object}, {"get_parent", 0, 0, Type::Object},
              {"get_children", 0, 0, Type::Array}, {"get_child", 1, 1, Type::Object}, {"get_child_count", 0, 0, Type::Int},
-             {"find_child", 1, 1, Type::Object}, {"queue_free", 0, 0, Type::Nil}, {"get_tree", 0, 0, Type::Object}}});
-        c.push_back({"Node3D", "Node",
+             {"find_child", 1, 1, Type::Object}, {"queue_free", 0, 0, Type::Nil}, {"get_tree", 0, 0, Type::Object},
+             {"add_child", 1, 2, Type::Nil}, {"remove_child", 1, 1, Type::Nil},
+             // run by the VM, listed for the editor's completion
+             {"connect", 2, 3, Type::Int}, {"disconnect", 2, 2, Type::Nil}, {"is_connected", 2, 2, Type::Bool},
+             {"emit_signal", 1, -1, Type::Int}, {"has_signal", 1, 1, Type::Bool}});
+        add("Node3D", "Node",
             {{"position", Type::Vector3}, {"rotation", Type::Vector3}, {"rotation_degrees", Type::Vector3}, {"scale", Type::Vector3},
              {"visible", Type::Bool}, {"global_position", Type::Vector3}},
             {{"translate", 1, 1}, {"rotate_x", 1, 1}, {"rotate_y", 1, 1}, {"rotate_z", 1, 1}, {"look_at", 1, 2},
-             {"show", 0, 0}, {"hide", 0, 0}, {"is_visible_in_tree", 0, 0, Type::Bool}}});
-        c.push_back({"MeshInstance3D", "Node3D", {{"color", Type::Color}, {"alpha", Type::Float}, {"uv_offset", Type::Vector3},
-            {"uv_scale", Type::Vector3}, {"perspective_correct", Type::Bool}, {"texture_filter", Type::Int}}, {}});
-        c.push_back({"Camera3D", "Node3D", {{"fov", Type::Float}, {"near", Type::Float}, {"far", Type::Float}, {"current", Type::Bool}},
-            {{"make_current", 0, 0}}});
-        c.push_back({"DirectionalLight3D", "Node3D", {{"light_color", Type::Color}, {"light_energy", Type::Float}}, {}});
-        c.push_back({"WorldEnvironment", "Node", {{"background_color", Type::Color}, {"ambient_color", Type::Color}}, {}});
+             {"show", 0, 0}, {"hide", 0, 0}, {"is_visible_in_tree", 0, 0, Type::Bool}});
+        add("MeshInstance3D", "Node3D", {{"color", Type::Color}, {"alpha", Type::Float}, {"uv_offset", Type::Vector3},
+            {"uv_scale", Type::Vector3}, {"perspective_correct", Type::Bool}, {"texture_filter", Type::Int}}, {});
+        add("Camera3D", "Node3D", {{"fov", Type::Float}, {"near", Type::Float}, {"far", Type::Float}, {"current", Type::Bool}},
+            {{"make_current", 0, 0}});
+        add("DirectionalLight3D", "Node3D", {{"light_color", Type::Color}, {"light_energy", Type::Float}}, {});
+        add("WorldEnvironment", "Node", {{"background_color", Type::Color}, {"ambient_color", Type::Color}}, {});
         // Controls: position and size are screen pixels (x, y)
-        c.push_back({"Control", "Node", {{"position", Type::Vector3}, {"size", Type::Vector3}, {"visible", Type::Bool}, {"alpha", Type::Float}},
-            {{"show", 0, 0}, {"hide", 0, 0}}});
-        c.push_back({"Label", "Control", {{"text", Type::String}, {"color", Type::Color}}, {}});
-        c.push_back({"TextureRect", "Control", {{"color", Type::Color}}, {}});
-        c.push_back({"ColorRect", "Control", {{"color", Type::Color}}, {}});
+        add("Control", "Node", {{"position", Type::Vector2}, {"size", Type::Vector2}, {"visible", Type::Bool}, {"alpha", Type::Float}},
+            {{"show", 0, 0}, {"hide", 0, 0}});
+        add("Label", "Control", {{"text", Type::String}, {"color", Type::Color}}, {});
+        add("TextureRect", "Control", {{"color", Type::Color}}, {});
+        add("ColorRect", "Control", {{"color", Type::Color}}, {});
         // Physics, with Godot's class hierarchy
-        c.push_back({"CollisionObject3D", "Node3D", {{"collision_layer", Type::Int}, {"collision_mask", Type::Int}}, {}});
-        c.push_back({"PhysicsBody3D", "CollisionObject3D", {}, {}});
-        c.push_back({"StaticBody3D", "PhysicsBody3D", {{"friction", Type::Float}, {"bounce", Type::Float}}, {}});
-        c.push_back({"CharacterBody3D", "PhysicsBody3D", {{"velocity", Type::Vector3}, {"floor_max_angle", Type::Float}},
+        add("CollisionObject3D", "Node3D", {{"collision_layer", Type::Int}, {"collision_mask", Type::Int}}, {});
+        add("PhysicsBody3D", "CollisionObject3D", {}, {});
+        add("StaticBody3D", "PhysicsBody3D", {{"friction", Type::Float}, {"bounce", Type::Float}}, {});
+        add("CharacterBody3D", "PhysicsBody3D", {{"velocity", Type::Vector3}, {"floor_max_angle", Type::Float}},
             {{"move_and_slide", 0, 0, Type::Bool}, {"is_on_floor", 0, 0, Type::Bool}, {"is_on_wall", 0, 0, Type::Bool},
-             {"is_on_ceiling", 0, 0, Type::Bool}, {"get_floor_normal", 0, 0, Type::Vector3}}});
-        c.push_back({"RigidBody3D", "PhysicsBody3D",
+             {"is_on_ceiling", 0, 0, Type::Bool}, {"get_floor_normal", 0, 0, Type::Vector3}});
+        add("RigidBody3D", "PhysicsBody3D",
             {{"linear_velocity", Type::Vector3}, {"angular_velocity", Type::Vector3}, {"mass", Type::Float}, {"gravity_scale", Type::Float},
              {"freeze", Type::Bool}, {"sleeping", Type::Bool}, {"friction", Type::Float}, {"bounce", Type::Float}},
-            {{"apply_central_impulse", 1, 1}, {"apply_impulse", 1, 2}, {"apply_central_force", 1, 1}}});
-        c.push_back({"Area3D", "CollisionObject3D", {{"monitoring", Type::Bool}},
-            {{"get_overlapping_bodies", 0, 0, Type::Array}, {"has_overlapping_bodies", 0, 0, Type::Bool}, {"overlaps_body", 1, 1, Type::Bool}}});
-        c.push_back({"CollisionShape3D", "Node3D", {{"disabled", Type::Bool}}, {}});
-        c.push_back({"CPUParticles3D", "Node3D",
+            {{"apply_central_impulse", 1, 1}, {"apply_impulse", 1, 2}, {"apply_central_force", 1, 1}});
+        add("Area3D", "CollisionObject3D", {{"monitoring", Type::Bool}},
+            {{"get_overlapping_bodies", 0, 0, Type::Array}, {"has_overlapping_bodies", 0, 0, Type::Bool}, {"overlaps_body", 1, 1, Type::Bool},
+             {"get_overlapping_areas", 0, 0, Type::Array}, {"has_overlapping_areas", 0, 0, Type::Bool}, {"overlaps_area", 1, 1, Type::Bool}},
+            area_signals);
+        add("CollisionShape3D", "Node3D", {{"disabled", Type::Bool}}, {});
+        add("CPUParticles3D", "Node3D",
             {{"emitting", Type::Bool}, {"amount", Type::Int}, {"lifetime", Type::Float}, {"one_shot", Type::Bool},
              {"explosiveness", Type::Float}, {"lifetime_randomness", Type::Float}, {"direction", Type::Vector3}, {"spread", Type::Float},
              {"gravity", Type::Vector3}, {"initial_velocity_min", Type::Float}, {"initial_velocity_max", Type::Float},
              {"damping_min", Type::Float}, {"damping_max", Type::Float}, {"color", Type::Color}, {"alpha", Type::Float}},
-            {{"restart", 0, 0}}});
-        c.push_back({"Sprite3D", "Node3D",
+            {{"restart", 0, 0}}, {{"finished", {}}});
+        add("Sprite3D", "Node3D",
             {{"frame", Type::Int}, {"hframes", Type::Int}, {"vframes", Type::Int}, {"flip_h", Type::Bool}, {"flip_v", Type::Bool},
-             {"pixel_size", Type::Float}, {"modulate", Type::Color}}, {}});
-        c.push_back({"SceneTree", "", {{"current_scene", Type::Object, true}},
-            {{"change_scene_to_file", 1, 1, Type::Int}, {"reload_current_scene", 0, 0, Type::Int}}});
-        c.push_back({"Input", "", {},
+             {"pixel_size", Type::Float}, {"modulate", Type::Color}}, {});
+        add("PackedScene", "", {}, {{"instantiate", 0, 0, Type::Object}});
+        // 2D, Godot's classes: positions in canvas pixels (y down), rotation in radians, clockwise.
+        add("Node2D", "Node",
+            {{"position", Type::Vector2}, {"rotation", Type::Float}, {"rotation_degrees", Type::Float}, {"scale", Type::Vector2},
+             {"global_position", Type::Vector2}, {"visible", Type::Bool}, {"z_index", Type::Int}, {"modulate", Type::Color},
+             {"alpha", Type::Float}},
+            {{"translate", 1, 1}, {"rotate", 1, 1}, {"look_at", 1, 1}, {"show", 0, 0}, {"hide", 0, 0},
+             {"is_visible_in_tree", 0, 0, Type::Bool}});
+        add("Sprite2D", "Node2D",
+            {{"frame", Type::Int}, {"hframes", Type::Int}, {"vframes", Type::Int}, {"flip_h", Type::Bool}, {"flip_v", Type::Bool},
+             {"centered", Type::Bool}, {"offset", Type::Vector2}}, {});
+        add("AnimatedSprite2D", "Node2D",
+            {{"frame", Type::Int}, {"flip_h", Type::Bool}, {"flip_v", Type::Bool}, {"centered", Type::Bool}, {"offset", Type::Vector2},
+             {"animation", Type::String}, {"speed_scale", Type::Float}},
+            {{"play", 0, 1}, {"stop", 0, 0}, {"is_playing", 0, 0, Type::Bool}}, {{"animation_finished", {}}});
+        add("Camera2D", "Node2D", {{"offset", Type::Vector2}, {"zoom", Type::Vector2}, {"enabled", Type::Bool}},
+            {{"make_current", 0, 0}});
+
+        // 2D physics: the same bodies in pixels, y down.
+        add("CollisionObject2D", "Node2D", {{"collision_layer", Type::Int}, {"collision_mask", Type::Int}}, {});
+        add("PhysicsBody2D", "CollisionObject2D", {}, {});
+        add("StaticBody2D", "PhysicsBody2D", {{"friction", Type::Float}, {"bounce", Type::Float}}, {});
+        add("CharacterBody2D", "PhysicsBody2D", {{"velocity", Type::Vector2}, {"floor_max_angle", Type::Float}},
+            {{"move_and_slide", 0, 0, Type::Bool}, {"is_on_floor", 0, 0, Type::Bool}, {"is_on_wall", 0, 0, Type::Bool},
+             {"is_on_ceiling", 0, 0, Type::Bool}, {"get_floor_normal", 0, 0, Type::Vector2}});
+        add("RigidBody2D", "PhysicsBody2D",
+            {{"linear_velocity", Type::Vector2}, {"angular_velocity", Type::Float}, {"mass", Type::Float}, {"gravity_scale", Type::Float},
+             {"freeze", Type::Bool}, {"sleeping", Type::Bool}, {"friction", Type::Float}, {"bounce", Type::Float}},
+            {{"apply_central_impulse", 1, 1}, {"apply_impulse", 1, 2}, {"apply_central_force", 1, 1}});
+        add("Area2D", "CollisionObject2D", {{"monitoring", Type::Bool}},
+            {{"get_overlapping_bodies", 0, 0, Type::Array}, {"has_overlapping_bodies", 0, 0, Type::Bool}, {"overlaps_body", 1, 1, Type::Bool},
+             {"get_overlapping_areas", 0, 0, Type::Array}, {"has_overlapping_areas", 0, 0, Type::Bool}, {"overlaps_area", 1, 1, Type::Bool}},
+            area_signals);
+        add("CollisionShape2D", "Node2D", {{"disabled", Type::Bool}, {"one_way_collision", Type::Bool}}, {});
+        add("Timer", "Node",
+            {{"wait_time", Type::Float}, {"one_shot", Type::Bool}, {"autostart", Type::Bool}, {"paused", Type::Bool},
+             {"time_left", Type::Float, true}},
+            {{"start", 0, 1}, {"stop", 0, 0}, {"is_stopped", 0, 0, Type::Bool}}, {{"timeout", {}}});
+        add("SceneTree", "", {{"current_scene", Type::Object, true}},
+            {{"change_scene_to_file", 1, 1, Type::Int}, {"reload_current_scene", 0, 0, Type::Int}});
+        add("Input", "", {},
             {{"is_action_pressed", 1, 1, Type::Bool}, {"is_action_just_pressed", 1, 1, Type::Bool},
-             {"is_action_just_released", 1, 1, Type::Bool}, {"get_axis", 2, 2, Type::Float}}});
+             {"is_action_just_released", 1, 1, Type::Bool}, {"get_axis", 2, 2, Type::Float}});
         return c;
     }();
     return classes;
@@ -115,37 +170,53 @@ jetscript::Vector3 from_vec(Vec3 v) { return {v.x, v.y, v.z}; }
 bool has_property(NodeType type, int p) {
     switch (p) {
     case Name: return true;
-    case Position: case Visible: return is_node3d(type) || is_control(type);
-    case Rotation: case RotationDegrees: case Scale: case GlobalPosition: return is_node3d(type);
-    case MeshColor: case MeshAlpha: return type == NodeType::MeshInstance3D || type == NodeType::CPUParticles3D || is_control(type);
+    case Position: case Visible: return is_node3d(type) || is_control(type) || is_node2d(type);
+    case Rotation: case RotationDegrees: case Scale: case GlobalPosition: return is_node3d(type) || is_node2d(type);
+    case MeshColor: return type == NodeType::MeshInstance3D || type == NodeType::CPUParticles3D || is_control(type);
+    case MeshAlpha: return type == NodeType::MeshInstance3D || type == NodeType::CPUParticles3D || is_control(type) || is_node2d(type);
+    case ZIndex: return is_node2d(type);
+    case Centered: return type == NodeType::Sprite2D || type == NodeType::AnimatedSprite2D;
+    case Offset: return type == NodeType::Sprite2D || type == NodeType::AnimatedSprite2D || type == NodeType::Camera2D;
+    case Animation: case SpeedScale: return type == NodeType::AnimatedSprite2D;
+    case Zoom: case Enabled: return type == NodeType::Camera2D;
     case UvOffset: case UvScale: case PerspectiveCorrect: case TextureFilter: return type == NodeType::MeshInstance3D;
     case Text: return type == NodeType::Label;
     case Size: return is_control(type);
     case Fov: case Near: case Far: case Current: return type == NodeType::Camera3D;
     case LightColor: case LightEnergy: return type == NodeType::DirectionalLight3D;
     case BackgroundColor: case AmbientColor: return type == NodeType::WorldEnvironment;
-    case Velocity: case FloorMaxAngle: return type == NodeType::CharacterBody3D;
-    case LinearVelocity: case AngularVelocity: case Mass: case GravityScale: case Freeze: case Sleeping: return type == NodeType::RigidBody3D;
-    case Friction: case Bounce: return type == NodeType::RigidBody3D || type == NodeType::StaticBody3D;
-    case Monitoring: return type == NodeType::Area3D;
-    case Disabled: return type == NodeType::CollisionShape3D;
+    case Velocity: case FloorMaxAngle: return physics::is_character(type);
+    case LinearVelocity: case AngularVelocity: case Mass: case GravityScale: case Freeze: case Sleeping: return physics::is_rigid(type);
+    case Friction: case Bounce:
+        return physics::is_rigid(type) || type == NodeType::StaticBody3D || type == NodeType::StaticBody2D;
+    case Monitoring: return physics::is_area(type);
+    case Disabled: return physics::is_collision_shape(type);
+    case OneWayCollision: return type == NodeType::CollisionShape2D;
     case CollisionLayer: case CollisionMask: return physics::is_collision_object(type);
-    case Emitting: case Amount: case Lifetime: case OneShot: case Explosiveness: case LifetimeRandomness: case Direction:
+    case OneShot: return type == NodeType::CPUParticles3D || type == NodeType::Timer;
+    case WaitTime: case Autostart: case Paused: case TimeLeft: return type == NodeType::Timer;
+    case Emitting: case Amount: case Lifetime: case Explosiveness: case LifetimeRandomness: case Direction:
     case Spread: case Gravity: case InitialVelocityMin: case InitialVelocityMax: case DampingMin: case DampingMax:
         return type == NodeType::CPUParticles3D;
-    case Frame: case Hframes: case Vframes: case FlipH: case FlipV: case PixelSize: case Modulate:
-        return type == NodeType::Sprite3D;
+    case Frame: case FlipH: case FlipV: return type == NodeType::Sprite3D || type == NodeType::Sprite2D || type == NodeType::AnimatedSprite2D;
+    case Hframes: case Vframes: return type == NodeType::Sprite3D || type == NodeType::Sprite2D;
+    case PixelSize: return type == NodeType::Sprite3D;
+    case Modulate: return type == NodeType::Sprite3D || is_node2d(type);
     }
     return false;
 }
-bool has_method(NodeType type, int m) {
-    if (m <= QueueFree || m == GetTree) return true;
-    if (m == Show || m == Hide) return is_node3d(type) || is_control(type);
+bool node_has_method(NodeType type, int m) {
+    if (m <= QueueFree || m == GetTree || m == AddChild || m == RemoveChild) return true;
+    if (m == Show || m == Hide) return is_node3d(type) || is_control(type) || is_node2d(type);
+    if (m == Translate || m == LookAt || m == IsVisibleInTree || m == Rotate) return is_node3d(type) ? m != Rotate : is_node2d(type);
     if (m <= IsVisibleInTree) return is_node3d(type);
-    if (m == MakeCurrent) return type == NodeType::Camera3D;
-    if (m >= MoveAndSlide && m <= GetFloorNormal) return type == NodeType::CharacterBody3D;
-    if (m >= ApplyCentralImpulse && m <= ApplyCentralForce) return type == NodeType::RigidBody3D;
-    if (m >= GetOverlappingBodies && m <= OverlapsBody) return type == NodeType::Area3D;
+    if (m == MakeCurrent) return type == NodeType::Camera3D || type == NodeType::Camera2D;
+    if (m == Play || m == IsPlaying) return type == NodeType::AnimatedSprite2D;
+    if (m == Stop) return type == NodeType::AnimatedSprite2D || type == NodeType::Timer;
+    if (m == Start || m == IsStopped) return type == NodeType::Timer;
+    if (m >= MoveAndSlide && m <= GetFloorNormal) return physics::is_character(type);
+    if (m >= ApplyCentralImpulse && m <= ApplyCentralForce) return physics::is_rigid(type);
+    if ((m >= GetOverlappingBodies && m <= OverlapsBody) || (m >= GetOverlappingAreas && m <= OverlapsArea)) return physics::is_area(type);
     if (m == Restart) return type == NodeType::CPUParticles3D;
     return false;
 }
@@ -160,9 +231,28 @@ const jetscript::ClassInfo* ScriptHost::find_class(std::string_view name) const 
     return nullptr;
 }
 
+// load()/preload(): a scene of the package as a PackedScene, by path.
+ObjectId ScriptHost::resource(std::string_view path) const {
+    if (!runtime_) return 0;
+    if (path == runtime_->description_.path) return SceneIdBase;
+    const auto& scenes = runtime_->description_.scenes;
+    for (size_t i = 0; i < scenes.size(); ++i)
+        if (scenes[i].path == path) return SceneIdBase + 1 + ObjectId(i);
+    return 0;
+}
+
+std::string_view ScriptHost::scene_path(ObjectId id) const {
+    if (!runtime_ || id < SceneIdBase || id >= AutoloadIdBase) return {};
+    const size_t i = id - SceneIdBase;
+    const auto& d = runtime_->description_;
+    if (i == 0) return d.path;
+    return i <= d.scenes.size() ? std::string_view(d.scenes[i - 1].path) : std::string_view();
+}
+
 std::string_view ScriptHost::class_of(ObjectId id) const {
     if (id == InputId) return "Input";
     if (id == TreeId) return "SceneTree";
+    if (!scene_path(id).empty()) return "PackedScene";
     if (!runtime_) return {};
     const int index = runtime_->index_of(id);
     if (index < 0 || runtime_->nodes_[index].freed) return {};
@@ -189,9 +279,35 @@ ObjectId ScriptHost::singleton(std::string_view name) const {
     return 0;
 }
 
+// From the node types, so the device never builds the class list (it's for the compiler).
+bool ScriptHost::has_signal(ObjectId id, std::string_view name) const {
+    if (!runtime_) return false;
+    const int index = runtime_->index_of(id);
+    if (index < 0 || runtime_->nodes_[index].freed) return false;
+    const NodeType type = runtime_->nodes_[index].d.type;
+    if (physics::is_area(type))
+        return name == "body_entered" || name == "body_exited" || name == "area_entered" || name == "area_exited";
+    if (type == NodeType::Timer) return name == "timeout";
+    if (type == NodeType::AnimatedSprite2D) return name == "animation_finished";
+    if (type == NodeType::CPUParticles3D) return name == "finished";
+    return false;
+}
+
+bool ScriptHost::has_method(ObjectId id, std::string_view name) const {
+    const int m = method_id(name);
+    if (m < 0) return false;
+    if (id == InputId) return m >= IsActionPressed && m <= GetAxis;
+    if (id == TreeId) return m == ChangeSceneToFile || m == ReloadCurrentScene;
+    if (!scene_path(id).empty()) return m == Instantiate;
+    if (!runtime_) return false;
+    const int index = runtime_->index_of(id);
+    return index >= 0 && !runtime_->nodes_[index].freed && node_has_method(runtime_->nodes_[index].d.type, m);
+}
+
 std::string ScriptHost::describe(ObjectId id) const {
     if (id == InputId) return "<Input>";
     if (id == TreeId) return "<SceneTree>";
+    if (!scene_path(id).empty()) return "<PackedScene:" + std::string(scene_path(id)) + ">";
     if (runtime_) {
         const int index = runtime_->index_of(id);
         if (index >= 0 && !runtime_->nodes_[index].freed) {
@@ -207,7 +323,7 @@ void ScriptHost::print(std::string_view text, bool is_error) {
 }
 
 // Built from the authored values, which scripts may have just changed.
-static Transform global_of(const std::vector<Runtime::Live>& nodes, int index) {
+static Transform global_of(const Runtime::Nodes& nodes, int index) {
     Transform result;
     std::vector<int> chain;
     for (int i = index; i >= 0 && is_node3d(nodes[i].d.type); i = nodes[i].parent) chain.push_back(i);
@@ -217,13 +333,30 @@ static Transform global_of(const std::vector<Runtime::Live>& nodes, int index) {
     }
     return result;
 }
-static Transform parent_global_of(const std::vector<Runtime::Live>& nodes, int index) {
+static Transform parent_global_of(const Runtime::Nodes& nodes, int index) {
     const int parent = nodes[index].parent;
     return parent >= 0 && is_node3d(nodes[parent].d.type) ? global_of(nodes, parent) : Transform{};
 }
 
+// 2D: the canvas transform through the 2D parents, from the authored values.
+static Transform local_2d(const NodeDesc& d) {
+    return local_transform({d.position.x, d.position.y, 0}, {0, 0, d.rotation.z}, {d.scale.x, d.scale.y, 1});
+}
+static Transform global_2d(const Runtime::Nodes& nodes, int index) {
+    Transform result;
+    std::vector<int> chain;
+    for (int i = index; i >= 0 && is_node2d(nodes[i].d.type); i = nodes[i].parent) chain.push_back(i);
+    for (auto it = chain.rbegin(); it != chain.rend(); ++it) result = result * local_2d(nodes[*it].d);
+    return result;
+}
+static Transform parent_global_2d(const Runtime::Nodes& nodes, int index) {
+    const int parent = nodes[index].parent;
+    return parent >= 0 && is_node2d(nodes[parent].d.type) ? global_2d(nodes, parent) : Transform{};
+}
+static jetscript::Vector2 to2(Vec3 v) { return {v.x, v.y}; }
+
 Status ScriptHost::get_property(ObjectId id, int p, Value& out, std::string& error) {
-    if (!runtime_ || id == InputId) return Status::NotFound;
+    if (!runtime_ || id == InputId || !scene_path(id).empty()) return Status::NotFound;
     if (id == TreeId) {
         if (p != CurrentScene) return Status::NotFound;
         out = runtime_->nodes_.empty() ? Value() : Value::object(runtime_->nodes_[0].d.id);
@@ -234,6 +367,26 @@ Status ScriptHost::get_property(ObjectId id, int p, Value& out, std::string& err
     const auto& live = runtime_->nodes_[index];
     const auto& d = live.d;
     if (p < 0 || p >= PropertyCount || !has_property(d.type, p)) return Status::NotFound;
+    if (is_node2d(d.type)) {
+        switch (p) {
+        case Position: out = Value(to2(d.position)); return Status::Ok;
+        case Rotation: out = Value(radians(d.rotation.z)); return Status::Ok;
+        case RotationDegrees: out = Value(d.rotation.z); return Status::Ok;
+        case Scale: out = Value(to2(d.scale)); return Status::Ok;
+        case GlobalPosition: out = Value(to2(global_2d(runtime_->nodes_, index).origin)); return Status::Ok;
+        case ZIndex: out = Value(jetscript::Int(d.z_index)); return Status::Ok;
+        case Centered: out = Value(d.centered); return Status::Ok;
+        case Offset: out = Value(jetscript::Vector2{d.offset[0], d.offset[1]}); return Status::Ok;
+        case Animation: out = Value(d.more().animation); return Status::Ok;
+        case SpeedScale: out = Value(d.more().speed_scale); return Status::Ok;
+        case Zoom: out = Value(jetscript::Vector2{d.more().zoom[0], d.more().zoom[1]}); return Status::Ok;
+        case Enabled: out = Value(d.more().current); return Status::Ok;
+        case Velocity: case LinearVelocity: out = Value(to2(live.motion().velocity)); return Status::Ok;
+        case AngularVelocity: out = Value(live.motion().angular.z); return Status::Ok;
+        case OneWayCollision: out = Value(d.more().one_way); return Status::Ok;
+        default: break;
+        }
+    }
     switch (p) {
     case Name: out = Value(d.name); break;
     case Velocity: case LinearVelocity: out = Value(from_vec(live.motion().velocity)); break;
@@ -262,7 +415,7 @@ Status ScriptHost::get_property(ObjectId id, int p, Value& out, std::string& err
     case InitialVelocityMax: out = Value(d.more().velocity_max); break;
     case DampingMin: out = Value(d.more().damping_min); break;
     case DampingMax: out = Value(d.more().damping_max); break;
-    case Position: out = Value(from_vec(d.position)); break;
+    case Position: out = is_control(d.type) ? Value(to2(d.position)) : Value(from_vec(d.position)); break;
     case Rotation: out = Value(jetscript::Vector3{radians(d.rotation.x), radians(d.rotation.y), radians(d.rotation.z)}); break;
     case RotationDegrees: out = Value(from_vec(d.rotation)); break;
     case Scale: out = Value(from_vec(d.scale)); break;
@@ -283,7 +436,7 @@ Status ScriptHost::get_property(ObjectId id, int p, Value& out, std::string& err
     case PerspectiveCorrect: out = Value(d.perspective); break;
     case TextureFilter: out = Value(jetscript::Int(d.bilinear ? 1 : 0)); break; // Godot: 0 nearest, 1 linear
     case Text: out = Value(d.more().text); break;
-    case Size: out = Value(from_vec(d.more().size)); break;
+    case Size: out = Value(to2(d.more().size)); break;
     case Frame: out = Value(jetscript::Int(d.frame)); break;
     case Hframes: out = Value(jetscript::Int(d.hframes)); break;
     case Vframes: out = Value(jetscript::Int(d.vframes)); break;
@@ -291,12 +444,16 @@ Status ScriptHost::get_property(ObjectId id, int p, Value& out, std::string& err
     case FlipV: out = Value(d.flip_v); break;
     case PixelSize: out = Value(d.pixel_size); break;
     case Modulate: out = Value(to_color(d.color)); break;
+    case WaitTime: out = Value(d.more().lifetime); break;
+    case Autostart: out = Value(d.more().autoplay); break;
+    case Paused: out = Value(d.more().paused); break;
+    case TimeLeft: out = Value(d.more().playing ? std::max(live.cycle, 0.0f) : 0.0f); break;
     }
     return Status::Ok;
 }
 
 Status ScriptHost::set_property(ObjectId id, int p, const Value& v, std::string& error) {
-    if (!runtime_ || id == InputId || id == TreeId) return Status::NotFound;
+    if (!runtime_ || id == InputId || id == TreeId || !scene_path(id).empty()) return Status::NotFound;
     const int index = runtime_->index_of(id);
     if (index < 0 || runtime_->nodes_[index].freed) { error = "Attempt to access a previously freed instance."; return Status::Error; }
     auto& live = runtime_->nodes_[index];
@@ -318,6 +475,20 @@ Status ScriptHost::set_property(ObjectId id, int p, const Value& v, std::string&
         target = value;
         return true;
     };
+    // Controls: Vector2 like Godot, or a Vector3 whose z is ignored (scripts written before Vector2).
+    auto plane = [&](Vec3& target, float bound) {
+        Vec3 value;
+        if (v.type() == Type::Vector3) value = to_vec(v.as_vector3());
+        else if (expect(Type::Vector2)) value = {v.as_vector2().x, v.as_vector2().y, 0};
+        else return false;
+        if (!value.finite() || std::abs(value.x) > bound || std::abs(value.y) > bound) {
+            error = std::string("Value of '") + property_names[p] + "' is not finite or out of range.";
+            return false;
+        }
+        target = {value.x, value.y, 0};
+        error.clear();
+        return true;
+    };
     auto number = [&](float& target, float low, float high) {
         if (!expect(Type::Float)) return false;
         const float value = v.as_real();
@@ -333,6 +504,83 @@ Status ScriptHost::set_property(ObjectId id, int p, const Value& v, std::string&
         target = uint32_t(v.as_int());
         return true;
     };
+    if (is_node2d(d.type)) {
+        jetscript::Vector2 w;
+        auto vector2 = [&](float bound) {
+            if (v.type() == Type::Vector3) w = {v.as_vector3().x, v.as_vector3().y};
+            else if (expect(Type::Vector2)) w = v.as_vector2();
+            else return false;
+            if (!std::isfinite(w.x) || !std::isfinite(w.y) || std::abs(w.x) > bound || std::abs(w.y) > bound) {
+                error = std::string("Value of '") + property_names[p] + "' is not finite or out of range.";
+                return false;
+            }
+            return true;
+        };
+        bool done = true, ok = true;
+        switch (p) {
+        case Position: ok = vector2(100000); if (ok) { d.position.x = w.x; d.position.y = w.y; } break;
+        case Rotation: {
+            float radians_value = 0;
+            ok = number(radians_value, -1e6f, 1e6f);
+            if (ok) d.rotation.z = radians_value * 180.0f / Pi;
+            break;
+        }
+        case RotationDegrees: ok = number(d.rotation.z, -1e6f, 1e6f); break;
+        case Scale:
+            ok = vector2(1000);
+            if (ok && (std::abs(w.x) < 0.001f || std::abs(w.y) < 0.001f)) { error = "Scale components must not be zero."; ok = false; }
+            if (ok) { d.scale.x = w.x; d.scale.y = w.y; }
+            break;
+        case GlobalPosition:
+            ok = vector2(100000);
+            if (ok) {
+                const Vec3 local = parent_global_2d(runtime_->nodes_, index).inverse().xform({w.x, w.y, 0});
+                d.position.x = local.x;
+                d.position.y = local.y;
+            }
+            break;
+        case ZIndex:
+            ok = v.type() == Type::Int && v.as_int() >= -4096 && v.as_int() <= 4096;
+            if (!ok) error = "z_index must be an int between -4096 and 4096.";
+            else d.z_index = int16_t(v.as_int());
+            break;
+        case Centered: ok = expect(Type::Bool); if (ok) d.centered = v.truthy(); break;
+        case Offset: ok = vector2(100000); if (ok) { d.offset[0] = w.x; d.offset[1] = w.y; } break;
+        case Animation: {
+            ok = expect(Type::String);
+            if (!ok) break;
+            // Switching keeps it playing (from the new animation's start) or stopped, as in Godot.
+            auto& e = d.extras();
+            const bool was_playing = e.playing;
+            e.playing = false;
+            ok = runtime_->play_animation(live, v.as_string());
+            if (!ok) error = "There is no animation with name '" + std::string(v.as_string()) + "'.";
+            e.playing = ok && was_playing;
+            break;
+        }
+        case SpeedScale: ok = number(d.extras().speed_scale, -100, 100); break;
+        case Zoom:
+            ok = vector2(100);
+            if (ok && (w.x < 0.01f || w.y < 0.01f)) { error = "Camera2D zoom must be positive."; ok = false; }
+            if (ok) { d.extras().zoom[0] = w.x; d.extras().zoom[1] = w.y; }
+            break;
+        case Enabled: ok = expect(Type::Bool); if (ok) d.extras().current = v.truthy(); break;
+        case Velocity: case LinearVelocity:
+            ok = vector2(100000);
+            if (ok) live.edit_motion().velocity = {w.x, w.y, 0};
+            if (ok && p == LinearVelocity) runtime_->wake(live);
+            break;
+        case AngularVelocity: {
+            float spin = 0;
+            ok = number(spin, -1000, 1000);
+            if (ok) { live.edit_motion().angular = {0, 0, spin}; runtime_->wake(live); }
+            break;
+        }
+        case OneWayCollision: ok = expect(Type::Bool); if (ok) d.extras().one_way = v.truthy(); runtime_->physics_->built = false; break;
+        default: done = false;
+        }
+        if (done) return ok ? Status::Ok : Status::Error;
+    }
     bool ok = true;
     switch (p) {
     case Name: error = "Property 'name' is read-only in JetScript."; return Status::Error;
@@ -362,13 +610,17 @@ Status ScriptHost::set_property(ObjectId id, int p, const Value& v, std::string&
         break;
     case Amount:
         if (v.type() != Type::Int || v.as_int() < 1 || v.as_int() > MaxParticles) {
-            error = "'amount' must be an int between 1 and 200 (Jet's particle pool)."; ok = false;
+            error = "'amount' must be an int between 1 and 200."; ok = false;
         } else {
             d.extras().amount = uint16_t(v.as_int());
         }
         break;
     case Lifetime: ok = number(d.extras().lifetime, 0.01f, 600); break;
     case OneShot: ok = expect(Type::Bool); if (ok) d.extras().one_shot = v.truthy(); break;
+    case WaitTime: ok = number(d.extras().lifetime, 0.001f, 100000); break;
+    case Autostart: ok = expect(Type::Bool); if (ok) d.extras().autoplay = v.truthy(); break;
+    case Paused: ok = expect(Type::Bool); if (ok) d.extras().paused = v.truthy(); break;
+    case TimeLeft: error = "Property 'time_left' is read-only."; return Status::Error;
     case Explosiveness: ok = number(d.extras().explosiveness, 0, 1); break;
     case LifetimeRandomness: ok = number(d.extras().lifetime_randomness, 0, 1); break;
     case Direction: ok = vector(d.extras().direction, 1000); break;
@@ -378,7 +630,7 @@ Status ScriptHost::set_property(ObjectId id, int p, const Value& v, std::string&
     case InitialVelocityMax: ok = number(d.extras().velocity_max, 0, 1000); break;
     case DampingMin: ok = number(d.extras().damping_min, 0, 1000); break;
     case DampingMax: ok = number(d.extras().damping_max, 0, 1000); break;
-    case Position: ok = vector(d.position, 10000); break;
+    case Position: ok = is_control(d.type) ? plane(d.position, 10000) : vector(d.position, 10000); break;
     case Rotation: ok = vector(d.rotation, 1e6f, 180.0f / Pi); break;
     case RotationDegrees: ok = vector(d.rotation, 1e6f); break;
     case Scale: {
@@ -427,7 +679,7 @@ Status ScriptHost::set_property(ObjectId id, int p, const Value& v, std::string&
         break;
     case Size: {
         Vec3 size;
-        ok = vector(size, 4096);
+        ok = plane(size, 4096);
         if (ok && (size.x < 0 || size.y < 0)) { error = "Size must not be negative."; ok = false; }
         if (ok) d.extras().size = size;
         break;
@@ -485,6 +737,13 @@ Status ScriptHost::call_method(ObjectId id, int m, const Value* args, int count,
         }
         return Status::NotFound;
     }
+    if (!scene_path(id).empty()) {
+        if (m != Instantiate) return Status::NotFound;
+        const uint32_t root = runtime_->instantiate(scene_path(id), error);
+        if (!root) return Status::Error;
+        result = Value::object(root);
+        return Status::Ok;
+    }
     if (id == InputId) {
         if (m < IsActionPressed || m > GetAxis) return Status::NotFound;
         auto bit = [&](int i, uint32_t& out) {
@@ -511,8 +770,27 @@ Status ScriptHost::call_method(ObjectId id, int m, const Value* args, int count,
     const int index = runtime_->index_of(id);
     if (index < 0 || nodes[index].freed) { error = "Attempt to call a method on a previously freed instance."; return Status::Error; }
     auto& node = nodes[index];
-    if (m < 0 || m >= MethodCount || !has_method(node.d.type, m)) return Status::NotFound;
+    if (m < 0 || m >= MethodCount || !node_has_method(node.d.type, m)) return Status::NotFound;
     auto object = [&](int i) { return Value::object(nodes[i].d.id); };
+    if (is_node2d(node.d.type) && (m == Translate || m == LookAt)) {
+        if (count < 1 || args[0].type() != Type::Vector2) {
+            error = std::string("Invalid argument for '") + method_names[m] + "': expected Vector2.";
+            return Status::Error;
+        }
+        const auto target = args[0].as_vector2();
+        if (m == Translate) {
+            node.d.position.x += target.x;
+            node.d.position.y += target.y;
+            return Status::Ok;
+        }
+        // look_at(): +x towards the point, whatever the parents' rotation.
+        const Transform parent = parent_global_2d(nodes, index);
+        const Vec3 here = global_2d(nodes, index).origin;
+        const float angle = std::atan2(target.y - here.y, target.x - here.x);
+        const float parent_angle = std::atan2(parent.basis.m[1][0], parent.basis.m[0][0]);
+        node.d.rotation.z = (angle - parent_angle) * 180.0f / Pi;
+        return Status::Ok;
+    }
     auto find_child = [&](int parent, std::string_view name) {
         for (int child : nodes[parent].children) if (!nodes[child].freed && nodes[child].d.name == name) return child;
         return -1;
@@ -608,6 +886,51 @@ Status ScriptHost::call_method(ObjectId id, int m, const Value* args, int count,
         return Status::Ok;
     }
     case QueueFree: node.free_requested = true; runtime_->pending_free_ = true; return Status::Ok;
+    case Play: {
+        std::string_view name;
+        if (count >= 1 && !arg_string(0, name)) return Status::Error;
+        if (!runtime_->play_animation(node, name)) {
+            error = name.empty() ? "AnimatedSprite2D has no animations: set them in the Inspector." :
+                                   "There is no animation with name '" + std::string(name) + "'.";
+            return Status::Error;
+        }
+        return Status::Ok;
+    }
+    case Stop:
+        node.d.extras().playing = false;
+        if (node.d.type == NodeType::Timer) {
+            node.cycle = 0;
+            node.d.extras().autoplay = false; // as Godot's stop()
+        }
+        return Status::Ok;
+    case Start: {
+        float wait_time = -1;
+        if (count >= 1) {
+            if (!args[0].is_number() || !std::isfinite(args[0].as_real()) || args[0].as_real() > 100000) {
+                error = "Invalid argument for 'start': expected the time in seconds."; return Status::Error;
+            }
+            wait_time = args[0].as_real();
+        }
+        runtime_->start_timer(node, wait_time);
+        return Status::Ok;
+    }
+    case IsStopped: result = Value(!node.d.more().playing); return Status::Ok;
+    case IsPlaying: result = Value(node.d.more().playing); return Status::Ok;
+    case Rotate:
+        if (count < 1 || !args[0].is_number()) { error = "Invalid argument for 'rotate': expected float (radians)."; return Status::Error; }
+        node.d.rotation.z += args[0].as_real() * 180.0f / Pi;
+        return Status::Ok;
+    case AddChild:
+    case RemoveChild: {
+        const int child = count >= 1 && args[0].type() == Type::Object ? runtime_->index_of(args[0].as_object()) : -1;
+        if (child < 0 || nodes[child].freed) {
+            error = std::string("Invalid argument for '") + method_names[m] + "': expected a node.";
+            return Status::Error;
+        }
+        // add_child() runs _ready(), which may add nodes and move nodes_: nothing of node is used after it.
+        const bool ok = m == AddChild ? runtime_->add_child(index, child, error) : runtime_->remove_child(index, child, error);
+        return ok ? Status::Ok : Status::Error;
+    }
     case Translate: {
         if (count < 1 || args[0].type() != Type::Vector3) { error = "Invalid argument for 'translate': expected Vector3."; return Status::Error; }
         const Basis local = local_transform({}, node.d.rotation, node.d.scale).basis;
@@ -647,20 +970,28 @@ Status ScriptHost::call_method(ObjectId id, int m, const Value* args, int count,
         return Status::Ok;
     }
     case MakeCurrent:
-        for (auto& n : nodes) if (n.d.type == NodeType::Camera3D) n.d.extras().current = false;
+        for (auto& n : nodes) if (n.d.type == node.d.type) n.d.extras().current = false;
         node.d.extras().current = true;
         return Status::Ok;
     case MoveAndSlide: result = Value(runtime_->move_and_slide(index)); return Status::Ok;
     case IsOnFloor: result = Value(node.motion().on_floor); return Status::Ok;
     case IsOnWall: result = Value(node.motion().on_wall); return Status::Ok;
     case IsOnCeiling: result = Value(node.motion().on_ceiling); return Status::Ok;
-    case GetFloorNormal: result = Value(from_vec(node.motion().on_floor ? node.motion().floor_normal : Vec3{})); return Status::Ok;
+    case GetFloorNormal: {
+        const Vec3 normal = node.motion().on_floor ? node.motion().floor_normal : Vec3{};
+        result = is_node2d(node.d.type) ? Value(to2(normal)) : Value(from_vec(normal));
+        return Status::Ok;
+    }
     case ApplyCentralImpulse: case ApplyImpulse: case ApplyCentralForce: {
-        if (args[0].type() != Type::Vector3 || !to_vec(args[0].as_vector3()).finite()) {
-            error = std::string("Invalid argument for '") + method_names[m] + "': expected Vector3.";
+        // 2D bodies take a Vector2.
+        const bool flat = is_node2d(node.d.type);
+        const Type wanted = flat ? Type::Vector2 : Type::Vector3;
+        const Vec3 value = args[0].type() != wanted ? Vec3{}
+            : flat ? Vec3{args[0].as_vector2().x, args[0].as_vector2().y, 0} : to_vec(args[0].as_vector3());
+        if (args[0].type() != wanted || !value.finite()) {
+            error = std::string("Invalid argument for '") + method_names[m] + "': expected " + jetscript::type_name(wanted) + ".";
             return Status::Error;
         }
-        const Vec3 value = to_vec(args[0].as_vector3());
         if (m == ApplyCentralForce) node.edit_motion().force = node.edit_motion().force + value;
         else node.edit_motion().velocity = node.edit_motion().velocity + value * (1.0f / std::max(node.d.more().mass, 0.001f)); // arcade: no torque
         runtime_->wake(node);
@@ -674,6 +1005,16 @@ Status ScriptHost::call_method(ObjectId id, int m, const Value* args, int count,
     case OverlapsBody: {
         if (args[0].type() != Type::Object) { error = "Invalid argument for 'overlaps_body': expected a body."; return Status::Error; }
         result = Value(std::find(node.motion().overlaps.begin(), node.motion().overlaps.end(), args[0].as_object()) != node.motion().overlaps.end());
+        return Status::Ok;
+    }
+    case GetOverlappingAreas:
+        result = Value::new_array();
+        for (uint32_t area : node.motion().areas) result.array_push(Value::object(area));
+        return Status::Ok;
+    case HasOverlappingAreas: result = Value(!node.motion().areas.empty()); return Status::Ok;
+    case OverlapsArea: {
+        if (args[0].type() != Type::Object) { error = "Invalid argument for 'overlaps_area': expected an area."; return Status::Error; }
+        result = Value(std::find(node.motion().areas.begin(), node.motion().areas.end(), args[0].as_object()) != node.motion().areas.end());
         return Status::Ok;
     }
     case Restart: runtime_->restart_particles(node); return Status::Ok;

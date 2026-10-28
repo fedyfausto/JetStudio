@@ -1,0 +1,160 @@
+extends Node2D
+
+# Title screen, waves of enemies, hits and the score.
+@export var lives_at_start := 3
+
+enum { TITLE, PLAY, OVER }
+
+var enemy_scene = preload("res://enemy.jetscene")
+var explosion_scene = preload("res://explosion.jetscene")
+
+@onready var player = $Player
+@onready var enemies = $Enemies
+@onready var bullets = $Bullets
+@onready var shots = $EnemyShots
+@onready var effects = $Effects
+@onready var camera = $Camera2D
+@onready var title = $Title
+@onready var prompt = $Prompt
+@onready var hud = $HUD
+@onready var score_label = $HUD/Score
+@onready var lives_label = $HUD/Lives
+@onready var message = $HUD/Message
+@onready var wave_timer = $WaveTimer
+@onready var message_timer = $MessageTimer
+
+var state := TITLE
+var timer := 0.0
+var score := 0
+var lives := 3
+var wave := 0
+var shake := 0.0
+
+
+# Connected in the editor (Signals dock): WaveTimer.timeout -> spawn_wave(), MessageTimer.timeout -> Message.hide(),
+# Player.hit -> player_hit().
+func _ready() -> void:
+	player.hide()
+	hud.hide()
+
+
+func _process(delta: float) -> void:
+	timer += delta
+	update_camera(delta)
+
+	match state:
+		TITLE:
+			if pressed():
+				start()
+		PLAY:
+			if enemies.get_child_count() == 0 and wave_timer.is_stopped():
+				wave_timer.start(1.5)
+		OVER:
+			if timer > 2.0:
+				prompt.show()
+				if pressed():
+					back_to_title()
+
+
+func pressed() -> bool:
+	return Input.is_action_just_pressed("move_up") or Input.is_action_just_pressed("move_down") \
+		or Input.is_action_just_pressed("ui_accept")
+
+
+func start() -> void:
+	state = PLAY
+	score = 0
+	lives = lives_at_start
+	wave = 0
+	wave_timer.start(1.0)
+	title.hide()
+	prompt.hide()
+	hud.show()
+	player.position = Vector2(40, 120)
+	player.show()
+	player.active = true
+	player.invincible = 1.5
+	update_hud()
+	show_message("GET READY")
+
+
+func spawn_wave() -> void:
+	wave += 1
+	for i in range(3 + wave):
+		var enemy = enemy_scene.instantiate()
+		enemies.add_child(enemy)
+		enemy.setup(i % 2 if wave > 1 else 0, randf_range(40.0, 200.0), i * 0.7, wave)
+		enemy.destroyed.connect(enemy_destroyed)
+	show_message("WAVE %d" % wave)
+
+
+# Hits come from the areas' signals: an enemy shot down by the player's bullets, the ship hit by an enemy or a shot.
+func enemy_destroyed(enemy) -> void:
+	score += 100 * wave
+	update_hud()
+	destroy(enemy)
+
+
+func destroy(enemy) -> void:
+	explode(enemy.position)
+	enemy.hide()
+	enemy.queue_free()
+
+
+func explode(at: Vector2) -> void:
+	var boom = explosion_scene.instantiate()
+	boom.position = at
+	effects.add_child(boom)
+
+
+func player_hit(by) -> void:
+	if by.collision_layer == player.SHOT_LAYER:
+		by.queue_free()
+	else:
+		destroy(by)
+	lives -= 1
+	shake = 0.4
+	explode(player.position)
+	update_hud()
+	if lives > 0:
+		player.invincible = 2.0
+		return
+	state = OVER
+	timer = 0.0
+	player.active = false
+	player.hide()
+	message.text = "GAME OVER\nSCORE %d" % score
+	message.position = Vector2(90, 96)
+	message.show()
+	message_timer.stop()
+
+
+func back_to_title() -> void:
+	state = TITLE
+	wave_timer.stop()
+	for group in [enemies, bullets, shots, effects]:
+		for node in group.get_children():
+			node.queue_free()
+	hud.hide()
+	message.hide()
+	title.show()
+
+
+func update_hud() -> void:
+	score_label.text = "SCORE %d" % score
+	lives_label.text = "SHIPS %d" % lives
+
+
+func show_message(text: String) -> void:
+	message.text = text
+	message.position = Vector2((320.0 - text.length() * 14.0) / 2.0, 104)
+	message.show()
+	message_timer.start()
+
+
+func update_camera(delta: float) -> void:
+	if shake > 0.0:
+		shake -= delta
+		camera.offset = Vector2(randf_range(-3.0, 3.0), randf_range(-3.0, 3.0))
+	else:
+		camera.offset = Vector2.ZERO

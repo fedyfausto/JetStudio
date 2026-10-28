@@ -49,6 +49,12 @@ var view_origin := Vector3.ZERO
 var view_basis := Basis.IDENTITY
 var view_fov := 70.0
 
+# 2D view, Godot's 2D editor: the canvas point at the image's top-left corner, and the zoom.
+var mode_2d := false
+var canvas_zoom := 0.8
+var canvas_origin := Vector2(-40, -30)
+var _tools_3d := [] # toolbar buttons only the 3D view has
+
 var area: Control
 var image: TextureRect
 var overlay: Control
@@ -83,6 +89,7 @@ func _ready() -> void:
 		bar.add_child(button)
 		_tool_buttons.append(button)
 	bar.add_child(VSeparator.new())
+	_tools_3d = [_tool_buttons[Tool.ROTATE], _tool_buttons[Tool.SCALE]]
 	_local_button = _bar_button("Object", "Use Local Space (T)", true)
 	_local_button.toggled.connect(func(on): local_space = on; overlay.queue_redraw())
 	bar.add_child(_local_button)
@@ -92,21 +99,9 @@ func _ready() -> void:
 	bar.add_child(VSeparator.new())
 	_view_menu = MenuButton.new()
 	_view_menu.text = "View"
-	_view_menu.tooltip_text = "Preset views and 3D view options"
-	var popup := _view_menu.get_popup()
-	popup.add_item("Top View (Kp 7)", 0)
-	popup.add_item("Bottom View (Ctrl+Kp 7)", 1)
-	popup.add_item("Front View (Kp 1)", 2)
-	popup.add_item("Rear View (Ctrl+Kp 1)", 3)
-	popup.add_item("Right View (Kp 3)", 4)
-	popup.add_item("Left View (Ctrl+Kp 3)", 5)
-	popup.add_separator()
-	popup.add_item("Focus Selection (F)", 6)
-	popup.add_item("Reset View", 7)
-	popup.add_separator()
-	popup.add_check_item("Show Grid", 8)
-	popup.set_item_checked(popup.get_item_index(8), true)
-	popup.id_pressed.connect(_on_view_menu)
+	_view_menu.tooltip_text = "Preset views and view options"
+	_view_menu.get_popup().id_pressed.connect(_on_view_menu)
+	_fill_view_menu()
 	bar.add_child(_view_menu)
 	_preview_button = _bar_button("Camera3D", "Preview: look through the selected Camera3D", true)
 	_preview_button.text = "Preview"
@@ -115,6 +110,7 @@ func _ready() -> void:
 		preview_camera = on
 		_update_view())
 	bar.add_child(_preview_button)
+	_tools_3d.append(_local_button)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(spacer)
@@ -161,6 +157,67 @@ func _ready() -> void:
 	area.add_child(_badge)
 	_update_view()
 
+func _fill_view_menu() -> void:
+	var popup := _view_menu.get_popup()
+	popup.clear()
+	if not mode_2d:
+		popup.add_item("Top View (Kp 7)", 0)
+		popup.add_item("Bottom View (Ctrl+Kp 7)", 1)
+		popup.add_item("Front View (Kp 1)", 2)
+		popup.add_item("Rear View (Ctrl+Kp 1)", 3)
+		popup.add_item("Right View (Kp 3)", 4)
+		popup.add_item("Left View (Ctrl+Kp 3)", 5)
+		popup.add_separator()
+	popup.add_item("Center Selection (F)" if mode_2d else "Focus Selection (F)", 6)
+	popup.add_item("Reset View", 7)
+	if mode_2d: popup.add_item("Zoom 100%", 9)
+	popup.add_separator()
+	popup.add_check_item("Show Grid", 8)
+	popup.set_item_checked(popup.get_item_index(8), show_grid)
+
+## The 2D view (Godot's 2D editor) or the 3D one; the editor renders the canvas only while it is 2D.
+func set_mode_2d(on: bool) -> void:
+	if on == mode_2d: return
+	mode_2d = on
+	_nav = Nav.NONE
+	_drag = {}
+	_hover_axis = -1
+	for button in _tools_3d: button.visible = not on
+	if on:
+		if tool == Tool.ROTATE or tool == Tool.SCALE: _set_tool(Tool.MOVE)
+		if preview_camera: _preview_button.button_pressed = false
+	_fill_view_menu()
+	set_scene(root, selected, playing)
+	camera_changed.emit()
+
+## 2D view: a canvas point and a point of the view area, both ways.
+func canvas_to_area(point: Vector2) -> Vector2:
+	var rect := _image_rect()
+	return rect.position + (point - canvas_origin) * canvas_zoom * (rect.size.x / W)
+
+func area_to_canvas(point: Vector2) -> Vector2:
+	var rect := _image_rect()
+	return canvas_origin + (point - rect.position) / (rect.size.x / W) / canvas_zoom
+
+func _zoom_2d(factor: float, at: Vector2) -> void:
+	var anchor := area_to_canvas(at)
+	canvas_zoom = clampf(canvas_zoom * factor, 0.05, 32.0)
+	canvas_origin = anchor - (at - _image_rect().position) / (_image_rect().size.x / W) / canvas_zoom
+	_view_2d_changed()
+
+func _pan_2d(relative: Vector2) -> void:
+	canvas_origin -= relative / (_image_rect().size.x / W) / canvas_zoom
+	_view_2d_changed()
+
+## Shows the canvas point `center` in the middle of the view.
+func _center_2d(center: Vector2) -> void:
+	canvas_origin = center - Vector2(W, H) * 0.5 / canvas_zoom
+	_view_2d_changed()
+
+func _view_2d_changed() -> void:
+	set_scene(root, selected, playing)
+	camera_changed.emit()
+
 func _bar_button(icon: String, tooltip: String, toggle: bool) -> Button:
 	var button := Button.new()
 	button.theme_type_variation = "FlatButton"
@@ -184,6 +241,7 @@ func set_resolution(size: Vector2i) -> void:
 
 func set_frame(texture: Texture2D) -> void:
 	image.texture = texture
+	overlay.queue_redraw() # outlines and selection come from the runtime's last frame
 
 func set_scene(new_root: Dictionary, new_selected: int, is_playing: bool) -> void:
 	root = new_root
@@ -191,7 +249,7 @@ func set_scene(new_root: Dictionary, new_selected: int, is_playing: bool) -> voi
 	playing = is_playing
 	var node := Document.find(root, selected) if selected > 0 else {}
 	var is_camera := not node.is_empty() and str(node.type) == "Camera3D"
-	_preview_button.visible = is_camera
+	_preview_button.visible = is_camera and not mode_2d
 	if not is_camera and preview_camera:
 		preview_camera = false
 		_preview_button.set_pressed_no_signal(false)
@@ -201,6 +259,9 @@ func set_scene(new_root: Dictionary, new_selected: int, is_playing: bool) -> voi
 	if playing:
 		_badge.text = "▶  GAME RUNNING · editor view"
 		_badge.add_theme_color_override("font_color", Style.WARNING)
+	elif mode_2d:
+		_badge.text = "2D  ·  JET %d×%d  ·  %d%%" % [int(W), int(H), roundi(canvas_zoom * 100)]
+		_badge.add_theme_color_override("font_color", Color(Style.MUTED, 0.9))
 	elif preview_camera:
 		_badge.text = "Camera preview: " + str(node.get("name", ""))
 		_badge.add_theme_color_override("font_color", Style.ACCENT)
@@ -249,7 +310,8 @@ func view_rotation() -> Vector3:
 	return view_basis.get_euler()
 
 func save_state() -> Dictionary:
-	return {"pivot": [pivot.x, pivot.y, pivot.z], "distance": distance, "yaw": yaw, "pitch": pitch}
+	return {"pivot": [pivot.x, pivot.y, pivot.z], "distance": distance, "yaw": yaw, "pitch": pitch,
+		"canvas_zoom": canvas_zoom, "canvas_origin": [canvas_origin.x, canvas_origin.y]}
 
 func load_state(state: Dictionary) -> void:
 	if state.is_empty(): return
@@ -258,6 +320,10 @@ func load_state(state: Dictionary) -> void:
 	distance = float(state.get("distance", 7.0))
 	yaw = float(state.get("yaw", yaw))
 	pitch = float(state.get("pitch", pitch))
+	if state.has("canvas_zoom"):
+		var o: Array = state.get("canvas_origin", [0.0, 0.0])
+		canvas_zoom = clampf(float(state.canvas_zoom), 0.05, 32.0)
+		canvas_origin = Vector2(float(o[0]), float(o[1]))
 	_update_view()
 
 func reset_view() -> void:
@@ -265,12 +331,21 @@ func reset_view() -> void:
 	distance = 7.0
 	yaw = deg_to_rad(35.0)
 	pitch = deg_to_rad(-28.0)
+	# 2D: the game's screen in the middle, with a margin around it.
+	canvas_zoom = 0.8
+	canvas_origin = Vector2(W, H) * 0.5 - Vector2(W, H) * 0.5 / canvas_zoom
 	_update_view()
+	if mode_2d: _view_2d_changed()
 
 func focus_selection() -> void:
 	if selected <= 0: return
 	var node := Document.find(root, selected)
-	if node.is_empty() or not Document.is_3d(str(node.type)): return
+	if node.is_empty(): return
+	if mode_2d:
+		if Document.is_control(str(node.type)) and control_rect.is_valid(): _center_2d((control_rect.call(node) as Rect2).get_center())
+		elif Document.is_2d(str(node.type)): _center_2d(Document.canvas_transform(root, selected).origin)
+		return
+	if not Document.is_3d(str(node.type)): return
 	var t := Document.global_transform(root, selected)
 	var radius := 1.0
 	if str(node.type) in ["MeshInstance3D", "Sprite3D"]:
@@ -283,6 +358,9 @@ func focus_selection() -> void:
 
 func _on_view_menu(id: int) -> void:
 	match id:
+		9:
+			canvas_zoom = 1.0
+			_center_2d(area_to_canvas(_image_rect().get_center()))
 		0: _set_angles(0, -PI * 0.5 + 0.0001)
 		1: _set_angles(0, PI * 0.5 - 0.0001)
 		2: _set_angles(0, 0)
@@ -372,6 +450,9 @@ func _draw_overlay() -> void:
 	var rect := _image_rect()
 	_gizmo_icons.clear()
 	if root.is_empty(): return
+	if mode_2d:
+		_draw_overlay_2d(rect)
+		return
 	# The overlay is clipped to the Jet image; draw in area coordinates.
 	overlay.draw_set_transform(-overlay.position)
 	if show_grid and not preview_camera: _draw_grid()
@@ -381,6 +462,9 @@ func _draw_overlay() -> void:
 		var type := str(node.type)
 		if type == "CollisionShape3D":
 			_draw_collision(node, Document.global_transform(root, int(node.id)), int(node.id) == selected)
+			continue
+		if type == "CollisionShape2D":
+			_draw_shape_2d(node, int(node.id) == selected, rect)
 			continue
 		if type == "CPUParticles3D" and not playing:
 			var t := Document.global_transform(root, int(node.id))
@@ -409,6 +493,10 @@ func _draw_overlay() -> void:
 	var node := Document.find(root, selected) if selected > 0 else {}
 	if not node.is_empty() and Document.is_control(str(node.type)) and control_rect.is_valid():
 		_draw_control(control_rect.call(node), rect)
+		return
+	if not node.is_empty() and Document.is_2d(str(node.type)):
+		var drawn: Rect2i = bridge.drawn_rect(selected) if bridge != null else Rect2i()
+		if drawn.has_area(): _draw_control(Rect2(drawn), rect)
 		return
 	if node.is_empty() or not Document.is_3d(str(node.type)) or preview_camera: return
 	var global := Document.global_transform(root, selected)
@@ -448,6 +536,11 @@ func _control_at(virtual: Vector2) -> int:
 			hidden[int(n.id)] = true
 			return
 		if Document.is_control(str(n.type)) and (control_rect.call(n) as Rect2).has_point(virtual): found[0] = int(n.id))
+	if found[0] == 0 and bridge != null:
+		# 2D sprites: what the runtime drew there (they may be rotated, scaled or seen through a Camera2D).
+		var hit: int = bridge.pick(int(virtual.x), int(virtual.y))
+		var node := Document.find(root, hit) if hit > 0 else {}
+		if not node.is_empty() and Document.is_2d(str(node.type)): found[0] = hit
 	return found[0]
 
 func _virtual(at: Vector2) -> Vector2:
@@ -457,12 +550,21 @@ func _virtual(at: Vector2) -> Vector2:
 func _begin_move_2d(id: int, at: Vector2) -> void:
 	var node := Document.find(root, id)
 	var p: Array = node.get("position", [0, 0])
-	_drag = {"id": id, "origin": Vector2(float(p[0]), float(p[1])), "press": _virtual(at)}
+	_drag = {"id": id, "origin": Vector2(float(p[0]), float(p[1])), "press": _virtual(at), "zoom": Vector2.ONE}
+	if mode_2d:
+		# The 2D view zooms the Controls too.
+		_drag.zoom = Vector2(canvas_zoom, canvas_zoom)
+	elif Document.is_2d(str(node.type)):
+		# Screen pixels are canvas pixels times the current Camera2D's zoom.
+		Document.walk(root, func(n, _p, _d):
+			if str(n.type) == "Camera2D" and bool(n.get("enabled", true)) and _drag.zoom == Vector2.ONE:
+				var z: Array = n.get("zoom", [1.0, 1.0])
+				_drag.zoom = Vector2(maxf(float(z[0]), 0.01), maxf(float(z[1]), 0.01)))
 	_nav = Nav.MOVE_2D
 
 func _update_move_2d(at: Vector2, final: bool) -> void:
 	if _drag.is_empty(): return
-	var target: Vector2 = (_drag.origin + _virtual(at) - _drag.press).round()
+	var target: Vector2 = (_drag.origin + (_virtual(at) - _drag.press) / _drag.get("zoom", Vector2.ONE)).round()
 	if snap: target = target.snapped(Vector2(8, 8))
 	if target != _drag.origin: _drag.moved = true
 	# A plain click selects without leaving an empty undo step.
@@ -514,6 +616,22 @@ func _draw_collision(node: Dictionary, t: Transform3D, is_selected: bool) -> voi
 			for side in [Vector3.RIGHT, Vector3.BACK]:
 				_draw_arc(t, Vector3(0, half, 0), side * r, Vector3.UP * r, color)
 				_draw_arc(t, Vector3(0, -half, 0), side * r, Vector3.DOWN * r, color)
+
+## CollisionShape2D: its outline where the runtime placed it (through the Camera2D), in the 3D shapes' colour.
+func _draw_shape_2d(node: Dictionary, is_selected: bool, image_rect: Rect2) -> void:
+	if bridge == null: return
+	var points: PackedVector2Array = bridge.shape_outline(int(node.id))
+	if points.size() < 3: return
+	var color := Color(0.35, 0.85, 1.0, 0.95 if is_selected else 0.6)
+	if bool(node.get("disabled", false)): color = Color(0.6, 0.6, 0.6, 0.35)
+	var k := image_rect.size.x / W
+	var outline := PackedVector2Array()
+	for point in points: outline.append(image_rect.position + point * k)
+	outline.append(outline[0])
+	overlay.draw_polyline(outline, color, 1.0, true)
+	# One way: the top edge (the side bodies land on) stands out, like Godot's arrow.
+	if bool(node.get("one_way_collision", false)) and str(node.get("shape", "Rectangle")) == "Rectangle":
+		overlay.draw_line(outline[0], outline[1], color, 3.0, true)
 
 ## CPUParticles3D: emission shape and the spread cone around Direction (1 m long).
 func _draw_particles(node: Dictionary, t: Transform3D, is_selected: bool) -> void:
@@ -651,6 +769,9 @@ func _draw_axes_cross(t: Transform3D) -> void:
 # ------------------------------------------------------------------ input
 
 func _input_event(event: InputEvent) -> void:
+	if mode_2d:
+		_input_2d(event)
+		return
 	if event is InputEventMouseButton: _mouse_button(event)
 	elif event is InputEventMouseMotion: _mouse_motion(event)
 	elif event is InputEventPanGesture:
@@ -727,6 +848,120 @@ func _mouse_motion(event: InputEventMouseMotion) -> void:
 				_hover_axis = axis
 				overlay.queue_redraw()
 	area.accept_event()
+
+# Godot's 2D editor: middle or right button (or Alt+left) pans, the wheel zooms where the cursor is, left selects and drags.
+func _input_2d(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		area.grab_focus()
+		var pan: bool = event.button_index in [MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_RIGHT] or (event.button_index == MOUSE_BUTTON_LEFT and event.alt_pressed)
+		if pan:
+			if event.pressed: _nav = Nav.PAN
+			elif _nav == Nav.PAN: _nav = Nav.NONE
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				_left_down = true
+				_press = event.position
+				if not playing and _image_rect().has_point(event.position) and tool != Tool.SELECT:
+					var hit := _pick_2d(event.position)
+					if hit > 0:
+						if hit != selected: node_picked.emit(hit)
+						_begin_move_2d(hit, event.position)
+			else:
+				_left_down = false
+				if _nav == Nav.MOVE_2D:
+					_nav = Nav.NONE
+					_update_move_2d(event.position, true)
+					_drag = {}
+				elif _press.distance_to(event.position) < 4.0:
+					_click(event.position)
+		elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+			_zoom_2d(1.1 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1 / 1.1, event.position)
+	elif event is InputEventMouseMotion:
+		if _nav == Nav.PAN: _pan_2d(event.relative)
+		elif _nav == Nav.MOVE_2D: _update_move_2d(event.position, false)
+	elif event is InputEventPanGesture:
+		_pan_2d(-event.delta * 12.0)
+	elif event is InputEventMagnifyGesture:
+		_zoom_2d(event.factor, area.get_local_mouse_position())
+	elif event is InputEventKey and event.pressed and not event.echo:
+		if event.ctrl_pressed and event.keycode == KEY_D: duplicate_requested.emit()
+		elif event.keycode == KEY_DELETE: delete_requested.emit()
+		elif event.ctrl_pressed or event.alt_pressed: return
+		elif event.keycode == KEY_Q: _set_tool(Tool.SELECT)
+		elif event.keycode == KEY_W: _set_tool(Tool.MOVE)
+		elif event.keycode == KEY_Y: _snap_button.button_pressed = not _snap_button.button_pressed
+		elif event.keycode == KEY_F: focus_selection()
+		else: return
+	area.accept_event()
+
+## The 2D node or Control drawn under a point of the view (the runtime drew the canvas, so it knows).
+func _pick_2d(at: Vector2) -> int:
+	if bridge == null: return 0
+	var virtual := _virtual(at)
+	var hit: int = bridge.pick(int(virtual.x), int(virtual.y))
+	var node := Document.find(root, hit) if hit > 0 else {}
+	return hit if not node.is_empty() and (Document.is_2d(str(node.type)) or Document.is_control(str(node.type))) else 0
+
+func _draw_overlay_2d(rect: Rect2) -> void:
+	overlay.draw_set_transform(-overlay.position)
+	if show_grid: _draw_grid_2d(rect)
+	# The game's screen at the canvas origin, as Godot draws the viewport's rectangle.
+	_draw_canvas_rect(Rect2(0, 0, W, H), Color(0.68, 0.55, 1.0, 0.9), 1.5)
+	var nodes := []
+	Document.walk(root, func(n, _p, _d): nodes.append(n))
+	for node in nodes:
+		var type := str(node.type)
+		if type == "CollisionShape2D":
+			_draw_shape_2d(node, int(node.id) == selected, rect)
+		elif type == "Camera2D":
+			var t := Document.canvas_transform(root, int(node.id))
+			var offset: Array = node.get("offset", [0.0, 0.0])
+			var zoom: Array = node.get("zoom", [1.0, 1.0])
+			var size := Vector2(W / maxf(float(zoom[0]), 0.01), H / maxf(float(zoom[1]), 0.01))
+			var center: Vector2 = t.origin + Vector2(float(offset[0]), float(offset[1]))
+			_draw_canvas_rect(Rect2(center - size * 0.5, size), Color(Style.ACCENT if int(node.id) == selected else Color(0.5, 0.75, 1.0), 0.8), 1.0)
+	var node := Document.find(root, selected) if selected > 0 else {}
+	if node.is_empty(): return
+	var type := str(node.type)
+	if Document.is_control(type) and control_rect.is_valid():
+		var box: Rect2 = control_rect.call(node)
+		_draw_control(Rect2((box.position - canvas_origin) * canvas_zoom, box.size * canvas_zoom), rect)
+	elif Document.is_2d(type):
+		var drawn: Rect2i = bridge.drawn_rect(selected) if bridge != null else Rect2i()
+		if drawn.has_area():
+			_draw_control(Rect2(drawn), rect)
+		else:
+			# Nodes that draw nothing: their origin.
+			var at := canvas_to_area(Document.canvas_transform(root, selected).origin)
+			overlay.draw_line(at - Vector2(8, 0), at + Vector2(8, 0), Color("ffb35c"), 2.0)
+			overlay.draw_line(at - Vector2(0, 8), at + Vector2(0, 8), Color("ffb35c"), 2.0)
+
+func _draw_canvas_rect(box: Rect2, color: Color, width: float) -> void:
+	var a := canvas_to_area(box.position)
+	var b := canvas_to_area(box.end)
+	overlay.draw_rect(Rect2(a, b - a), color, false, width)
+
+## Lines every 8, 16, 32... canvas pixels, at least 12 screen pixels apart; the axes through the origin.
+func _draw_grid_2d(rect: Rect2) -> void:
+	var per_pixel := canvas_zoom * rect.size.x / W
+	var step := 8.0
+	while step * per_pixel < 12.0: step *= 2.0
+	var top_left := area_to_canvas(rect.position)
+	var bottom_right := area_to_canvas(rect.end)
+	var x := floorf(top_left.x / step) * step
+	while x <= bottom_right.x:
+		var major := is_zero_approx(fmod(absf(x), step * 4.0))
+		var at := canvas_to_area(Vector2(x, 0)).x
+		var color := Color(Style.AXIS[1], 0.5) if is_zero_approx(x) else Color(1, 1, 1, 0.09 if major else 0.04)
+		overlay.draw_line(Vector2(at, rect.position.y), Vector2(at, rect.end.y), color)
+		x += step
+	var y := floorf(top_left.y / step) * step
+	while y <= bottom_right.y:
+		var major := is_zero_approx(fmod(absf(y), step * 4.0))
+		var at := canvas_to_area(Vector2(0, y)).y
+		var color := Color(Style.AXIS[0], 0.5) if is_zero_approx(y) else Color(1, 1, 1, 0.09 if major else 0.04)
+		overlay.draw_line(Vector2(rect.position.x, at), Vector2(rect.end.x, at), color)
+		y += step
 
 func _orbit(relative: Vector2) -> void:
 	yaw -= relative.x * ORBIT_SPEED

@@ -76,7 +76,8 @@ bool key_equal(const Value& a, const Value& b);
 
 // Raw access to Value internals for the hot paths.
 struct Heap {
-    static bool is_heap(Type t) { return ((0x190u >> unsigned(t)) & 1u) != 0; }
+    // String, Array, Dictionary, and the name of a Callable or Signal.
+    static bool is_heap(Type t) { return ((0x1990u >> unsigned(t)) & 1u) != 0; }
     static Type type(const Value& v) { return v.type_; }
     static Int i(const Value& v) { return v.u_.i; }
     static Real f(const Value& v) { return v.f_; }
@@ -84,10 +85,25 @@ struct Heap {
     static ObjectId o(const Value& v) { return v.u_.o; }
     static void* p(const Value& v) { return v.u_.p; }
     static Vector3 vec(const Value& v) { Vector3 r; r.x = v.f_; r.y = v.u_.f[0]; r.z = v.u_.f[1]; return r; }
+    static Vector2 vec2(const Value& v) { Vector2 r; r.x = v.f_; r.y = v.u_.f[0]; return r; }
     static Color col(const Value& v) { Color r; r.r = v.f_; r.g = v.u_.f[0]; r.b = v.u_.f[1]; return r; }
     static Real comp(const Value& v, int k) { return k == 0 ? v.f_ : v.u_.f[k - 1]; }
     static void set_comp(Value& v, int k, Real x) { if (k == 0) v.f_ = x; else v.u_.f[k - 1] = x; }
     static StrObj* str(const Value& v) { return static_cast<StrObj*>(v.u_.p); }
+    static bool is_bound(Type t) { return t == Type::Callable || t == Type::Signal; }
+    static ObjectId bound_object(const Value& v) {
+        ObjectId o;
+        std::memcpy(&o, &v.f_, sizeof o);
+        return o;
+    }
+    static std::string_view bound_name(const Value& v) { return static_cast<StrObj*>(v.u_.p)->view(); }
+    // `slot` must hold no heap reference; `name` is a non-empty String.
+    static void init_bound(Value& slot, Type t, ObjectId o, const Value& name) {
+        retain(name);
+        slot.type_ = t;
+        std::memcpy(&slot.f_, &o, sizeof o);
+        slot.u_.p = name.u_.p;
+    }
     static ArrObj* arr(const Value& v) { return static_cast<ArrObj*>(v.u_.p); }
     static DictObj* dict(const Value& v) { return static_cast<DictObj*>(v.u_.p); }
     static std::string_view sv(const Value& v) {
@@ -129,6 +145,8 @@ struct Heap {
     static void set_int(Value& v, Int x) { release(v); v.type_ = Type::Int; v.u_.i = x; }
     static void set_float(Value& v, Real x) { release(v); v.type_ = Type::Float; v.f_ = x; }
     static void set_vec(Value& v, const Vector3& a) { release(v); v.type_ = Type::Vector3; v.f_ = a.x; v.u_.f[0] = a.y; v.u_.f[1] = a.z; }
+    // A Vector2 keeps its z at 0, so code that treats vectors as three components works on it too.
+    static void set_vec2(Value& v, const Vector2& a) { release(v); v.type_ = Type::Vector2; v.f_ = a.x; v.u_.f[0] = a.y; v.u_.f[1] = 0; }
     static void set_color(Value& v, const Color& a) { release(v); v.type_ = Type::Color; v.f_ = a.r; v.u_.f[0] = a.g; v.u_.f[1] = a.b; }
     static void set_object(Value& v, ObjectId o) { release(v); v.type_ = Type::Object; v.u_.o = o; }
     // Adopts one reference of `h` (may be null for the empty string).
@@ -212,6 +230,15 @@ struct BuiltinCtx {
     std::string error;
 };
 
+// Signals and Callables, run by the VM itself: Godot's Object methods for signals, then Signal's and Callable's.
+enum SignalMethod : int8_t {
+    SM_connect, SM_disconnect, SM_is_connected, SM_emit_signal, SM_has_signal, // on objects
+    SM_emit, SM_get_name, SM_get_object, SM_is_null, SM_call, SM_callv, SM_get_method, SM_is_valid,
+    SM_COUNT
+};
+int find_signal_method(std::string_view name); // -1 if none
+const char* signal_method_name(int id);
+
 // Static type tag used by the compiler: -1 unknown/Variant, otherwise a Type.
 using SType = int8_t;
 constexpr SType kUnknown = -1;
@@ -243,6 +270,8 @@ bool builtin_global_constant(std::string_view name, Value& out);
 // Builtin type names usable in annotations / `is` (int, float, ...). Returns false if unknown.
 bool builtin_type_from_name(std::string_view name, Type& out, bool& variant);
 bool parse_color_string(std::string_view s, Color& out);
+// Arguments and result of a signal method on a receiver type (Object, Signal or Callable); false if it has none.
+bool signal_method_info(int id, Type receiver, int& min_args, int& max_args, SType& ret);
 
 } // namespace detail
 
@@ -268,6 +297,7 @@ enum class Op : uint8_t {
     CallScript, CallSelf, CallNamed, CallBuiltin,
     MakeArray, MakeDict,
     MatchEq,
+    PushBound, // a Callable (arg bit 0 clear) or Signal of self, named by const[arg >> 1]
     Return, ReturnNil,
     // superinstructions
     AddLocalInt,   // local[a] += imm (int fast path)  : word1 = imm
@@ -290,6 +320,7 @@ struct NameEntry {
     int mid = -1;        // Host::method_id
     int8_t field = -1;   // builtin field (x y z r g b a)
     int16_t bmethod = -1; // builtin method id
+    int8_t smethod = -1;  // signal method id (SM_...)
 };
 
 struct LineEntry { uint32_t pc; int32_t line; };
@@ -314,7 +345,7 @@ struct VarData {
     Value initial;           // value before initializers run
 };
 
-enum class SymKind : uint8_t { Var, Const, Func };
+enum class SymKind : uint8_t { Var, Const, Func, Signal };
 struct SymEntry { std::string name; SymKind kind; uint32_t index; };
 
 } // namespace detail
@@ -325,13 +356,14 @@ struct ScriptData {
     std::vector<ExportInfo> exports;
     std::vector<MemberInfo> members;
     std::vector<FunctionInfo> functions;
+    std::vector<SignalInfo> signals;
 
     std::vector<detail::FunctionData> funcs;   // user functions, then hidden initializers
     std::vector<detail::VarData> vars;
     std::vector<Value> constants;              // constant pool
     std::vector<std::pair<std::string, Value>> consts; // named constants (dynamic access)
     std::vector<detail::NameEntry> names;      // member names used by dynamic access
-    std::vector<detail::SymEntry> symbols;     // sorted by name: vars, consts, functions
+    std::vector<detail::SymEntry> symbols;     // sorted by name: vars, consts, functions, signals
     int init_fn = -1, onready_fn = -1, ready_fn = -1, process_fn = -1;
     uint32_t serial = 0;
 

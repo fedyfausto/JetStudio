@@ -1,0 +1,11 @@
+extends Node2D
+
+# Three layers of stars drifting left, the farther the slower; off the left edge they come back on the right.
+@onready var stars: Array = get_children()
+
+
+func _process(delta: float) -> void:
+	for star in stars:
+		star.position.x -= (12.0 + star.frame * 28.0) * delta
+		if star.position.x < -4.0:
+			star.position = Vector2(324.0, randf_range(0.0, 240.0))

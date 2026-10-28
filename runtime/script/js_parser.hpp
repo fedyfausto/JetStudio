@@ -99,7 +99,13 @@ struct FuncDecl {
     int line = 0, col = 0;
 };
 
-enum class ItemKind : uint8_t { Var, Const, Enum, Func };
+struct SignalDecl {
+    uint32_t name = 0;
+    std::vector<uint32_t> params; // names; their types are only documentation
+    int line = 0, col = 0;
+};
+
+enum class ItemKind : uint8_t { Var, Const, Enum, Func, Signal };
 struct ClassItem { ItemKind kind; uint32_t index; };
 
 // Nodes and statements live in arenas here, so freeing a deep tree never recurses.
@@ -116,6 +122,7 @@ struct Ast {
     std::vector<ConstDecl> consts;
     std::vector<EnumDecl> enums;
     std::vector<FuncDecl> funcs;
+    std::vector<SignalDecl> signals;
     std::vector<ClassItem> order;
 
     Ast() { names.push_back(std::string()); }
@@ -163,6 +170,7 @@ private:
     JS_NOINLINE void parse_const_decl();
     JS_NOINLINE void parse_enum();
     JS_NOINLINE void parse_func();
+    JS_NOINLINE void parse_signal();
     JS_NOINLINE bool parse_type(TypeRef& t, bool allow_void);
     JS_NOINLINE void skip_block();
     JS_NOINLINE void unsupported_statement(Tok type, int line, int col);

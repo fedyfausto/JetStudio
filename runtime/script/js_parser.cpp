@@ -186,7 +186,7 @@ void Parser::parse_script() {
 void Parser::unsupported_statement(Tok type, int line, int col) {
     const char* msg = "This construct is not supported yet in JetScript.";
     switch (type) {
-    case Tok::KwSignal: msg = "Signals (\"signal\") are not supported yet in JetScript."; break;
+    case Tok::KwSignal: msg = "Signals can only be declared at the top level of the script."; break;
     case Tok::KwClass: msg = "Inner classes (\"class\") are not supported yet in JetScript."; break;
     case Tok::KwClassName: msg = "\"class_name\" is not supported yet in JetScript."; break;
     case Tok::KwStatic: msg = "Static functions and variables (\"static\") are not supported yet in JetScript."; break;
@@ -291,8 +291,8 @@ void Parser::parse_class_item() {
     case Tok::KwConst: parse_const_decl(); return;
     case Tok::KwEnum: parse_enum(); return;
     case Tok::KwFunc: parse_func(); return;
+    case Tok::KwSignal: parse_signal(); return;
     case Tok::KwStatic:
-    case Tok::KwSignal:
     case Tok::KwClass:
     case Tok::KwClassName: {
         Tok type = t.type;
@@ -455,6 +455,47 @@ void Parser::parse_enum() {
     }
     ast_.order.push_back({ItemKind::Enum, uint32_t(ast_.enums.size())});
     ast_.enums.push_back(std::move(e));
+    end_statement();
+}
+
+// signal name, or signal name(a, b: int)
+void Parser::parse_signal() {
+    skip(); // signal
+    seen_items_ = true;
+    SignalDecl d;
+    if (!check(Tok::Ident)) {
+        error_here("Expected signal name after \"signal\".");
+        sync_line();
+        return;
+    }
+    Token n = advance();
+    d.name = ast_.intern(n.text);
+    d.line = n.line;
+    d.col = n.col;
+    if (match(Tok::LParen)) {
+        while (!abort_ && !check(Tok::RParen) && !check(Tok::Eof)) {
+            if (!check(Tok::Ident)) {
+                error_here("Expected parameter name.");
+                break;
+            }
+            d.params.push_back(ast_.intern(advance().text));
+            if (match(Tok::Colon)) {
+                TypeRef type;
+                parse_type(type, false);
+            }
+            if (check(Tok::Assign)) {
+                error_here("Signal parameters can't have default values.");
+                break;
+            }
+            if (!match(Tok::Comma)) break;
+        }
+        if (!expect(Tok::RParen, "Expected closing \")\" after signal parameters.")) {
+            sync_line();
+            return;
+        }
+    }
+    ast_.order.push_back({ItemKind::Signal, uint32_t(ast_.signals.size())});
+    ast_.signals.push_back(std::move(d));
     end_statement();
 }
 
@@ -1085,7 +1126,7 @@ void Parser::parse_args(Node* call) {
 Node* Parser::parse_call() {
     const Token& k = peek();
     Node* n = new_node(NK::Call, k.line, k.col);
-    n->name = ast_.intern(k.text);
+    n->name = ast_.intern(k.type == Tok::KwPreload ? std::string("preload") : k.text);
     skip();
     parse_args(n);
     finish(n);
@@ -1144,6 +1185,7 @@ Node* Parser::parse_primary() {
     case Tok::LBracket: return parse_array();
     case Tok::LBrace: return parse_dict();
     case Tok::Ident:
+    case Tok::KwPreload: // a keyword in GDScript, a function here: preload("res://bullet.jetscene")
         if (peek(1).type == Tok::LParen) return parse_call();
         return parse_leaf();
     default: return parse_leaf();
@@ -1202,7 +1244,7 @@ Node* Parser::parse_leaf() {
     case Tok::KwFunc: msg = "Lambdas are not supported yet in JetScript."; break;
     case Tok::KwAwait: msg = "\"await\" is not supported yet in JetScript."; break;
     case Tok::KwYield: msg = "\"yield\" is not supported in JetScript."; break;
-    case Tok::KwPreload: msg = "\"preload\" is not supported yet in JetScript."; break;
+    case Tok::KwPreload: msg = "\"preload\" needs a path: preload(\"res://scene.jetscene\")."; break;
     case Tok::KwSuper: msg = "\"super\" is not supported yet in JetScript."; break;
     case Tok::KwSignal:
     case Tok::KwClass:

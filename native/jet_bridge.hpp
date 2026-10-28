@@ -9,6 +9,8 @@
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
+#include <godot_cpp/variant/packed_vector2_array.hpp>
+#include <godot_cpp/variant/rect2i.hpp>
 
 // Runtime wrapper for the Godot UI. Scenes come as the editor's JSON tree (jetscene v2), scripts as source text.
 // assets.textures: {path: Image | {"image": Image, "palette": "Auto"|"Quantize"|"RGB565"}}
@@ -22,6 +24,7 @@ public:
     godot::Dictionary texture_info(const godot::Ref<godot::Image>& image, const godot::String& palette) const;
     void set_editor_camera(const godot::Vector3& position, const godot::Vector3& rotation, double fov);
     void use_editor_camera(bool enabled);
+    void set_editor_canvas(bool enabled, double zoom, const godot::Vector2& origin);
     void update(double delta);
     godot::Ref<godot::ImageTexture> render_frame();
     godot::Array play_start();
@@ -30,6 +33,9 @@ public:
     void set_input(int mask);
     godot::Array take_log();
     int pick(int x, int y);
+    godot::Rect2i drawn_rect(int id) const;
+    godot::PackedVector2Array shape_outline(int id) const;
+    godot::Dictionary memory_estimate(bool textures_in_place) const;
     godot::Dictionary compile_script(const godot::String& source, const godot::String& path) const;
     godot::Array class_db() const;
     godot::Dictionary node_state(int id) const;

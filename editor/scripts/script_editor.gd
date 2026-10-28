@@ -7,12 +7,14 @@ signal message(text: String, is_error: bool)
 
 const Style := preload("res://scripts/theme.gd")
 const Icons := preload("res://scripts/icons.gd")
+const Highlighter := preload("res://scripts/script_highlighter.gd")
 
 const KEYWORDS := ["if", "elif", "else", "for", "while", "break", "continue", "pass", "return", "match", "and", "or", "not",
 	"in", "is", "as", "var", "const", "func", "extends", "enum", "signal", "class", "class_name", "static", "await",
 	"yield", "preload", "breakpoint", "super", "void", "self"]
 const CONTROL_FLOW := ["if", "elif", "else", "for", "while", "break", "continue", "pass", "return", "match", "await", "yield"]
-const BASE_TYPES := ["bool", "int", "float", "String", "Vector3", "Color", "Array", "Dictionary", "null", "true", "false", "PI", "TAU", "INF", "NAN"]
+const BASE_TYPES := ["bool", "int", "float", "String", "Vector2", "Vector3", "Color", "Array", "Dictionary", "Callable", "Signal",
+	"null", "true", "false", "PI", "TAU", "INF", "NAN", "OK", "CONNECT_ONE_SHOT"]
 const ENGINE_TYPES := ["Node", "Node3D", "MeshInstance3D", "Camera3D", "DirectionalLight3D", "WorldEnvironment", "Input"]
 const BUILTINS := ["print", "printerr", "str", "int", "float", "bool", "len", "range", "abs", "sign", "floor", "ceil", "round",
 	"sqrt", "pow", "exp", "log", "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "deg_to_rad", "rad_to_deg", "min", "max",
@@ -29,6 +31,8 @@ const MEMBERS := {
 	"Array": ["size", "is_empty", "append", "push_back", "push_front", "pop_back", "pop_front", "insert", "remove_at", "erase",
 		"has", "find", "clear", "front", "back", "duplicate", "reverse", "sort", "pick_random"],
 	"Dictionary": ["size", "is_empty", "has", "get", "keys", "values", "erase", "clear", "duplicate"],
+	"Signal": ["emit", "connect", "disconnect", "is_connected", "get_name", "get_object"],
+	"Callable": ["call", "callv", "get_method", "get_object", "is_valid"],
 }
 const TEMPLATE := "extends %s\n\n\n# Called when the node enters the scene tree for the first time.\nfunc _ready() -> void:\n\tpass # Replace with function body.\n\n\n# Called every frame. 'delta' is the elapsed time since the previous frame.\nfunc _process(delta: float) -> void:\n\tpass\n"
 
@@ -192,22 +196,8 @@ func _ready() -> void:
 	add_child(_reload_dialog)
 	_update_status()
 
-func _highlighter() -> CodeHighlighter:
-	var h := CodeHighlighter.new()
-	h.number_color = Color("a1ffe0")
-	h.symbol_color = Color("abc9ff")
-	h.function_color = Color("57b3ff")
-	h.member_variable_color = Color("bce0ff")
-	for word in KEYWORDS: h.add_keyword_color(word, Color("ff7085"))
-	for word in CONTROL_FLOW: h.add_keyword_color(word, Color("ff8ccc"))
-	for word in BASE_TYPES: h.add_keyword_color(word, Color("42ffc2"))
-	for word in ENGINE_TYPES: h.add_keyword_color(word, Color("8fffdb"))
-	h.add_color_region("#", "", Color("cdcfd2", 0.5), true)
-	h.add_color_region("\"", "\"", Color("ffeda1"))
-	h.add_color_region("'", "'", Color("ffeda1"))
-	h.add_color_region("@", " ", Color("ffb373"))
-	h.add_color_region("$", " ", Color("63c259"))
-	return h
+func _highlighter() -> SyntaxHighlighter:
+	return Highlighter.new(KEYWORDS, CONTROL_FLOW, BASE_TYPES, ENGINE_TYPES + class_db.map(func(c): return str(c.name)))
 
 func _make_code() -> CodeEdit:
 	var code := CodeEdit.new()
@@ -247,6 +237,12 @@ func _make_code() -> CodeEdit:
 	code.add_comment_delimiter("#", "", true)
 	code.add_string_delimiter("\"", "\"", false)
 	code.add_string_delimiter("'", "'", false)
+	# Godot's slot icon next to the methods that the scene's signals call.
+	code.add_gutter()
+	var slots := code.get_gutter_count() - 1
+	code.set_meta("slot_gutter", slots)
+	code.set_gutter_type(slots, TextEdit.GUTTER_TYPE_ICON)
+	code.set_gutter_width(slots, 18)
 	code.text_changed.connect(_on_text_changed.bind(code))
 	code.caret_changed.connect(_update_caret)
 	code.code_completion_requested.connect(_on_completion.bind(code))
@@ -281,6 +277,22 @@ func open_script(path: String, line: int = 0) -> bool:
 	show_script(path)
 	if line > 0: goto_line(line)
 	return true
+
+## Appends Godot's stub for a connected signal's method and returns its line; the script stays unsaved, as in Godot.
+func add_function(path: String, function_name: String, arguments: Array) -> int:
+	if not open_script(path): return 0
+	var code: CodeEdit = _scripts[path].code
+	var text := code.text
+	var gap := "\n\n" if text.ends_with("\n") else "\n\n\n"
+	if text.is_empty(): gap = ""
+	var last := code.get_line_count() - 1
+	code.insert_text(gap + "func %s(%s) -> void:\n\tpass # Replace with function body.\n" % [function_name, ", ".join(arguments)],
+		last, code.get_line(last).length())
+	_refresh_list_marks()
+	check(path)
+	for f in _scripts[path].info.get("functions", []):
+		if str(f.name) == function_name: return int(f.line)
+	return code.get_line_count()
 
 func show_script(path: String) -> void:
 	if not _scripts.has(path): return
@@ -545,11 +557,29 @@ func check(path: String) -> void:
 		var line := int(error.line) - 1
 		if line >= 0 and line < code.get_line_count(): code.set_line_background_color(line, Color(Style.ERROR, 0.22))
 	entry.info = info
+	_mark_connected(path)
 	if path == _current:
 		_update_status()
 		_refresh_methods()
 	_refresh_list()
 	script_info_changed.emit(path, info)
+
+var _connected := {} # script path -> {method: "Node.signal"}, from the scene being edited
+
+## The methods of each script that the scene's connections call, marked in the gutter.
+func set_connected_methods(methods: Dictionary) -> void:
+	_connected = methods
+	for path in _scripts: _mark_connected(path)
+
+func _mark_connected(path: String) -> void:
+	var code: CodeEdit = _scripts[path].code
+	var marks: Dictionary = _connected.get(path, {})
+	var lines := {}
+	for f in _scripts[path].info.get("functions", []):
+		if marks.has(str(f.name)): lines[int(f.line) - 1] = marks[str(f.name)]
+	var slots: int = code.get_meta("slot_gutter")
+	for line in code.get_line_count():
+		code.set_line_gutter_icon(line, slots, Icons.get_icon("Slot") if lines.has(line) else null)
 
 func info_of(path: String) -> Dictionary:
 	return _scripts[path].info if _scripts.has(path) else {}
@@ -667,7 +697,9 @@ func _on_completion(code: CodeEdit) -> void:
 			for c in class_db:
 				for p in c.properties: add.call(CodeEdit.KIND_MEMBER, p.name, p.name, Color("bce0ff"), "MemberProperty")
 				for m in c.methods: add.call(CodeEdit.KIND_FUNCTION, m.name + "()", m.name + "(", Color("57b3ff"), "MemberMethod")
-			for type in ["Vector3", "String", "Array", "Dictionary", "Color"]:
+				for sig in c.get("signals", []): add.call(CodeEdit.KIND_SIGNAL, sig.name, sig.name, Color("ffd760"), "Signal")
+			for sig in info.get("signals", []): add.call(CodeEdit.KIND_SIGNAL, sig.name, sig.name, Color("ffd760"), "Signal")
+			for type in ["Vector3", "String", "Array", "Dictionary", "Color", "Signal", "Callable"]:
 				for m in MEMBERS[type]: add.call(CodeEdit.KIND_MEMBER, m, m, Color("bce0ff"), "MemberProperty")
 		code.update_code_completion_options(true)
 		return
@@ -675,10 +707,12 @@ func _on_completion(code: CodeEdit) -> void:
 		add.call(CodeEdit.KIND_CONSTANT if m.constant else CodeEdit.KIND_MEMBER, m.name, m.name, Color("bce0ff"), "MemberConstant" if m.constant else "MemberProperty")
 	for f in info.get("functions", []):
 		add.call(CodeEdit.KIND_FUNCTION, f.name + "()", f.name + "(", Color("57b3ff"), "MemberMethod")
+	for sig in info.get("signals", []): add.call(CodeEdit.KIND_SIGNAL, sig.name, sig.name, Color("ffd760"), "Signal")
 	var base := str(info.get("base", "Node"))
 	for c in _class_chain(base):
 		for p in c.properties: add.call(CodeEdit.KIND_MEMBER, p.name, p.name, Color("bce0ff"), "MemberProperty")
 		for m in c.methods: add.call(CodeEdit.KIND_FUNCTION, m.name + "()", m.name + "(", Color("57b3ff"), "MemberMethod")
+		for sig in c.get("signals", []): add.call(CodeEdit.KIND_SIGNAL, sig.name, sig.name, Color("ffd760"), "Signal")
 	for word in BUILTINS: add.call(CodeEdit.KIND_FUNCTION, word + "()", word + "(", Color("57b3ff"), "MemberMethod")
 	for word in BASE_TYPES + ENGINE_TYPES: add.call(CodeEdit.KIND_CLASS, word, word, Color("42ffc2"), "Object")
 	for word in KEYWORDS: add.call(CodeEdit.KIND_PLAIN_TEXT, word, word, Color("ff7085"), "")

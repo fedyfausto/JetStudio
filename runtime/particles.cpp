@@ -1,4 +1,5 @@
-// Godot's CPUParticles3D emission, simulated here in Jet units. Jet's ParticleSystem only draws the streaks.
+// Godot's CPUParticles3D emission, simulated here in Jet units. Jet's ParticleSystem only draws the streaks:
+// one is shared by all emitters, each keeps just its own particles.
 #include "runtime.hpp"
 #include "ParticleSystem.hpp"
 #include <algorithm>
@@ -27,6 +28,11 @@ Vec3 perpendicular(Vec3 v) {
 }
 } // namespace
 
+void Runtime::FreeDrawer::operator()(Renderer::ParticleSystem* p) const {
+    p->~ParticleSystem();
+    cold_free(p);
+}
+
 float Runtime::random01() {
     random_ ^= random_ << 13;
     random_ ^= random_ >> 17;
@@ -36,21 +42,28 @@ float Runtime::random01() {
 
 void Runtime::start_particles() {
     particles_.clear();
-    particle_damping_.clear();
     for (auto& n : nodes_) {
         n.particles = -1;
-        if (n.d.type != NodeType::CPUParticles3D) continue;
-        particles_.push_back(std::make_unique<Renderer::ParticleSystem>(JetWorldScale));
-        particle_damping_.emplace_back();
-        n.particles = int32_t(particles_.size()) - 1;
-        n.cycle = 0;
-        n.emitted = 0;
+        if (n.d.type == NodeType::CPUParticles3D && n.in_tree) start_particle(n);
     }
+}
+
+// Takes a free slot first: emitters of instanced scenes come and go (release_node() empties theirs).
+void Runtime::start_particle(Live& n) {
+    size_t slot = 0;
+    while (slot < particles_.size() && particles_[slot].used) ++slot;
+    if (slot == particles_.size()) particles_.emplace_back();
+    particles_[slot].used = true;
+    particles_[slot].particles.reserve(std::clamp(int(n.d.more().amount), 1, MaxParticles));
+    n.particles = int32_t(slot);
+    n.cycle = 0;
+    n.emitted = 0;
 }
 
 int Runtime::live_particles() const {
     int count = 0;
-    for (const auto& system : particles_) count += int(system->activeCount());
+    for (const auto& pool : particles_)
+        for (const auto& p : pool.particles) count += p.active;
     return count;
 }
 
@@ -59,15 +72,19 @@ void Runtime::restart_particles(Live& n) {
     n.cycle = 0;
     n.emitted = 0;
     if (n.particles >= 0)
-        for (auto& p : particles_[size_t(n.particles)]->pool) p.active = false;
+        for (auto& p : particles_[size_t(n.particles)].particles) p.active = false;
 }
 
 // age: how long before the end of this update the particle was emitted.
-void Runtime::emit_particle(Live& n, Renderer::ParticleSystem& system, float age) {
-    Renderer::Particle* slot = nullptr;
-    for (auto& p : system.pool)
+// The first free slot, as many as the amount (one more for a moment when one dies as the next is emitted).
+void Runtime::emit_particle(Live& n, ParticlePool& pool, float age) {
+    Particle* slot = nullptr;
+    for (auto& p : pool.particles)
         if (!p.active) { slot = &p; break; }
-    if (!slot) return; // pool full: Godot would not emit either (amount <= pool)
+    if (!slot) {
+        if (pool.particles.size() >= size_t(MaxParticles)) return;
+        slot = &pool.particles.emplace_back();
+    }
     const NodeDesc& d = n.d;
     const Basis& basis = n.world.basis;
     Vec3 offset{};
@@ -90,31 +107,28 @@ void Runtime::emit_particle(Live& n, Renderer::ParticleSystem& system, float age
     const float speed = d.more().velocity_min + (d.more().velocity_max - d.more().velocity_min) * random01();
     const float life = std::max(0.01f, d.more().lifetime * (1 - std::clamp(d.more().lifetime_randomness, 0.0f, 1.0f) * random01()));
     if (age >= life) return;
-    particle_damping_[size_t(n.particles)][size_t(slot - system.pool)] =
-        (d.more().damping_min + (d.more().damping_max - d.more().damping_min) * random01()) * JetUnits;
+    slot->damping = (d.more().damping_min + (d.more().damping_max - d.more().damping_min) * random01()) * JetUnits;
     Vec3 velocity = dir * speed;
     const Vec3 position = origin + velocity * age + d.more().gravity * (0.5f * age * age);
     velocity = velocity + d.more().gravity * age;
     slot->pos = to_jet_f(position);
     slot->vel = to_jet_f(velocity);
-    slot->maxLife = life;
+    slot->max_life = life;
     slot->life = life - age;
-    slot->kind = d.more().particle_style == ParticleStyle::Water ? Renderer::ParticleKind::Splash : Renderer::ParticleKind::Spark;
     slot->active = true;
 }
 
 // Godot's cycle: amount particles per lifetime, all emitted in the first (1 - explosiveness) of it.
 void Runtime::update_particles(float dt) {
     for (auto& n : nodes_) {
-        if (n.particles < 0 || n.freed) continue;
-        Renderer::ParticleSystem& system = *particles_[size_t(n.particles)];
+        if (n.particles < 0 || n.freed || !n.in_tree) continue;
+        ParticlePool& pool = particles_[size_t(n.particles)];
         const Renderer::Vec3f gravity = to_jet_f(n.d.more().gravity);
-        const auto& damping = particle_damping_[size_t(n.particles)];
-        for (auto& p : system.pool) {
+        for (auto& p : pool.particles) {
             if (!p.active) continue;
             p.vel = p.vel + gravity * dt;
             // Godot's damping: the speed drops by `damping` per second, down to zero.
-            const float slow = damping[size_t(&p - system.pool)] * dt;
+            const float slow = p.damping * dt;
             if (slow > 0) {
                 const float speed = p.vel.length();
                 p.vel = speed > slow ? p.vel * ((speed - slow) / speed) : Renderer::Vec3f{};
@@ -123,7 +137,6 @@ void Runtime::update_particles(float dt) {
             p.life -= dt;
             if (p.life <= 0) p.active = false;
         }
-        system.additiveSparks = n.d.more().additive;
         if (!n.d.more().emitting) continue;
         const int amount = std::clamp(int(n.d.more().amount), 1, MaxParticles);
         const float lifetime = std::max(n.d.more().lifetime, 0.01f);
@@ -132,17 +145,22 @@ void Runtime::update_particles(float dt) {
         for (int guard = 0; guard < 8 * MaxParticles; ++guard) {
             if (n.emitted >= amount) {
                 if (n.cycle < lifetime) break;
-                if (n.d.more().one_shot) { n.d.extras().emitting = false; break; }
+                if (n.d.more().one_shot) {
+                    n.d.extras().emitting = false;
+                    if (vm_->has_connections(n.d.id)) signals_.push_back({n.d.id, "finished"});
+                    break;
+                }
                 n.cycle -= lifetime;
                 n.emitted = 0;
                 continue;
             }
             const float at = window * float(n.emitted) / float(amount);
             if (n.cycle < at) break;
-            emit_particle(n, system, n.cycle - at);
+            emit_particle(n, pool, n.cycle - at);
             ++n.emitted;
         }
     }
+    emit_signals();
 }
 
 // Projects like Jet (camera space x right, y up, z forward). The matrix is built as in Scene::renderObject().
@@ -181,7 +199,7 @@ void Runtime::render_particles() {
     for (const auto& n : nodes_) {
         if (n.particles < 0 || n.freed || !n.world_visible || n.d.more().no_depth_test) continue;
         const float margin = n.d.more().particle_style == ParticleStyle::Puff ? std::max(n.d.more().puff_size, n.d.more().puff_size_end) * JetUnits * 0.5f : 0;
-        for (const auto& p : particles_[size_t(n.particles)]->pool) {
+        for (const auto& p : particles_[size_t(n.particles)].particles) {
             if (!p.active) continue;
             float c[3];
             view.to_camera(p.pos.x, p.pos.y, p.pos.z, c);
@@ -216,28 +234,27 @@ void Runtime::render_particles() {
 }
 
 unsigned Runtime::draw_particles(const Live& n, const ParticleView& view) {
-    Renderer::ParticleSystem& system = *particles_[size_t(n.particles)];
-    if (n.d.more().particle_style == ParticleStyle::Puff) return draw_puffs(n, system, view);
-#if !Z_BUFFERING
-    // Jet draws its streaks over the frame: leave out those behind a mesh.
-    bool hidden[MaxParticles] = {};
-    if (!occlusion_.empty() && !n.d.more().no_depth_test)
-        for (int i = 0; i < MaxParticles; ++i) {
-            auto& p = system.pool[i];
-            if (!p.active) continue;
+    if (n.d.more().particle_style == ParticleStyle::Puff) return draw_puffs(n, view);
+    if (!particle_drawer_) particle_drawer_.reset(new (cold_alloc(sizeof(Renderer::ParticleSystem))) Renderer::ParticleSystem(JetWorldScale));
+    Renderer::ParticleSystem& drawer = *particle_drawer_;
+    drawer.additiveSparks = n.d.more().additive;
+    const auto kind = n.d.more().particle_style == ParticleStyle::Water ? Renderer::ParticleKind::Splash : Renderer::ParticleKind::Spark;
+
+    // Into Jet's pool in the same order; on the device, without those behind a mesh (Jet draws over the frame).
+    const bool occlude = !Z_BUFFERING && !occlusion_.empty() && !n.d.more().no_depth_test;
+    int count = 0;
+    for (const auto& p : particles_[size_t(n.particles)].particles) {
+        if (!p.active || count == MaxParticles) continue;
+        if (occlude) {
             float c[3];
             view.to_camera(p.pos.x, p.pos.y, p.pos.z, c);
-            if (c[2] <= view.near) continue;
-            const float k = view.fov / c[2];
-            if (occluded(view, view.cx + c[0] * k, view.cy - c[1] * k, c[2])) hidden[i] = true, p.active = false;
+            if (c[2] > view.near && occluded(view, view.cx + c[0] * view.fov / c[2], view.cy - c[1] * view.fov / c[2], c[2])) continue;
         }
-#endif
-    system.render(&scene_, &camera_, width_, height_);
-#if !Z_BUFFERING
-    for (int i = 0; i < MaxParticles; ++i)
-        if (hidden[i]) system.pool[i].active = true;
-#endif
-    return system.lastRenderedTriangles;
+        drawer.pool[count++] = {p.pos, p.vel, p.life, p.max_life, kind, true};
+    }
+    drawer.render(&scene_, &camera_, width_, height_);
+    for (int i = 0; i < count; ++i) drawer.pool[i].active = false;
+    return drawer.lastRenderedTriangles;
 }
 
 // Device only: nearest opaque depth per 4x4 pixel cell. Coarse, but enough to hide particles behind a car.
@@ -319,19 +336,19 @@ bool Runtime::occluded(const ParticleView&, float x, float y, float z) const {
 }
 
 // Soft discs painted far to near straight into the frame. Triangle fans would blend their shared edges twice.
-unsigned Runtime::draw_puffs(const Live& n, Renderer::ParticleSystem& system, const ParticleView& view) {
+unsigned Runtime::draw_puffs(const Live& n, const ParticleView& view) {
     struct Puff { float x, y, z, age; };
     Puff puffs[MaxParticles];
     int count = 0;
     const float far_sq = (1500.0f * JetWorldScale) * (1500.0f * JetWorldScale);
-    for (const auto& p : system.pool) {
-        if (!p.active) continue;
+    for (const auto& p : particles_[size_t(n.particles)].particles) {
+        if (!p.active || count == MaxParticles) continue;
         const float dx = p.pos.x - view.px, dy = p.pos.y - view.py, dz = p.pos.z - view.pz;
         if (dx * dx + dy * dy + dz * dz > far_sq) continue;
         float c[3];
         view.to_camera(p.pos.x, p.pos.y, p.pos.z, c);
         if (c[2] <= view.near || c[2] >= view.far) continue;
-        puffs[count++] = {c[0], c[1], c[2], 1 - p.life / p.maxLife};
+        puffs[count++] = {c[0], c[1], c[2], 1 - p.life / p.max_life};
     }
     std::sort(puffs, puffs + count, [](const Puff& a, const Puff& b) { return a.z > b.z; });
     // scene_.render() has already advanced the frame counter.

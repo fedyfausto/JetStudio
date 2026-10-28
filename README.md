@@ -1,4 +1,4 @@
-# Jet Studio - prototype 0.3.1
+# Jet Studio - prototype 0.5.0
 
 A **Godot**-style 3D desktop editor, built with Godot's UI, with an **independent C++17** game
 runtime, the **Jet** renderer and the **JetScript** scripting language (GDScript syntax). The
@@ -34,17 +34,21 @@ otherwise make the Wayland driver terminate. The interface scale is changed from
 
 ## Layout (like Godot)
 
-- **Top bar**: Scene/Project/Debug/Editor/Help menus, **3D · Script · Game** screens,
+- **Top bar**: Scene/Project/Debug/Editor/Help menus, **2D · 3D · Script · Game** screens,
   Play (F5), Play current scene (F6), Pause (F7), Stop (F8), target, Build, Flash.
 - **Scene** (top left): node tree. `+` or Ctrl+A opens *Create New Node*; drag nodes to
   reparent them (the global transform is kept); double-click or F2 renames; Ctrl+D duplicates;
-  Delete deletes; eye icon = visibility; script icon = open script.
+  Delete deletes; eye icon = visibility; script icon = open script; signal icon = its connections.
+  The context menu's *Change Type...* turns a node into another type, keeping its name, children,
+  script and the properties both types have. A new scene (Ctrl+N) asks for its root, as Godot:
+  2D Scene (`Node2D`), 3D Scene (`Node3D` with a light and an environment), User Interface (a
+  `Control` as big as the screen) or Other Node.
 - **FileSystem** (bottom left): the contents of `res://`. Double-click opens scenes and scripts;
   the context menu creates scripts/scenes/folders, renames, duplicates, deletes (to the trash)
   and sets the main scene. Drag a `.jet` onto a node to attach it. Selecting a PNG or an OBJ
   shows its **import settings** in the Inspector (like Godot's Import dock), saved next to the
   file in `name.png.import` / `name.obj.import`; "Reimport" applies them.
-- **Inspector** (right): categories per class (MeshInstance3D, Node3D, Node…), collapsible
+- **Inspector** and **Signals** (right): the Signals tab is Godot's Node dock (see Signals). The Inspector has categories per class (MeshInstance3D, Node3D, Node…), collapsible
   groups, draggable numeric fields (Shift for precision, Ctrl for snapping, click to type a
   value or an expression), a button that reverts to the default value, a property filter and the
   `@export` variables of the attached script. A drag produces a single undo step.
@@ -62,6 +66,13 @@ otherwise make the Wayland driver terminate. The interface scale is changed from
 | `Camera3D` | vertical FOV, near/far, `current` |
 | `DirectionalLight3D` | color and energy; lights along its own −Z |
 | `WorldEnvironment` | background (color, sky/ground gradient, panorama) and ambient light |
+| `Node2D` | 2D position (canvas pixels, y down), rotation, scale and `z_index`; children follow it |
+| `Sprite2D` | a PNG or one frame of a sprite sheet in the 2D world: `centered`, `offset`, flips, `modulate`; rotated and scaled at full resolution |
+| `AnimatedSprite2D` | a sprite sheet with named animations (`idle 0-3 8, run 4-9 12`): `play()`, `stop()`, autoplay |
+| `Camera2D` | moves the 2D view (its position at the screen centre), `offset`, `zoom` |
+| `StaticBody2D`, `CharacterBody2D`, `RigidBody2D` | the 3D bodies' 2D versions, in pixels with y down (gravity 980 px/s²) |
+| `Area2D` | reports bodies and other areas that enter and exit (bullets, pickups, triggers) |
+| `CollisionShape2D` | Rectangle, Circle or Capsule shape of a 2D body or area; `one_way_collision` for jump-through platforms |
 | `Control` | groups 2D nodes (a HUD): children sit relative to it and are hidden and faded with it |
 | `Label` | 2D text over the scene, the runtime's 7×15 bitmap font (Latin with accents), integer scale |
 | `TextureRect` | 2D PNG image, integer scale or free size, transparent key color |
@@ -72,6 +83,7 @@ otherwise make the Wayland driver terminate. The interface scale is changed from
 | `Area3D` | reports bodies that enter and exit (coins, triggers, zones) |
 | `CollisionShape3D` | Box, Sphere or Capsule collision shape, child of a body or an area |
 | `CPUParticles3D` | particle emitter (sparks, splashes, fountains) using Jet's particle system |
+| `Timer` | counts down `wait_time` and emits `timeout`; `one_shot`, `autostart`, `start()`, `stop()`, `time_left` |
 
 2D nodes (`Control`) use 320×240 screen pixels; the position is relative to the parent Control.
 They have opacity and visibility, are selected by clicking them in the viewport and are moved by
@@ -90,8 +102,41 @@ dragging them (Y = 8 px snap); from scripts: `text`, `color`, `position`, `size`
   `angular_velocity`, damping (plus Godot's default 0.1), `freeze`, `sleeping`,
   `apply_central_impulse()`, `apply_impulse()`, `apply_central_force()`. Spheres roll; boxes
   do not tip over. Bodies that have been at rest for half a second go to sleep and cost nothing.
-- **Area3D**: `_on_body_entered(body)` / `_on_body_exited(body)` in the area's script (the
-  names Godot gives to connected signals), `get_overlapping_bodies()`, `overlaps_body()`.
+- **Area3D**: the signals `body_entered(body)` / `body_exited(body)` and, for other areas in
+  its mask, `area_entered(area)` / `area_exited(area)`, which any node can connect to; the
+  area's own script also gets `_on_body_entered(body)` and the others by name (the names Godot
+  gives to connected signals). `get_overlapping_bodies()`, `overlaps_body()`,
+  `get_overlapping_areas()`, `overlaps_area()`.
+
+**2D physics** has the same nodes and API in canvas pixels with y down: `StaticBody2D`,
+`CharacterBody2D` (`velocity` is a Vector2, the floor is below), `RigidBody2D` (gravity
+980 px/s² like Godot, `angular_velocity` in rad/s, circles roll), `Area2D` and
+`CollisionShape2D` (Rectangle, Circle, Capsule). `one_way_collision` makes a platform that
+bodies land on from above and jump through from below. 2D and 3D shapes never meet. In the
+viewport 2D shapes are outlined where they are drawn (through the Camera2D).
+
+### Signals
+
+Godot's signals, from scripts: `signal health_changed(old, new)`, `health_changed.emit(3, 2)`,
+`$Player.health_changed.connect(_on_health_changed)`, `connect("died", _on_died, CONNECT_ONE_SHOT)`,
+`disconnect()`, `is_connected()`, `emit_signal()`. A method or a signal named without calling it is a
+`Callable` or a `Signal` value (`$Timer.timeout.connect($Door.hide)`). The engine's nodes emit
+`body_entered`/`body_exited`/`area_entered`/`area_exited` (areas), `timeout` (Timer),
+`animation_finished` (AnimatedSprite2D) and `finished` (a one-shot CPUParticles3D).
+The connections are kept by the VM, outside the nodes: a node costs no memory for its signals,
+and a signal nobody is connected to costs one check when it is emitted. Freeing a node drops its
+connections.
+
+In the editor, the **Signals** tab next to the Inspector is Godot's Node dock (Signals): the selected node's
+signals (its script's first, then its classes'), each with its connections. *Connect...* (or a
+double-click on a signal) opens Godot's dialog: pick the receiving node, keep or change the
+proposed method (`_on_wave_timer_timeout`, `_on_body_entered` on itself), One Shot. A method the
+receiver's script doesn't have is added to it and the script opens there; a node without a script
+can receive the signal in one of its engine methods (`hide`, `queue_free`, `start`...). The Scene
+dock shows a signal icon on the nodes that have connections, the Script screen a slot icon next to
+the methods they call. The connections are saved in the `.jetscene`, follow undo, copies and
+deletions, travel in the package and are made when the scene starts or is instantiated, before
+`_ready()`; a missing method is reported in the Output.
 
 In the 3D viewport shapes are drawn in light blue. `examples/physics_demo` (generated by
 `./jet-studio examples`) uses all of them: a character that jumps, a ramp, a moving platform,
@@ -106,7 +151,8 @@ Bounce and friction combine as in Godot (bounces are added, up to 1; the lower f
 
 ### Particles
 
-`CPUParticles3D` uses Godot's properties: `emitting`, `amount` (up to 200, Jet's fixed pool),
+`CPUParticles3D` uses Godot's properties: `emitting`, `amount` (up to 200; each particle takes
+about 40 bytes, Jet's pool of 200 is shared by all emitters to draw them),
 `lifetime`, `one_shot`, `explosiveness`, `lifetime_randomness`, `emission_shape` (Point,
 Sphere, Box), `direction` and `spread` (cone), `gravity`, `initial_velocity_min/max`,
 `damping_min/max`; from scripts also `restart()`. Emission and simulation follow Godot's cycle:
@@ -174,7 +220,7 @@ again. Only the import settings change, never the PNG files.
 - **From scripts**: `color`, `alpha`, `uv_offset`, `uv_scale`, `perspective_correct`,
   `texture_filter` of the MeshInstance3D.
 
-Examples: `examples/jetrun` (an OutRun-style race: an endless road of recycled segments with curves
+Examples: `examples/jet_blaster` (a side-scrolling 2D shooter: `Sprite2D` stars on three parallax layers, an `AnimatedSprite2D` ship that tilts and fires on its own, enemies, bullets and explosions spawned with `instantiate()` and freed when done, hits found by `Area2D` collision layers and masks and passed on with signals, waves and messages paced by `Timer` nodes connected in the Signals dock, explosions that free themselves with no script, a `Camera2D` that shakes on hits; two buttons move the ship; about 62 fps on the Nano and 83 fps on the Nucleo-F746ZG), `examples/jetrun` (an OutRun-style race: an endless road of recycled segments with curves
 and hills, `Sprite3D` palms and rival cars, the player's car turning through sprite-sheet frames, a start gate with lights,
 two buttons to steer, one script per node: game, track, player, traffic, camera, HUD; about 60 fps on the Nano), `examples/textured_boxes` (JetExamples' "textured boxes" demo, with the CC0 crate),
 `examples/first_world` (panoramic sunset sky) and `examples/neon_car` (the "Neon Motorworks"
@@ -186,9 +232,17 @@ JetExamples demos (up to the "ESP 88" film): [docs/jet-demos-analysis.md](docs/j
 Coordinates as in Godot: meters, Y up, −Z forward. The runtime converts to Jet's left-handed
 space. At most 256 nodes and 128 meshes per scene.
 
-## 3D viewport
+## 2D and 3D views
 
-Navigation as in Godot: **middle button** orbits, **Shift+middle** pans, **Ctrl+middle** zooms,
+The **2D** screen is Godot's 2D editor: the canvas alone (no 3D world), with a grid, the axes,
+the game's screen as a purple rectangle at the origin and each Camera2D's view. **Middle** or
+**right button** (or Alt+left) pans, the **wheel** zooms where the cursor is, **F** centres the
+selection; clicking picks the 2D node or Control under the cursor and dragging moves it (Y
+snaps to 8 px). Controls sit on the screen rectangle, as Godot shows a CanvasLayer. It is drawn
+by the runtime at the display's resolution, so it looks like the board. A 2D or UI scene opens
+in the 2D screen, a 3D one in the 3D screen; Ctrl+F1/F2 switch.
+
+In the **3D** screen the navigation is Godot's: **middle button** orbits, **Shift+middle** pans, **Ctrl+middle** zooms,
 **right button** looks around, with **WASD/QE** to fly (Shift for speed, wheel = speed),
 **wheel** zooms, **Alt+left** emulates the middle button (touchpad), **F** focuses the selection,
 numpad 1/3/7 for front/right/top views. Tools: Q select, W move, E rotate, R scale,
@@ -226,6 +280,22 @@ its `_ready()` runs. Play, Export and Build take every `.jetscene` of the projec
 (and the firmware) contains all of them; they share scripts, textures and models, and only the
 current scene is in memory. Stop always goes back to the scene you are editing.
 `examples/physics_demo` goes to `win.jetscene` after the last coin and back with Space.
+
+A scene can also be a part to spawn while playing (bullets, enemies, explosions), as in Godot:
+
+```gdscript
+var bullet_scene = preload("res://bullet.jetscene")
+
+func shoot():
+    var bullet = bullet_scene.instantiate()
+    bullet.position = position
+    get_parent().add_child(bullet)
+```
+
+`instantiate()` builds the scene's nodes outside the tree with their scripts set up; `add_child()`
+puts them in, and `_ready()` runs. `remove_child()` takes a subtree out without freeing it, and
+`queue_free()` releases the nodes and everything they hold at the end of the frame, so spawning
+and freeing for a whole game doesn't grow the memory.
 
 **Autoloads** (`Project > Project Settings > Autoload`, as in Godot) keep state across scenes:
 pick a script and a name, and every script reaches it as a global or at `/root/<Name>`:
@@ -274,6 +344,12 @@ machine, without the compiler.
   - **Release**: no console, logs, statistics or assertions (`firmware/sdkconfig.release`):
     with `neon_car`, 72 KB less program and 6 KB less static RAM. Flashing over USB stays
     automatic. Both profiles are optimized for speed (`-O2`).
+  - Before building, the Output log estimates the game's RAM on the board: frame buffers,
+    textures, compiled scripts and the heaviest scene (nodes, meshes, triangle queues,
+    particles). On boards with PSRAM it shows what goes to PSRAM and what stays in internal
+    RAM; on boards without it says whether the game fits with both field buffers, with one
+    (slower), or not at all. What scripts create while playing (spawned scenes, arrays) isn't
+    known in advance: on a Nucleo-F746ZG the estimate stays within ~10% of the measured heap.
 - **Serial** (bottom panel): monitor of the board's USB console. ESP-IDF level colors,
   clickable script errors (they open the line), device FPS and memory to the right of the tabs,
   "Restart" to restart the board over USB and see the log from boot. Crash and watchdog
@@ -345,11 +421,14 @@ not written back): `tools/patches/LovyanGFX-stm32-dma.patch` fixes it, and `./je
 applies it.
 Memory: the RAM is the internal RAM (no PSRAM), so the firmware keeps only the scene being played
 in RAM, reads palette textures straight from the package in flash, shares identical meshes and
-gives each node only the fields of its type. The second field buffer (38 KB at 320×240) is given
+gives each node only the fields of its type. Nodes live in blocks of 8 (~4 KB), so a scene that
+spawns many of them never needs one big free piece of RAM. The second field buffer (38 KB at 320×240) is given
 up when the scene needs the RAM: drawing then waits for the DMA. Running out of RAM is reported in
 the log instead of crashing. Verified on a Nucleo-F746ZG with an ILI9341 at 54 MHz:
-`examples/textured_boxes` and `examples/first_world` run at ~12 ms per frame (83 fps),
-`examples/jetrun` at ~25 ms with one field buffer. `examples/physics_demo` doesn't fit in 320 KB.
+`examples/textured_boxes` and `examples/first_world` run at ~12 ms per frame (83 fps) with
+~140 KB of RAM to spare, `examples/jet_blaster` at ~12 ms with 25-60 KB (the later waves have
+more enemies on screen), `examples/jetrun` at
+~25 ms with one field buffer. `examples/physics_demo` doesn't fit in 320 KB.
 The firmware takes ~425 KB of flash (Jet, runtime, VM and LovyanGFX): on the 512 KB boards
 ~90 KB remain for the scene.
 
@@ -389,7 +468,7 @@ package and the project have the same actions.
   (save them to update the file).
 - `.jet`: JetScript script.
 - `*.import`: import settings of a PNG or OBJ (JSON, next to the file).
-- `.jetpack`: binary package version 14 (resolution, Input Map, every scene of the project with its 3D and 2D nodes, autoloads, materials, converted textures, imported meshes, script bytecode, exported values)
+- `.jetpack`: binary package version 16 (resolution, Input Map, every scene of the project with its 3D and 2D nodes and signal connections, autoloads, materials, converted textures, imported meshes, script bytecode, exported values)
   read by the runtime. The bytecode has a version, an instruction-set fingerprint and a CRC; on
   load every operand and jump is verified. A package must be re-exported when the JetScript version changes.
 
@@ -472,14 +551,14 @@ The `neon_car` example is left out because its car model can't be redistributed.
 ./jet-studio test --screenshot .cache/tests/editor.png
 ```
 
-`test` runs the C++ tests (runtime, bytecode, "VM-only" player and 2436 JetScript checks) and the editor smoke test: it creates a project,
+`test` runs the C++ tests (runtime, bytecode, "VM-only" player and 2522 JetScript checks) and the editor smoke test: it creates a project,
 adds and undoes nodes, edits properties, checks undo merging during drags, the hierarchy,
 scripts with exported variables, Play/Stop, the runtime error with pause and line, saving,
 reopening and export, the 2D nodes (dragging, picking, text), a RigidBody3D falling onto a
 StaticBody3D, and OBJ/MTL import with import settings. The C++ tests also cover OBJ import,
 quantization, Quad/Torus, reflections, the 2D overlay, Draw Order, physics (rest, bounce, stacks,
 character on the floor, walls and slopes, moving platforms, crate pushing, areas, layers,
-disabled shapes), particles, the Input Map, scene changes, autoloads, Sprite3D and the v14 package; `device`
+disabled shapes), particles, the Input Map, scene changes, autoloads, Sprite3D, signals and the v16 package; `device`
 builds the runtime and Jet with the device configuration and checks fields, the row-by-row HUD
 and bands without z-buffer; `serial` tests the serial port on a pseudo-terminal. They also pass
 with AddressSanitizer/UBSan.
@@ -508,7 +587,7 @@ The diagrams are drawn by `tools/diagrams.py` (plain Python): run it after chang
 ### Data flow
 
 1. A project is `.jetscene` files (JSON v2: `{"format": "jetscene", "version": 2, "root": {id,
-   name, type, properties, children}}`), `.jet` scripts, PNG/OBJ/MTL assets with their
+   name, type, properties, children}, "connections": [{from, signal, to, method, flags}]}`, nodes by id), `.jet` scripts, PNG/OBJ/MTL assets with their
    `.import` settings and `project.jetproject` (hardware and therefore resolution, Input Map).
 2. `studio.gd` passes the bridge the resolution and the Input Map, then calls
    `load_scene(doc, scripts, assets)`. It sends the scene Dictionary, the script sources (with
@@ -595,11 +674,14 @@ bilinear filter, no picking):
 
 | `editor/scripts/` | Role |
 | --- | --- |
-| `studio.gd` | main window: menus, toolbar, scene tabs, 3D/Script/Game screens, undo/redo, Play/Stop, export, Build/Flash jobs (`tasks.py` started with `OS.create_process`, log polled from `.cache/jobs/`), command-line export, smoke test (`--smoke-test`) |
+| `studio.gd` | main window: menus, toolbar, scene tabs, 2D/3D/Script/Game screens, undo/redo, Play/Stop, export, Build/Flash jobs (`tasks.py` started with `OS.create_process`, log polled from `.cache/jobs/`), command-line export, smoke test (`--smoke-test`) |
 | `scene_document.gd` | scene model: node Dictionaries, class hierarchy, per-class property schema (Inspector rows and defaults), validation, v1 migration, configuration warnings, transforms |
 | `inspector.gd`, `spin_slider.gd` | Inspector built from the schema and the script's `@export`s, import settings of PNG/OBJ files |
 | `scene_dock.gd`, `filesystem_dock.gd`, `project.gd` | node tree, `res://` browser, file I/O of the project folder. The docks emit signals and `studio.gd` applies the edits |
-| `viewport_3d.gd` | editor camera with Godot's navigation. Shows the bridge's frame, draws grid, selection, gizmos, collision shapes and emitter cones on a 2D overlay with its own projection of the same camera, picks with `bridge.pick()` |
+| `viewport_3d.gd` | the 2D and 3D views: editor camera with Godot's navigation, or the canvas with pan and zoom (`set_editor_canvas()`). Shows the bridge's frame, draws grid, selection, gizmos, collision shapes and emitter cones on a 2D overlay with its own projection of the same view, picks with `bridge.pick()` |
+| `signals_dock.gd`, `connect_dialog.gd` | Signals tab and Godot's Connect dialog |
+| `new_scene_dialog.gd`, `create_node_dialog.gd` | a new scene's root; Create New Node, also for Change Type |
+| `script_highlighter.gd` | JetScript colours, token by token |
 | `script_editor.gd` | `CodeEdit` with highlighting. `bridge.compile_script()` while typing (errors, warnings, exports, outline), completion from `bridge.class_db()` |
 | `project_settings_dialog.gd`, `hardware.gd`, `input_map.gd` | project settings, board/display catalogue with the pin rules of `tools/hardware.py`, Input Map |
 | `serial_monitor.gd` | Serial panel on `JetSerial` |
@@ -611,7 +693,8 @@ with the same merge key, such as a drag, make one step), change, then `_upload()
 the scene to `load_scene()` again so the runtime rebuilds its Jet objects. When something has
 changed, and on every frame during Play, `render_frame()` returns the frame as an
 `ImageTexture` converted from RGB565: the 3D view with the editor camera
-(`set_editor_camera()`), the Game screen with the scene's `Camera3D`. It is the same runtime and
+(`set_editor_camera()`), the 2D view with the editor's canvas view (`set_editor_canvas()`), the
+Game screen with the scene's `Camera3D`. It is the same runtime and
 Jet code as the device, in the full-frame configuration. During Play `_process()` passes the
 input mask and `update(delta)`, drains the log (a script error pauses the game and opens the
 line) and reads `node_state()` for the live Inspector values. Stop restores the authored scene.
@@ -630,7 +713,7 @@ examples/     Example projects (first_world, textured_boxes, neon_car, physics_d
 tools/        Setup, build, assets, examples, launcher and asynchronous jobs
 ```
 
-Not available yet: audio, signals and classes in JetScript, scene instances,
+Not available yet: audio, `await`, lambdas and classes in JetScript,
 animations, particle preview in the editor, a debugger with breakpoints, physics with box
 rotations (arcade only), collisions with OBJ meshes.
 The firmware of the example project (scene + 3 scripts in bytecode) compiles: 521 KB of program

@@ -6,9 +6,11 @@
 #include "ParticleSystem.hpp"
 #include "font_data.hpp"
 #include <algorithm>
+#include <cstdlib>
 #include <cctype>
 #include <cmath>
 #include <unordered_set>
+#include <set>
 
 namespace jetstudio {
 namespace {
@@ -153,6 +155,16 @@ const char* node_type_name(NodeType type) {
     case NodeType::CPUParticles3D: return "CPUParticles3D";
     case NodeType::Sprite3D: return "Sprite3D";
     case NodeType::Control: return "Control";
+    case NodeType::Node2D: return "Node2D";
+    case NodeType::Sprite2D: return "Sprite2D";
+    case NodeType::AnimatedSprite2D: return "AnimatedSprite2D";
+    case NodeType::Camera2D: return "Camera2D";
+    case NodeType::StaticBody2D: return "StaticBody2D";
+    case NodeType::CharacterBody2D: return "CharacterBody2D";
+    case NodeType::RigidBody2D: return "RigidBody2D";
+    case NodeType::Area2D: return "Area2D";
+    case NodeType::CollisionShape2D: return "CollisionShape2D";
+    case NodeType::Timer: return "Timer";
     }
     return "Node";
 }
@@ -164,9 +176,17 @@ __attribute__((weak)) void* cold_alloc(size_t bytes) { return std::malloc(bytes)
 __attribute__((weak)) void cold_free(void* p) { std::free(p); }
 
 bool uses_extras(NodeType type) {
-    return type != NodeType::Node && type != NodeType::Node3D && type != NodeType::MeshInstance3D && type != NodeType::Sprite3D;
+    return type != NodeType::Node && type != NodeType::Node3D && type != NodeType::MeshInstance3D && type != NodeType::Sprite3D
+        && type != NodeType::Node2D && type != NodeType::Sprite2D;
 }
-bool is_node3d(NodeType type) { return type != NodeType::Node && type != NodeType::WorldEnvironment && !is_control(type); }
+bool is_node2d(NodeType type) {
+    return type == NodeType::Node2D || type == NodeType::Sprite2D || type == NodeType::AnimatedSprite2D || type == NodeType::Camera2D
+        || physics::is_flat(type);
+}
+bool is_node3d(NodeType type) {
+    return type != NodeType::Node && type != NodeType::WorldEnvironment && type != NodeType::Timer && !is_control(type)
+        && !is_node2d(type);
+}
 uint16_t rgb565(uint32_t c) { return uint16_t(((c >> 19) & 31) << 11 | ((c >> 10) & 63) << 5 | ((c >> 3) & 31)); }
 
 bool validate(const Description& d, std::string& error) {
@@ -219,6 +239,19 @@ bool validate(const Description& d, std::string& error) {
                 || std::abs(v.v) > 1000) return fail("Model with invalid coordinates: " + m.path);
     }
     if (total_vertices > MaxSceneVertices) return fail("Models exceed 262144 vertices in total.");
+    auto check_connections = [&](const std::vector<NodeDesc>& nodes, const std::vector<SceneConnection>& connections) -> bool {
+        if (connections.size() > MaxConnections) return fail("At most 512 signal connections per scene.");
+        auto identifier = [](const std::string& s) {
+            if (s.empty() || s.size() > 80 || std::isdigit(uint8_t(s[0]))) return false;
+            for (char c : s) if (!std::isalnum(uint8_t(c)) && c != '_') return false;
+            return true;
+        };
+        for (const auto& c : connections)
+            if (c.from < 0 || c.to < 0 || size_t(c.from) >= nodes.size() || size_t(c.to) >= nodes.size() || !identifier(c.signal)
+                || !identifier(c.method) || (c.flags & ~6u))
+                return fail("Invalid signal connection: " + c.signal + " -> " + c.method + ".");
+        return true;
+    };
     auto check_nodes = [&](const std::vector<NodeDesc>& nodes) -> bool {
         if (nodes.empty()) return fail("The scene must have a root node.");
         if (nodes.size() > MaxNodes) return fail("At most 256 nodes per scene.");
@@ -228,10 +261,12 @@ bool validate(const Description& d, std::string& error) {
         for (size_t i = 0; i < nodes.size(); ++i) {
             const auto& n = nodes[i];
             if (i == 0 ? n.parent != -1 : (n.parent < 0 || size_t(n.parent) >= i)) return fail("Invalid node hierarchy.");
-            if (!n.id || n.id >= AutoloadIdBase || !ids.insert(n.id).second) return fail("Duplicate or null node identifier.");
+            if (!n.id || n.id >= InstanceIdBase || !ids.insert(n.id).second) return fail("Duplicate or null node identifier.");
             if (!valid_name(n.name)) return fail("Invalid node name: \"" + n.name + "\" (1..80 characters, without . : @ / \" %).");
             if (!siblings.insert(std::to_string(n.parent) + "/" + n.name).second) return fail("Two sibling nodes have the same name: " + n.name);
-            if (uint8_t(n.type) > uint8_t(NodeType::Control)) return fail("Unsupported node type.");
+            if (uint8_t(n.type) > uint8_t(NodeType::Timer)) return fail("Unsupported node type.");
+            if (n.type == NodeType::Timer && (!std::isfinite(n.more().lifetime) || n.more().lifetime < 0.001f || n.more().lifetime > 100000))
+                return fail("Invalid wait time in " + n.name + " (0.001 to 100000 seconds).");
             if (n.type == NodeType::CPUParticles3D) {
                 const float values[] = {n.more().lifetime, n.more().lifetime_randomness, n.more().explosiveness, n.more().spread, n.more().velocity_min, n.more().velocity_max,
                                         n.more().damping_min, n.more().damping_max, n.more().emission_radius};
@@ -248,19 +283,42 @@ bool validate(const Description& d, std::string& error) {
                     || n.more().puff_size_end < 0 || n.more().puff_size_end > 100)
                     return fail("Particle parameter out of range in " + n.name + " (amount 1-200, lifetime 0.01-600 s, spread 0-180).");
             }
-            if (n.type == NodeType::CollisionShape3D
-                && (uint8_t(n.more().collision) > uint8_t(CollisionKind::Capsule) || !bounded(n.more().box_size, 1000) || n.more().box_size.x <= 0 || n.more().box_size.y <= 0
-                    || n.more().box_size.z <= 0 || !std::isfinite(n.more().radius) || n.more().radius <= 0 || n.more().radius > 1000 || !std::isfinite(n.more().height)
-                    || n.more().height <= 0 || n.more().height > 1000)) return fail("Invalid collision shape in " + n.name + ".");
+            // Sizes in metres, or in pixels for 2D shapes (whose box depth isn't used).
+            const float most = physics::is_flat(n.type) ? 100000 : 1000;
+            if (physics::is_collision_shape(n.type)
+                && (uint8_t(n.more().collision) > uint8_t(CollisionKind::Capsule) || !bounded(n.more().box_size, most) || n.more().box_size.x <= 0 || n.more().box_size.y <= 0
+                    || (n.type == NodeType::CollisionShape3D && n.more().box_size.z <= 0) || !std::isfinite(n.more().radius) || n.more().radius <= 0
+                    || n.more().radius > most || !std::isfinite(n.more().height) || n.more().height <= 0 || n.more().height > most))
+                return fail("Invalid collision shape in " + n.name + ".");
             if (physics::is_collision_object(n.type)) {
                 const float values[] = {n.more().mass, n.more().gravity_scale, n.more().linear_damp, n.more().angular_damp, n.more().friction, n.more().bounce, n.more().floor_max_angle};
                 for (float v : values) if (!std::isfinite(v) || std::abs(v) > 100000) return fail("Invalid physics parameter in " + n.name + ".");
                 if (n.more().mass <= 0 || n.more().bounce < 0 || n.more().bounce > 1 || n.more().friction < 0 || n.more().linear_damp < 0 || n.more().angular_damp < 0
-                    || n.more().floor_max_angle < 0 || n.more().floor_max_angle > 89 || !bounded(n.more().linear_velocity, 1000) || !bounded(n.more().angular_velocity, 1000))
+                    || n.more().floor_max_angle < 0 || n.more().floor_max_angle > 89 || !bounded(n.more().linear_velocity, most) || !bounded(n.more().angular_velocity, 1000))
                     return fail("Physics parameter out of range in " + n.name + ".");
             }
-            if (!bounded(n.position, is_control(n.type) ? 10000 : 1000) || !bounded(n.rotation, 100000) || !valid_scale(n.scale))
+            if (is_node2d(n.type)) {
+                // Negative scales flip, as in Godot.
+                if (!bounded(n.position, 100000) || !bounded(n.rotation, 100000) || !bounded(n.scale, 1000) || !std::isfinite(n.offset[0])
+                    || !std::isfinite(n.offset[1]) || std::abs(n.offset[0]) > 100000 || std::abs(n.offset[1]) > 100000
+                    || n.z_index < -4096 || n.z_index > 4096 || n.color > 0xffffff || !std::isfinite(n.alpha) || n.alpha < 0 || n.alpha > 1)
+                    return fail("Invalid 2D node: " + n.name + ".");
+            } else if (!bounded(n.position, is_control(n.type) ? 10000 : 1000) || !bounded(n.rotation, 100000) || !valid_scale(n.scale)) {
                 return fail("Transform out of range in " + n.name + ".");
+            }
+            if (n.type == NodeType::Sprite2D || n.type == NodeType::AnimatedSprite2D) {
+                std::vector<SpriteAnimation> animations;
+                if (!texture_ok(n.texture) || n.hframes < 1 || n.vframes < 1 || n.hframes > 256 || n.vframes > 256
+                    || n.frame >= n.hframes * n.vframes || n.more().animations.size() > MaxText
+                    || !parse_animations(n.more().animations, n.hframes * n.vframes, animations) || !std::isfinite(n.more().speed_scale)
+                    || std::abs(n.more().speed_scale) > 100)
+                    return fail("Invalid sprite in " + n.name + ".");
+            }
+            if (n.type == NodeType::Camera2D) {
+                const float* zoom = n.more().zoom;
+                if (!std::isfinite(zoom[0]) || !std::isfinite(zoom[1]) || zoom[0] <= 0.01f || zoom[1] <= 0.01f || zoom[0] > 100 || zoom[1] > 100)
+                    return fail("Invalid Camera2D zoom in " + n.name + ".");
+            }
             if (is_control(n.type) && (n.more().text.size() > MaxText || !n.more().size.finite() || n.more().size.x < 0 || n.more().size.y < 0 || n.more().size.x > 4096
                 || n.more().size.y > 4096 || n.more().text_scale < 1 || n.more().text_scale > 8 || n.color > 0xffffff || !std::isfinite(n.alpha) || n.alpha < 0
                 || n.alpha > 1 || !texture_ok(n.texture))) return fail("Invalid 2D node: " + n.name + ".");
@@ -300,7 +358,7 @@ bool validate(const Description& d, std::string& error) {
         }
         return true;
     };
-    if (!check_nodes(d.nodes)) return false;
+    if (!check_nodes(d.nodes) || !check_connections(d.nodes, d.connections)) return false;
 
     if (d.autoloads.size() > MaxAutoloads) return fail("At most 16 autoloads.");
 
@@ -319,7 +377,7 @@ bool validate(const Description& d, std::string& error) {
         bool ok = scene.path.rfind("res://", 0) == 0 && scene.path.size() <= 512 && scene.path != d.path;
         for (size_t j = 0; j < i; ++j) ok = ok && d.scenes[j].path != scene.path;
         if (!ok) return fail("Invalid or duplicate scene path: " + scene.path);
-        if (!check_nodes(scene.nodes)) {
+        if (!check_nodes(scene.nodes) || !check_connections(scene.nodes, scene.connections)) {
             error += " (" + scene.path + ")";
             return false;
         }
@@ -420,20 +478,30 @@ bool Runtime::load_pack(const uint8_t* data, size_t size, std::string& error, bo
     pack_size_ = size;
     // Every scene was validated while decoding; the built one now lives in nodes_.
     std::vector<NodeDesc>().swap(description_.nodes);
-    for (auto& scene : description_.scenes) std::vector<NodeDesc>().swap(scene.nodes);
+    std::vector<SceneConnection>().swap(description_.connections);
+    for (auto& scene : description_.scenes) {
+        std::vector<NodeDesc>().swap(scene.nodes);
+        std::vector<SceneConnection>().swap(scene.connections);
+    }
     return true;
 }
 
 // The nodes of a scene, from the description or read again from the package.
-const std::vector<NodeDesc>* Runtime::nodes_of(std::string_view path) {
+const std::vector<NodeDesc>* Runtime::nodes_of(std::string_view path, std::vector<SceneConnection>* connections) {
     const std::vector<NodeDesc>* nodes = nullptr;
+    const std::vector<SceneConnection>* links = nullptr;
     uint32_t offset = 0;
-    if (path == description_.path) { nodes = &description_.nodes; offset = description_.nodes_offset; }
+    if (path == description_.path) { nodes = &description_.nodes; links = &description_.connections; offset = description_.nodes_offset; }
     for (const auto& scene : description_.scenes)
-        if (scene.path == path) { nodes = &scene.nodes; offset = scene.offset; }
-    if (!nodes || !pack_ || !nodes->empty()) return nodes;
+        if (scene.path == path) { nodes = &scene.nodes; links = &scene.connections; offset = scene.offset; }
+    if (!nodes || !pack_ || !nodes->empty()) {
+        if (connections && links) *connections = *links;
+        return nodes;
+    }
     std::string error;
-    if (!decode_nodes(pack_, pack_size_, offset, pack_nodes_, error)) return nullptr;
+    std::vector<SceneConnection> read;
+    if (!decode_nodes(pack_, pack_size_, offset, pack_nodes_, read, error)) return nullptr;
+    if (connections) *connections = std::move(read);
     return &pack_nodes_;
 }
 
@@ -449,11 +517,12 @@ bool Runtime::build(std::string& error) {
     nodes_.clear();
     index_.clear();
     meshes_ = 0;
-    pending_free_ = false;
+    pending_free_ = reorder_needed_ = false;
+    next_instance_id_ = InstanceIdBase;
     if (!scene_nodes_) scene_nodes_ = &description_.nodes;
     const auto& scene_nodes = *scene_nodes_;
-    // Exact capacity: a push_back past it would double the array, and a Live is ~490 bytes on the device.
-    std::vector<Live>().swap(nodes_);
+
+    nodes_.clear();
     nodes_.reserve(scene_nodes.size() + description_.autoloads.size());
     nodes_.resize(scene_nodes.size());
     for (size_t i = 0; i < nodes_.size(); ++i) {
@@ -462,44 +531,12 @@ bool Runtime::build(std::string& error) {
         n.parent = n.d.parent;
         if (n.parent >= 0) nodes_[n.parent].children.push_back(int32_t(i));
         index_[n.d.id] = int32_t(i);
-        if (n.d.type == NodeType::Sprite3D) {
-            // A quad, unlit and double-sided like Godot's Sprite3D, the frame picked through the UVs.
-            n.d.shape = Shape::Quad;
-            n.d.shading = Shading::Unlit;
-            n.d.cull = CullMode::Disabled;
-            n.d.repeat = false;
-            n.d.perspective = true;
-            n.d.reflection = false;
-            sprite_uv(n.d);
-        } else if (n.d.type != NodeType::MeshInstance3D || (n.d.shape == Shape::Mesh && n.d.mesh < 0)) {
-            continue;
-        }
-        auto material = std::make_unique<Renderer::Material>(rgb565(n.d.color));
-        // Reflections rewrite their UVs every frame, so they always keep geometry of their own.
-        // The others get their shared copy at the first bake, once the world scale is known.
-        Renderer::Object* mesh = n.d.reflection ? make_mesh(n.d, material.get()) : new Renderer::Object();
-        mesh->calculateBoundingBox();
-        n.baked_scale = {0, 0, 0}; // forces the first bake
-        n.object = mesh;
-        n.material = material.get();
-        if (n.d.texture >= 0) {
-            const auto& asset = description_.textures[size_t(n.d.texture)];
-            const bool indexed = !asset.palette.empty();
-            auto* data = indexed ? reinterpret_cast<uint16_t*>(const_cast<uint8_t*>(asset.index_data()))
-                                 : const_cast<uint16_t*>(asset.pixels.data());
-            auto texture = std::make_unique<Renderer::Texture>(asset.width, asset.height, data, asset.has_alpha, asset.alpha_color,
-                false, Renderer::WRAP, indexed ? const_cast<uint16_t*>(asset.palette.data()) : nullptr);
-            n.texture = texture.get();
-            material->diffuseMap = n.texture;
-            textures_.push_back(std::move(texture));
-        }
-        n.applied = Applied::of(n.d);
-        apply_material(n);
-        scene_.addObject(mesh);
-        objects_.emplace_back(mesh);
-        materials_.push_back(std::move(material));
-        ++meshes_;
+        create_visual(int32_t(i));
     }
+    scene_ids_.clear();
+    if (!scene_connections_.empty())
+        for (size_t i = 0; i < scene_nodes.size(); ++i) scene_ids_.push_back(nodes_[i].d.id);
+
     // Autoloads come after the scene, outside its tree, and keep their ids across scene changes.
     for (size_t i = 0; i < description_.autoloads.size(); ++i) {
         Live a;
@@ -515,13 +552,93 @@ bool Runtime::build(std::string& error) {
         scene_nodes_ = nullptr;
     }
 
-    // Each shape belongs to the nearest body or area above it. The hierarchy can't change while playing.
+    collect_physics();
+    particles_.clear(); // created by start()
+    particle_triangles_ = 0;
+    update_transforms();
+    apply_environment();
+    apply_camera();
+    return true;
+}
+
+// The Jet object, material and texture of a mesh or sprite node.
+void Runtime::create_visual(int32_t index) {
+    Live& n = nodes_[size_t(index)];
+    if (n.d.type == NodeType::Sprite3D) {
+        // A quad, unlit and double-sided like Godot's Sprite3D, the frame picked through the UVs.
+        n.d.shape = Shape::Quad;
+        n.d.shading = Shading::Unlit;
+        n.d.cull = CullMode::Disabled;
+        n.d.repeat = false;
+        n.d.perspective = true;
+        n.d.reflection = false;
+        sprite_uv(n.d);
+    } else if (n.d.type != NodeType::MeshInstance3D || (n.d.shape == Shape::Mesh && n.d.mesh < 0)) {
+        return;
+    }
+
+    auto material = std::make_unique<Renderer::Material>(rgb565(n.d.color));
+    // Reflections rewrite their UVs every frame, so they always keep geometry of their own.
+    // The others get their shared copy at the first bake, once the world scale is known.
+    Renderer::Object* mesh = n.d.reflection ? make_mesh(n.d, material.get()) : new Renderer::Object();
+    mesh->calculateBoundingBox();
+    n.baked_scale = {0, 0, 0}; // forces the first bake
+    n.object = mesh;
+    n.material = material.get();
+    if (n.d.texture >= 0) {
+        const auto& asset = description_.textures[size_t(n.d.texture)];
+        const bool indexed = !asset.palette.empty();
+        auto* data = indexed ? reinterpret_cast<uint16_t*>(const_cast<uint8_t*>(asset.index_data()))
+                             : const_cast<uint16_t*>(asset.pixels.data());
+        auto texture = std::make_unique<Renderer::Texture>(asset.width, asset.height, data, asset.has_alpha, asset.alpha_color,
+            false, Renderer::WRAP, indexed ? const_cast<uint16_t*>(asset.palette.data()) : nullptr);
+        n.texture = texture.get();
+        material->diffuseMap = n.texture;
+        textures_.push_back(std::move(texture));
+    }
+
+    n.applied = Applied::of(n.d);
+    apply_material(n);
+    scene_.addObject(mesh);
+    objects_.emplace_back(mesh);
+    materials_.push_back(std::move(material));
+    ++meshes_;
+}
+
+// Frees what a freed node holds outside nodes_: its script, Jet object, material, texture and particles.
+void Runtime::release_node(Live& n) {
+    if (vm_->has_instance(n.d.id)) vm_->detach(n.d.id);
+    vm_->forget(n.d.id);
+    if (n.object) {
+        auto& drawn = scene_.getObjects();
+        drawn.erase(std::remove(drawn.begin(), drawn.end(), n.object), drawn.end());
+        objects_.erase(std::find_if(objects_.begin(), objects_.end(), [&](const auto& o) { return o.get() == n.object; }));
+        materials_.erase(std::find_if(materials_.begin(), materials_.end(), [&](const auto& m) { return m.get() == n.material; }));
+        if (n.texture)
+            textures_.erase(std::find_if(textures_.begin(), textures_.end(), [&](const auto& t) { return t.get() == n.texture; }));
+        n.object = nullptr;
+        n.material = nullptr;
+        n.texture = nullptr;
+        --meshes_;
+    }
+    if (n.particles >= 0) {
+        particles_[size_t(n.particles)] = {};
+        n.particles = -1;
+    }
+}
+
+// Each shape belongs to the nearest body or area above it. Called again whenever the tree changes.
+void Runtime::collect_physics() {
     shape_owners_.clear();
     collision_objects_.clear();
     for (size_t i = 0; i < nodes_.size(); ++i) {
-        if (nodes_[i].d.type != NodeType::CollisionShape3D) continue;
-        int body = nodes_[i].parent;
-        while (body >= 0 && !physics::is_collision_object(nodes_[size_t(body)].d.type)) body = nodes_[size_t(body)].parent;
+        const Live& n = nodes_[i];
+        if (!physics::is_collision_shape(n.d.type) || n.freed || !n.in_tree) continue;
+        // A 2D shape belongs to a 2D body or area, a 3D one to a 3D one.
+        const bool flat = physics::is_flat(n.d.type);
+        int body = n.parent;
+        while (body >= 0 && !(physics::is_collision_object(nodes_[size_t(body)].d.type) && physics::is_flat(nodes_[size_t(body)].d.type) == flat))
+            body = nodes_[size_t(body)].parent;
         if (body < 0) continue;
         shape_owners_.emplace_back(int32_t(i), body);
         if (std::find(collision_objects_.begin(), collision_objects_.end(), body) == collision_objects_.end())
@@ -529,12 +646,6 @@ bool Runtime::build(std::string& error) {
     }
     has_physics_ = !shape_owners_.empty();
     physics_->built = physics_->valid = false;
-    particles_.clear(); // created by start()
-    particle_triangles_ = 0;
-    update_transforms();
-    apply_environment();
-    apply_camera();
-    return true;
 }
 
 namespace {
@@ -740,16 +851,30 @@ void Runtime::update_transforms(bool sync) {
                 n.local_valid = true;
             }
             n.world = parent ? parent->world * n.local : n.local;
-            n.world_visible = n.d.visible && !n.freed && (!parent || parent->world_visible);
+            n.world_visible = n.d.visible && !n.freed && n.in_tree && (!parent || parent->world_visible);
+        } else if (is_node2d(n.d.type)) {
+            // A 2D node inherits from a 2D parent; under anything else it starts a canvas of its own, as in Godot.
+            const Live* parent2d = n.parent >= 0 && is_node2d(nodes_[n.parent].d.type) ? &nodes_[n.parent] : nullptr;
+            if (!n.local_valid || n.d.position != n.local_position || n.d.rotation != n.local_rotation || n.d.scale != n.local_scale) {
+                const Vec3 position{n.d.position.x, n.d.position.y, 0}, rotation{0, 0, n.d.rotation.z}, scale{n.d.scale.x, n.d.scale.y, 1};
+                n.local = local_transform(position, rotation, scale);
+                n.local_position = n.d.position;
+                n.local_rotation = n.d.rotation;
+                n.local_scale = n.d.scale;
+                n.local_valid = true;
+            }
+            n.world = parent2d ? parent2d->world * n.local : n.local;
+            n.world_visible = n.d.visible && !n.freed && n.in_tree && (!parent2d || parent2d->world_visible);
+            n.canvas_z = int16_t(std::clamp(n.d.z_index + (parent2d ? parent2d->canvas_z : 0), -4096, 4096));
         } else if (is_control(n.d.type)) {
             // As in Godot, a Control sits relative to its parent Control, and any hidden ancestor hides it.
             const bool nested = n.parent >= 0 && is_control(nodes_[n.parent].d.type);
             n.world = {};
             n.world.origin = nested ? nodes_[n.parent].world.origin + n.d.position : n.d.position;
-            n.world_visible = n.d.visible && !n.freed && (n.parent < 0 || nodes_[n.parent].world_visible);
+            n.world_visible = n.d.visible && !n.freed && n.in_tree && (n.parent < 0 || nodes_[n.parent].world_visible);
         } else {
             n.world = {};
-            n.world_visible = !n.freed;
+            n.world_visible = !n.freed && n.in_tree;
         }
         if (sync && n.object) sync_object(n);
     }
@@ -760,7 +885,7 @@ void Runtime::apply_environment() {
     const Live* environment = nullptr;
     const Live* light = nullptr;
     for (const auto& n : nodes_) {
-        if (n.freed) continue;
+        if (n.freed || !n.in_tree) continue;
         if (!environment && n.d.type == NodeType::WorldEnvironment) environment = &n;
         if (!light && n.d.type == NodeType::DirectionalLight3D && n.world_visible) light = &n;
     }
@@ -780,8 +905,8 @@ void Runtime::apply_environment() {
 void Runtime::apply_camera() {
     const Live* camera = nullptr;
     if (playing_ && !editor_view_) {
-        for (const auto& n : nodes_) if (!n.freed && n.d.type == NodeType::Camera3D && n.d.more().current) { camera = &n; break; }
-        if (!camera) for (const auto& n : nodes_) if (!n.freed && n.d.type == NodeType::Camera3D) { camera = &n; break; }
+        for (const auto& n : nodes_) if (!n.freed && n.in_tree && n.d.type == NodeType::Camera3D && n.d.more().current) { camera = &n; break; }
+        if (!camera) for (const auto& n : nodes_) if (!n.freed && n.in_tree && n.d.type == NodeType::Camera3D) { camera = &n; break; }
     }
     Basis basis;
     Vec3 position;
@@ -857,6 +982,12 @@ bool coerce(const jetscript::Value& in, jetscript::Type type, jetscript::Value& 
         out = type == Type::Vector3 ? jetscript::Value(jetscript::Vector3{v[0], v[1], v[2]}) : jetscript::Value(jetscript::Color{v[0], v[1], v[2]});
         return true;
     }
+    if (type == Type::Vector2 && from == Type::Array && in.array_size() == 2) {
+        const auto x = in.array_get(0), y = in.array_get(1);
+        if (!x.is_number() || !y.is_number()) return false;
+        out = jetscript::Value(jetscript::Vector2{x.as_real(), y.as_real()});
+        return true;
+    }
     if (type == Type::Color && from == Type::Int) {
         const auto c = uint32_t(in.as_int());
         out = jetscript::Value(jetscript::Color{((c >> 16) & 255) / 255.0f, ((c >> 8) & 255) / 255.0f, (c & 255) / 255.0f});
@@ -872,7 +1003,7 @@ bool Runtime::start(std::vector<ScriptDiagnostic>& errors) {
     playing_ = false;
     vm_->clear();
     vm_->take_errors();
-    scene_nodes_ = nodes_of(description_.path);
+    scene_nodes_ = nodes_of(description_.path, &scene_connections_);
     current_scene_ = description_.path;
     pending_scene_.clear();
     build(error);
@@ -911,10 +1042,14 @@ bool Runtime::start(std::vector<ScriptDiagnostic>& errors) {
 }
 
 // Like Godot, the autoloads are ready before the first scene.
+// Scripts may add nodes, which can move nodes_: loops that call them go by id, never keeping a Live&.
 void Runtime::start_autoloads() {
-    for (auto& n : nodes_) {
-        if (n.d.id < AutoloadIdBase || n.d.script < 0) continue;
-        if (vm_->attach(n.d.id, compiled_[size_t(n.d.script)])) vm_->ready(n.d.id);
+    std::vector<uint32_t> ids;
+    for (const auto& n : nodes_)
+        if (n.d.id >= AutoloadIdBase && n.d.script >= 0) ids.push_back(n.d.id);
+    for (uint32_t id : ids) {
+        const int i = index_of(id);
+        if (i >= 0 && vm_->attach(id, compiled_[size_t(nodes_[size_t(i)].d.script)])) vm_->ready(id);
     }
     flush_script_errors();
 }
@@ -923,43 +1058,319 @@ void Runtime::enter_scene() {
     physics_time_ = 0;
     start_particles();
     for (auto& n : nodes_)
-        if (n.d.type == NodeType::RigidBody3D) {
+        if (physics::is_rigid(n.d.type)) {
             n.edit_motion().velocity = n.d.more().linear_velocity;
             n.edit_motion().angular = n.d.more().angular_velocity;
         }
-    for (auto& n : nodes_) {
-        if (n.d.script < 0 || vm_->has_instance(n.d.id)) continue; // autoloads are already running
-        const auto& script = compiled_[size_t(n.d.script)];
-        if (!vm_->attach(n.d.id, script)) continue;
-        for (const auto& o : n.d.overrides) {
-            const auto& exports = script->exports();
-            const auto found = std::find_if(exports.begin(), exports.end(), [&](const auto& e) { return e.name == o.name; });
-            if (found == exports.end()) continue; // the variable was removed from the script
-            jetscript::Value value;
-            if (!coerce(o.value, found->type, value) || !vm_->set_member(n.d.id, o.name, value))
-                log("Invalid value for " + n.d.name + "." + o.name, true, script->path(), found->line);
-        }
-    }
+    std::vector<uint32_t> ids;
+    for (const auto& n : nodes_)
+        if (n.d.script >= 0) ids.push_back(n.d.id);
+    for (uint32_t id : ids) attach_script(id); // autoloads are already running
+    // As in Godot, the scene's connections are made before _ready().
+    connect_scene(scene_connections_, scene_ids_);
+    std::vector<SceneConnection>().swap(scene_connections_);
+    std::vector<uint32_t>().swap(scene_ids_);
     flush_script_errors();
     // _ready(): children before parents, siblings in tree order, as in Godot.
-    std::vector<std::pair<int32_t, size_t>> stack{{0, 0}};
-    while (!stack.empty()) {
-        auto& [index, child] = stack.back();
-        if (child < nodes_[index].children.size()) {
-            const int32_t next = nodes_[index].children[child++];
-            stack.push_back({next, 0});
-            continue;
-        }
-        Live& n = nodes_[index];
-        stack.pop_back();
-        if (!n.freed && vm_->has_instance(n.d.id)) vm_->ready(n.d.id);
-    }
-    flush_script_errors();
+    if (!nodes_.empty()) enter_tree(0);
     free_pending();
     update_transforms();
     for (int32_t i : collision_objects_) nodes_[size_t(i)].edit_motion().last_origin = nodes_[size_t(i)].world.origin;
     apply_environment();
     apply_camera();
+}
+
+// Creates the script instance (its member initializers run) and applies the exported values set in the scene.
+void Runtime::attach_script(uint32_t id) {
+    int i = index_of(id);
+    if (i < 0 || nodes_[size_t(i)].d.script < 0 || vm_->has_instance(id)) return;
+    const auto& script = compiled_[size_t(nodes_[size_t(i)].d.script)];
+    if (!vm_->attach(id, script)) return;
+
+    // The initializers may have added nodes: look the node up again.
+    i = index_of(id);
+    if (i < 0) return;
+    const NodeDesc& d = nodes_[size_t(i)].d;
+    for (const auto& o : d.overrides) {
+        const auto& exports = script->exports();
+        const auto found = std::find_if(exports.begin(), exports.end(), [&](const auto& e) { return e.name == o.name; });
+        if (found == exports.end()) continue; // the variable was removed from the script
+        jetscript::Value value;
+        if (!coerce(o.value, found->type, value) || !vm_->set_member(id, o.name, value))
+            log("Invalid value for " + d.name + "." + o.name, true, script->path(), found->line);
+    }
+}
+
+// The nodes of a scene, copied from the description or read again from the package.
+bool Runtime::scene_descs(std::string_view path, std::vector<NodeDesc>& out, std::vector<SceneConnection>& connections) const {
+    const std::vector<NodeDesc>* nodes = nullptr;
+    const std::vector<SceneConnection>* links = nullptr;
+    uint32_t offset = 0;
+    if (path == description_.path) { nodes = &description_.nodes; links = &description_.connections; offset = description_.nodes_offset; }
+    for (const auto& scene : description_.scenes)
+        if (scene.path == path) { nodes = &scene.nodes; links = &scene.connections; offset = scene.offset; }
+    if (!nodes) return false;
+    if (!nodes->empty() || !pack_) {
+        out = *nodes;
+        connections = *links;
+        return !out.empty();
+    }
+    std::string error;
+    return decode_nodes(pack_, pack_size_, offset, out, connections, error);
+}
+
+void Runtime::connect_scene(const std::vector<SceneConnection>& connections, const std::vector<uint32_t>& ids) {
+    auto name = [&](uint32_t id) {
+        const int i = index_of(id);
+        return i >= 0 ? nodes_[size_t(i)].d.name : std::string("?");
+    };
+    for (const auto& c : connections) {
+        if (size_t(c.from) >= ids.size() || size_t(c.to) >= ids.size()) continue;
+        const uint32_t from = ids[size_t(c.from)], to = ids[size_t(c.to)];
+        std::string error;
+        if (!vm_->connect(from, c.signal, to, c.method, c.flags, error))
+            log("Signal connection " + name(from) + "." + c.signal + " -> " + name(to) + "." + c.method + "(): " + error, true);
+    }
+}
+
+// PackedScene.instantiate(): the scene's nodes outside the tree, with their scripts attached but not ready yet.
+uint32_t Runtime::instantiate(std::string_view path, std::string& error) {
+    std::vector<NodeDesc> descs;
+    std::vector<SceneConnection> connections;
+    if (!scene_descs(path, descs, connections)) {
+        error = "Failed to instantiate \"" + std::string(path) + "\": no such scene in the package.";
+        return 0;
+    }
+
+    const size_t first = nodes_.size();
+    std::vector<uint32_t> ids;
+    for (auto& desc : descs) {
+        Live n;
+        n.d = std::move(desc);
+        n.d.id = next_instance_id_++;
+        n.parent = n.d.parent >= 0 ? int32_t(first) + n.d.parent : -1;
+        n.in_tree = false;
+        const int32_t index = int32_t(nodes_.size());
+        if (n.parent >= 0) nodes_[size_t(n.parent)].children.push_back(index);
+        index_[n.d.id] = index;
+        ids.push_back(n.d.id);
+        nodes_.push_back(std::move(n));
+        create_visual(index);
+    }
+
+    // Scripts once the whole subtree exists, since their initializers may look for children.
+    for (uint32_t id : ids) attach_script(id);
+    connect_scene(connections, ids);
+    flush_script_errors();
+    return ids.front();
+}
+
+// Node.add_child(): the child (with its subtree) joins the parent; if the parent is in the tree, it enters it too.
+bool Runtime::add_child(int32_t parent, int32_t child, std::string& error) {
+    Live& c = nodes_[size_t(child)];
+    Live& p = nodes_[size_t(parent)];
+    if (c.parent >= 0) {
+        error = "Can't add child \"" + c.d.name + "\" to \"" + p.d.name + "\", already has a parent \"" +
+                nodes_[size_t(c.parent)].d.name + "\".";
+        return false;
+    }
+    if (c.in_tree || c.d.id >= AutoloadIdBase || child == 0) {
+        error = "Can't add child \"" + c.d.name + "\": it is a scene root or an autoload.";
+        return false;
+    }
+    for (int32_t i = parent; i >= 0; i = nodes_[size_t(i)].parent)
+        if (i == child) {
+            error = "Can't add child \"" + c.d.name + "\" to \"" + p.d.name + "\": it is one of its ancestors.";
+            return false;
+        }
+
+    // Siblings need distinct names (paths go by name): Bullet, Bullet2, Bullet3...
+    const std::string base = c.d.name;
+    for (int n = 2;; ++n) {
+        const bool taken = std::any_of(p.children.begin(), p.children.end(),
+                                       [&](int32_t s) { return nodes_[size_t(s)].d.name == c.d.name; });
+        if (!taken) break;
+        c.d.name = base + std::to_string(n);
+    }
+
+    c.parent = parent;
+    p.children.push_back(child);
+    if (child < parent) reorder_needed_ = true;
+    if (p.in_tree) enter_tree(child);
+    return true;
+}
+
+// Node.remove_child(): the child stays alive outside the tree, as in Godot; add_child() can put it back.
+bool Runtime::remove_child(int32_t parent, int32_t child, std::string& error) {
+    Live& p = nodes_[size_t(parent)];
+    const auto found = std::find(p.children.begin(), p.children.end(), child);
+    if (found == p.children.end()) {
+        error = "Cannot remove child \"" + nodes_[size_t(child)].d.name + "\" as it's not a child of \"" + p.d.name + "\".";
+        return false;
+    }
+    p.children.erase(found);
+    nodes_[size_t(child)].parent = -1;
+
+    std::vector<int32_t> stack{child};
+    while (!stack.empty()) {
+        Live& n = nodes_[size_t(stack.back())];
+        stack.pop_back();
+        n.in_tree = false;
+        stack.insert(stack.end(), n.children.begin(), n.children.end());
+    }
+    collect_physics();
+    return true;
+}
+
+// A subtree joins the scene: particles, the initial velocity of rigid bodies, physics, then _ready() with
+// children before parents, as in Godot.
+void Runtime::enter_tree(int32_t root) {
+    std::vector<uint32_t> ready;
+    std::vector<std::pair<int32_t, size_t>> stack{{root, 0}};
+    while (!stack.empty()) {
+        auto& [index, child] = stack.back();
+        Live& n = nodes_[size_t(index)];
+        if (child == 0) {
+            if (!n.in_tree && physics::is_rigid(n.d.type)) {
+                n.edit_motion().velocity = n.d.more().linear_velocity;
+                n.edit_motion().angular = n.d.more().angular_velocity;
+            }
+            n.in_tree = true;
+            if (playing_ && n.d.type == NodeType::CPUParticles3D && n.particles < 0) start_particle(n);
+            if (playing_ && n.d.type == NodeType::AnimatedSprite2D && n.d.more().autoplay && !n.d.more().playing) play_animation(n, {});
+            if (playing_ && n.d.type == NodeType::Timer && n.d.more().autoplay && !n.d.more().playing) start_timer(n);
+        }
+        if (child < n.children.size()) {
+            const int32_t next = n.children[child++];
+            stack.push_back({next, 0});
+            continue;
+        }
+        if (!n.freed && vm_->has_instance(n.d.id)) ready.push_back(n.d.id);
+        stack.pop_back();
+    }
+    collect_physics();
+
+    // _ready() may add nodes, which can move nodes_: go by id.
+    for (uint32_t id : ready) {
+        const int i = index_of(id);
+        if (i >= 0 && !nodes_[size_t(i)].freed) vm_->ready(id);
+    }
+    flush_script_errors();
+}
+
+// "idle 0-3 8, run 4-9 12, die 10-14 10 once": name, first-last frame (or one frame), frames per second, "once".
+bool parse_animations(std::string_view text, int frames, std::vector<SpriteAnimation>& out) {
+    out.clear();
+    size_t start = 0;
+    while (start <= text.size()) {
+        size_t end = text.find_first_of(",\n", start);
+        if (end == std::string_view::npos) end = text.size();
+        std::vector<std::string_view> words;
+        for (size_t i = start; i < end;) {
+            while (i < end && text[i] == ' ') ++i;
+            size_t j = i;
+            while (j < end && text[j] != ' ') ++j;
+            if (j > i) words.push_back(text.substr(i, j - i));
+            i = j;
+        }
+        start = end + 1;
+        if (words.empty()) continue;
+        if (words.size() < 2 || words.size() > 4 || out.size() >= 64) return false;
+
+        SpriteAnimation a;
+        a.name = std::string(words[0]);
+        const std::string range(words[1]);
+        char* rest = nullptr;
+        a.first = int(std::strtol(range.c_str(), &rest, 10));
+        a.last = *rest == '-' ? int(std::strtol(rest + 1, &rest, 10)) : a.first;
+        if (*rest || a.first < 0 || a.last < a.first || a.last >= frames) return false;
+        if (words.size() >= 3) {
+            const std::string fps(words[2]);
+            a.fps = std::strtof(fps.c_str(), &rest);
+            if (*rest || !std::isfinite(a.fps) || a.fps <= 0 || a.fps > 240) return false;
+        }
+        if (words.size() == 4) {
+            if (words[3] != "once") return false;
+            a.loop = false;
+        }
+        out.push_back(std::move(a));
+    }
+    return true;
+}
+
+// AnimatedSprite2D.play(): an empty name plays the current animation, or the first one.
+bool Runtime::play_animation(Live& n, std::string_view name) {
+    auto& e = n.d.extras();
+    std::vector<SpriteAnimation> animations;
+    parse_animations(e.animations, n.d.hframes * n.d.vframes, animations);
+    if (name.empty()) name = !e.animation.empty() ? std::string_view(e.animation) : std::string_view();
+    const auto found = std::find_if(animations.begin(), animations.end(), [&](const auto& a) { return name.empty() || a.name == name; });
+    if (found == animations.end()) return false;
+    if (e.animation != found->name || !e.playing) {
+        e.animation = found->name;
+        e.anim_time = 0;
+        n.d.frame = uint16_t(found->first);
+    }
+    e.anim_first = int16_t(found->first);
+    e.anim_last = int16_t(found->last);
+    e.anim_fps = found->fps;
+    e.anim_loop = found->loop;
+    e.playing = true;
+    return true;
+}
+
+// Advances the playing AnimatedSprite2Ds and Timers. A "once" animation stops on its last frame.
+void Runtime::update_animations(float dt) {
+    for (auto& n : nodes_) {
+        if ((n.d.type != NodeType::AnimatedSprite2D && n.d.type != NodeType::Timer) || n.freed || !n.in_tree || !n.d.more().playing)
+            continue;
+        auto& e = n.d.extras();
+
+        // Godot's Timer: at most one timeout per frame, a repeating one keeps the time it overran by.
+        if (n.d.type == NodeType::Timer) {
+            if (e.paused) continue;
+            n.cycle -= dt;
+            if (n.cycle >= 0) continue;
+            if (e.one_shot) {
+                e.playing = false;
+                n.cycle = 0;
+            } else {
+                n.cycle += e.lifetime;
+            }
+            if (vm_->has_connections(n.d.id)) signals_.push_back({n.d.id, "timeout"});
+            continue;
+        }
+
+        e.anim_time += dt * e.speed_scale;
+        const int count = e.anim_last - e.anim_first + 1;
+        int step = int(std::floor(e.anim_time * e.anim_fps));
+        if (e.anim_loop) {
+            step %= count;
+            if (step < 0) step += count;
+        } else if (step >= count || step < 0) {
+            step = step < 0 ? 0 : count - 1;
+            e.playing = false;
+            if (vm_->has_connections(n.d.id)) signals_.push_back({n.d.id, "animation_finished"});
+        }
+        n.d.frame = uint16_t(e.anim_first + step);
+    }
+    emit_signals();
+}
+
+void Runtime::start_timer(Live& n, float wait_time) {
+    auto& e = n.d.extras();
+    if (wait_time > 0) e.lifetime = wait_time;
+    e.playing = true;
+    n.cycle = e.lifetime;
+}
+
+// The callees may add and free nodes, so they run after the walk over nodes_ that found the signals.
+void Runtime::emit_signals() {
+    if (signals_.empty()) return;
+    std::vector<std::pair<uint32_t, const char*>> pending;
+    pending.swap(signals_);
+    for (const auto& [id, signal] : pending) vm_->emit_signal(id, signal);
+    flush_script_errors();
 }
 
 bool Runtime::change_scene(std::string_view path) {
@@ -973,12 +1384,17 @@ bool Runtime::change_scene(std::string_view path) {
 void Runtime::switch_scene() {
     const std::string path = std::move(pending_scene_);
     pending_scene_.clear();
-    const std::vector<NodeDesc>* target = nodes_of(path);
+    std::vector<SceneConnection> connections;
+    const std::vector<NodeDesc>* target = nodes_of(path, &connections);
     if (!target) return;
-    for (const auto& n : nodes_)
-        if (n.d.id < AutoloadIdBase && vm_->has_instance(n.d.id)) vm_->detach(n.d.id);
+    for (const auto& n : nodes_) {
+        if (n.d.id >= AutoloadIdBase) continue;
+        if (vm_->has_instance(n.d.id)) vm_->detach(n.d.id);
+        vm_->forget(n.d.id); // the next scene's nodes may get the same ids
+    }
     flush_script_errors();
     scene_nodes_ = target;
+    scene_connections_ = std::move(connections);
     current_scene_ = path;
     std::string error;
     build(error);
@@ -999,18 +1415,93 @@ void Runtime::stop() {
     editor_view_ = true;
 }
 
+// queue_free() is deferred to the end of the frame, as in Godot. The freed nodes, their subtrees included,
+// release what they hold and leave nodes_, so spawning and freeing doesn't grow it forever.
 void Runtime::free_pending() {
-    // queue_free() is deferred to the end of the frame, as in Godot.
-    if (!pending_free_) return;
-    pending_free_ = false;
-    physics_->built = false; // freed bodies and shapes leave the physics world
-    for (auto& n : nodes_) {
-        // Parents precede children, so a freed parent is already marked.
-        if (n.free_requested || (n.parent >= 0 && nodes_[n.parent].freed)) n.freed = true;
-        if (!n.freed) continue;
-        if (vm_->has_instance(n.d.id)) vm_->detach(n.d.id);
-        if (n.object) n.object->enabled = false;
+    if (!pending_free_ && !reorder_needed_) return;
+    if (pending_free_) {
+        pending_free_ = false;
+        std::vector<int32_t> stack;
+        for (size_t i = 0; i < nodes_.size(); ++i)
+            if (nodes_[i].free_requested) stack.push_back(int32_t(i));
+        while (!stack.empty()) {
+            Live& n = nodes_[size_t(stack.back())];
+            stack.pop_back();
+            if (n.freed) continue;
+            n.freed = true;
+            stack.insert(stack.end(), n.children.begin(), n.children.end());
+        }
+        for (auto& n : nodes_)
+            if (n.freed) release_node(n);
     }
+    compact_nodes();
+}
+
+// Drops the freed nodes and keeps parents before children (update_transforms() needs it), then fixes every index.
+void Runtime::compact_nodes() {
+    std::vector<int32_t> order;
+    order.reserve(nodes_.size());
+    if (reorder_needed_) {
+        // A node went under one that comes later: walk the trees again, roots in their current order.
+        std::vector<int32_t> stack;
+        for (size_t i = nodes_.size(); i-- > 0;)
+            if (nodes_[i].parent < 0) stack.push_back(int32_t(i));
+        while (!stack.empty()) {
+            const int32_t i = stack.back();
+            stack.pop_back();
+            if (nodes_[size_t(i)].freed) continue;
+            order.push_back(i);
+            const auto& children = nodes_[size_t(i)].children;
+            stack.insert(stack.end(), children.rbegin(), children.rend());
+        }
+    } else {
+        for (size_t i = 0; i < nodes_.size(); ++i)
+            if (!nodes_[i].freed) order.push_back(int32_t(i));
+        if (order.size() == nodes_.size()) return;
+    }
+
+    std::vector<int32_t> moved_to(nodes_.size(), -1);
+    for (size_t k = 0; k < order.size(); ++k) moved_to[size_t(order[k])] = int32_t(k);
+    if (reorder_needed_) {
+        // In place, one cycle of the permutation at a time: a second array would need as much RAM again.
+        // source[k] is the node that goes to slot k; the freed ones go last.
+        std::vector<int32_t> source(order);
+        for (size_t i = 0; i < nodes_.size(); ++i)
+            if (moved_to[i] < 0) source.push_back(int32_t(i));
+        std::vector<bool> placed(source.size(), false);
+        for (size_t k = 0; k < source.size(); ++k) {
+            if (placed[k]) continue;
+            placed[k] = true;
+            if (size_t(source[k]) == k) continue;
+            Live held = std::move(nodes_[k]);
+            size_t j = k;
+            while (size_t(source[j]) != k) {
+                nodes_[j] = std::move(nodes_[size_t(source[j])]);
+                j = size_t(source[j]);
+                placed[j] = true;
+            }
+            nodes_[j] = std::move(held);
+        }
+        nodes_.resize(order.size());
+    } else {
+        // Same order minus the freed: in place, no second array.
+        for (size_t k = 0; k < order.size(); ++k)
+            if (size_t(order[k]) != k) nodes_[k] = std::move(nodes_[size_t(order[k])]);
+        nodes_.resize(order.size());
+    }
+    reorder_needed_ = false;
+
+    index_.clear();
+    for (size_t k = 0; k < nodes_.size(); ++k) {
+        Live& n = nodes_[k];
+        index_[n.d.id] = int32_t(k);
+        n.parent = n.parent >= 0 ? moved_to[size_t(n.parent)] : -1;
+        n.children.clear();
+        if (n.motion_.allocated()) n.edit_motion().floor_body = -1; // found again at the next physics tick
+    }
+    for (size_t k = 0; k < nodes_.size(); ++k)
+        if (nodes_[k].parent >= 0) nodes_[size_t(nodes_[k].parent)].children.push_back(int32_t(k));
+    collect_physics();
 }
 
 void Runtime::update(float delta) {
@@ -1027,10 +1518,15 @@ void Runtime::update(float delta) {
         }
         if (ticks == 4) physics_time_ = 0;
         free_pending();
-        for (auto& n : nodes_)
-            if (!n.freed && n.d.script >= 0 && vm_->has_instance(n.d.id)) vm_->process(n.d.id, dt);
+        for (size_t i = 0; i < nodes_.size(); ++i) {
+            const Live& n = nodes_[i];
+            if (n.freed || !n.in_tree || n.d.script < 0) continue;
+            const uint32_t id = n.d.id;
+            if (vm_->has_instance(id)) vm_->process(id, dt);
+        }
         flush_script_errors();
         free_pending();
+        update_animations(dt);
         previous_input_ = input_;
         if (!pending_scene_.empty()) switch_scene();
     }
@@ -1053,7 +1549,7 @@ uint16_t lerp565(uint32_t a, uint32_t b, float t) {
 // Jet clears each row with gradient_ (water reflections use it too). A panorama is drawn here and Jet's clear is skipped.
 void Runtime::prepare_background() {
     const Live* env = nullptr;
-    for (const auto& n : nodes_) if (!n.freed && n.d.type == NodeType::WorldEnvironment) { env = &n; break; }
+    for (const auto& n : nodes_) if (!n.freed && n.in_tree && n.d.type == NodeType::WorldEnvironment) { env = &n; break; }
     gradient_.resize(size_t(height_));
     const Vec3 forward = -view_basis_.column(2);
     const float focal = (height_ * 0.5f) / std::tan(radians(view_fov_) * 0.5f);
@@ -1149,8 +1645,142 @@ int glyph_index(uint32_t code) {
 }
 } // namespace
 
+// The 2D nodes as seen by the current Camera2D (its position at the screen centre) or, without one, with the canvas
+// origin at the top-left corner, as in Godot. Sorted by z_index, then tree order; the Controls come after them.
+// The current Camera2D's view: screen = canvas * zoom + shift.
+void Runtime::set_editor_canvas(bool enabled, float zoom, Vec3 origin) {
+    editor_canvas_ = enabled;
+    editor_canvas_zoom_ = std::isfinite(zoom) ? std::clamp(zoom, 0.05f, 64.0f) : 1;
+    editor_canvas_origin_ = origin.finite() ? origin : Vec3{};
+}
+
+void Runtime::canvas_view(float& zoom_x, float& zoom_y, float& shift_x, float& shift_y) const {
+    zoom_x = zoom_y = 1;
+    shift_x = shift_y = 0;
+    if (canvas_override()) {
+        zoom_x = zoom_y = editor_canvas_zoom_;
+        shift_x = -editor_canvas_origin_.x * zoom_x;
+        shift_y = -editor_canvas_origin_.y * zoom_y;
+        return;
+    }
+    for (const auto& n : nodes_)
+        if (n.d.type == NodeType::Camera2D && !n.freed && n.in_tree && n.d.more().current) {
+            zoom_x = n.d.more().zoom[0];
+            zoom_y = n.d.more().zoom[1];
+            shift_x = width_ * 0.5f - (n.world.origin.x + n.d.offset[0]) * zoom_x;
+            shift_y = height_ * 0.5f - (n.world.origin.y + n.d.offset[1]) * zoom_y;
+            return;
+        }
+}
+
+std::vector<float> Runtime::shape_outline(uint32_t id) const {
+    std::vector<float> out;
+    const int index = index_of(id);
+    if (index < 0 || nodes_[size_t(index)].d.type != NodeType::CollisionShape2D || nodes_[size_t(index)].freed) return out;
+    const Live& n = nodes_[size_t(index)];
+    float zoom_x, zoom_y, shift_x, shift_y;
+    canvas_view(zoom_x, zoom_y, shift_x, shift_y);
+    auto add = [&](float x, float y) {
+        const Vec3 p = n.world.xform({x, y, 0});
+        out.push_back(p.x * zoom_x + shift_x);
+        out.push_back(p.y * zoom_y + shift_y);
+    };
+
+    // A closed polygon: the rectangle's corners, or the lower and upper half of the circle (capsule: apart).
+    const NodeExtras& e = n.d.more();
+    if (e.collision == CollisionKind::Box) {
+        const float w = e.box_size.x * 0.5f, h = e.box_size.y * 0.5f;
+        add(-w, -h); add(w, -h); add(w, h); add(-w, h);
+        return out;
+    }
+    constexpr int Arc = 12;
+    const float r = e.radius, half = e.collision == CollisionKind::Capsule ? std::max(0.0f, e.height * 0.5f - r) : 0;
+    for (int i = 0; i <= Arc; ++i) add(std::cos(Pi * i / Arc) * r, std::sin(Pi * i / Arc) * r + half);
+    for (int i = 0; i <= Arc; ++i) add(-std::cos(Pi * i / Arc) * r, -std::sin(Pi * i / Arc) * r - half);
+    return out;
+}
+
+void Runtime::prepare_canvas() {
+    float zoom_x, zoom_y, shift_x, shift_y;
+    canvas_view(zoom_x, zoom_y, shift_x, shift_y);
+    auto screen = [&](const Live& n, float x, float y) {
+        const Vec3 p = n.world.xform({x, y, 0});
+        return Vec3{p.x * zoom_x + shift_x, p.y * zoom_y + shift_y, 0};
+    };
+
+    std::vector<std::pair<int, int32_t>> order;
+    for (size_t i = 0; i < nodes_.size(); ++i) {
+        const Live& n = nodes_[i];
+        if ((n.d.type == NodeType::Sprite2D || n.d.type == NodeType::AnimatedSprite2D) && n.world_visible && n.d.texture >= 0)
+            order.emplace_back(n.canvas_z, int32_t(i));
+    }
+    std::stable_sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    for (const auto& [z, index] : order) {
+        const Live& n = nodes_[size_t(index)];
+        const NodeDesc& d = n.d;
+        // Opacity comes down from the 2D parents, like Godot's modulate.
+        float alpha = std::clamp(d.alpha, 0.0f, 1.0f);
+        for (int p = n.parent; p >= 0 && is_node2d(nodes_[p].d.type); p = nodes_[p].parent) alpha *= std::clamp(nodes_[p].d.alpha, 0.0f, 1.0f);
+        const auto& t = description_.textures[size_t(d.texture)];
+        const int fw = t.width / d.hframes, fh = t.height / d.vframes;
+        if (alpha <= 0 || fw <= 0 || fh <= 0) continue;
+
+        OverlayItem item;
+        item.type = NodeType::Sprite2D;
+        item.id = d.id;
+        item.texture = &t;
+        item.tint = d.color;
+        item.alpha = uint8_t(std::lround(alpha * 255));
+        const int frame = std::min(int(d.frame), d.hframes * d.vframes - 1);
+        item.frame_x = (frame % d.hframes) * fw;
+        item.frame_y = (frame / d.hframes) * fh;
+        item.frame_w = fw;
+        item.frame_h = fh;
+        item.flip_h = d.flip_h;
+        item.flip_v = d.flip_v;
+
+        // The frame's corners on the screen: a = (0, 0), b = (fw, 0), c = (0, fh).
+        const float left = (d.centered ? -fw * 0.5f : 0) + d.offset[0], top = (d.centered ? -fh * 0.5f : 0) + d.offset[1];
+        const Vec3 a = screen(n, left, top), b = screen(n, left + fw, top), c = screen(n, left, top + fh);
+        const Vec3 across = b - a, down = c - a;
+        if (std::abs(across.y) < 1e-3f && std::abs(down.x) < 1e-3f) {
+            // Not rotated: a rectangle, flipped by negative scales.
+            if (across.x < 0) item.flip_h = !item.flip_h;
+            if (down.y < 0) item.flip_v = !item.flip_v;
+            item.x = int(std::lround(std::min(a.x, b.x)));
+            item.y = int(std::lround(std::min(a.y, c.y)));
+            item.w = int(std::lround(std::max(a.x, b.x))) - item.x;
+            item.h = int(std::lround(std::max(a.y, c.y))) - item.y;
+        } else {
+            // Rotated or skewed: each screen pixel finds its texel through the inverse map.
+            const float det = across.x * down.y - down.x * across.y;
+            if (std::abs(det) < 1e-6f) continue;
+            const float m[4] = {down.y * fw / det, -down.x * fw / det, -across.y * fh / det, across.x * fh / det};
+            item.ux = int32_t(std::lround(m[0] * 65536));
+            item.uy = int32_t(std::lround(m[1] * 65536));
+            item.vx = int32_t(std::lround(m[2] * 65536));
+            item.vy = int32_t(std::lround(m[3] * 65536));
+            // At pixel centres: u = m0 * (x + 0.5 - a.x) + m1 * (y + 0.5 - a.y).
+            item.u0 = int64_t(std::llround((m[0] * (0.5f - a.x) + m[1] * (0.5f - a.y)) * 65536));
+            item.v0 = int64_t(std::llround((m[2] * (0.5f - a.x) + m[3] * (0.5f - a.y)) * 65536));
+            item.affine = true;
+            const Vec3 e = b + down;
+            const float x0 = std::min({a.x, b.x, c.x, e.x}), x1 = std::max({a.x, b.x, c.x, e.x});
+            const float y0 = std::min({a.y, b.y, c.y, e.y}), y1 = std::max({a.y, b.y, c.y, e.y});
+            item.x = int(std::floor(x0));
+            item.y = int(std::floor(y0));
+            item.w = int(std::ceil(x1)) - item.x;
+            item.h = int(std::ceil(y1)) - item.y;
+        }
+        if (item.w <= 0 || item.h <= 0 || item.x >= width_ || item.y >= height_ || item.x + item.w <= 0 || item.y + item.h <= 0) continue;
+        overlay_.push_back(std::move(item));
+    }
+}
+
 void Runtime::prepare_overlay() {
     overlay_.clear();
+    prepare_canvas();
     for (const auto& n : nodes_) {
         if (!is_control(n.d.type) || n.d.type == NodeType::Control || !n.world_visible) continue;
         // Opacity is inherited from the parent Controls, like Godot's modulate.
@@ -1160,20 +1790,25 @@ void Runtime::prepare_overlay() {
         const auto& d = n.d;
         OverlayItem item;
         item.type = d.type;
-        item.x = int(std::lround(n.world.origin.x));
-        item.y = int(std::lround(n.world.origin.y));
+        item.id = d.id;
+        // The editor's 2D view moves and zooms them with the canvas (text and images by whole pixels).
+        const float zoom = canvas_override() ? editor_canvas_zoom_ : 1;
+        const Vec3 at = canvas_override() ? (n.world.origin - editor_canvas_origin_) * zoom : n.world.origin;
+        item.x = int(std::lround(at.x));
+        item.y = int(std::lround(at.y));
         item.color = rgb565(d.color);
         item.tint = d.color;
         item.alpha = uint8_t(std::lround(alpha * 255));
         item.scale = uint8_t(std::max<int>(1, d.more().text_scale));
+        const float scale = item.scale * zoom;
         if (d.type == NodeType::ColorRect) {
-            item.w = int(std::lround(d.more().size.x));
-            item.h = int(std::lround(d.more().size.y));
+            item.w = int(std::lround(d.more().size.x * zoom));
+            item.h = int(std::lround(d.more().size.y * zoom));
         } else if (d.type == NodeType::TextureRect) {
             if (d.texture < 0) continue;
             item.texture = &description_.textures[size_t(d.texture)];
-            item.w = d.more().size.x > 0 ? int(std::lround(d.more().size.x)) : item.texture->width * item.scale;
-            item.h = d.more().size.y > 0 ? int(std::lround(d.more().size.y)) : item.texture->height * item.scale;
+            item.w = int(std::lround(d.more().size.x > 0 ? d.more().size.x * zoom : item.texture->width * scale));
+            item.h = int(std::lround(d.more().size.y > 0 ? d.more().size.y * zoom : item.texture->height * scale));
         } else {
             // UTF-8 to glyphs, one list per line.
             item.lines.emplace_back();
@@ -1187,8 +1822,10 @@ void Runtime::prepare_overlay() {
                 item.lines.back().push_back(uint8_t(glyph_index(code)));
                 longest = std::max(longest, item.lines.back().size());
             }
-            item.w = int(longest) * font::Width * item.scale;
-            item.h = int(item.lines.size()) * font::Height * item.scale;
+            item.columns = int(longest);
+            item.w = int(std::lround(float(longest * font::Width) * scale));
+            item.h = int(std::lround(float(item.lines.size() * font::Height) * scale));
+            item.stretched = zoom != 1;
         }
         if (item.w <= 0 || item.h <= 0 || item.x >= width_ || item.y >= height_ || item.x + item.w <= 0 || item.y + item.h <= 0) continue;
         overlay_.push_back(std::move(item));
@@ -1207,6 +1844,28 @@ void compose_overlay_row(const std::vector<OverlayItem>& items, uint16_t* row, i
         const int x0 = std::max(0, it.x), x1 = std::min(width, it.x + it.w);
         if (it.type == NodeType::ColorRect) {
             for (int x = x0; x < x1; ++x) put(x, it.color, it.alpha);
+        } else if (it.type == NodeType::Sprite2D) {
+            const auto& t = *it.texture;
+            const uint8_t* indices = t.palette.empty() ? nullptr : t.index_data();
+            auto draw = [&](int x, int u, int v) {
+                if (it.flip_h) u = it.frame_w - 1 - u;
+                if (it.flip_v) v = it.frame_h - 1 - v;
+                const size_t i = size_t(it.frame_y + v) * t.width + size_t(it.frame_x + u);
+                uint16_t c = indices ? t.palette[indices[i]] : t.pixels[i];
+                if (t.has_alpha && c == t.alpha_color) return;
+                if (it.tint != 0xffffff) c = tint565(c, it.tint);
+                put(x, c, it.alpha);
+            };
+            if (!it.affine) {
+                const int v = (y - it.y) * it.frame_h / it.h;
+                for (int x = x0; x < x1; ++x) draw(x, (x - it.x) * it.frame_w / it.w, v);
+            } else {
+                int64_t u = int64_t(it.ux) * x0 + int64_t(it.uy) * y + it.u0;
+                int64_t v = int64_t(it.vx) * x0 + int64_t(it.vy) * y + it.v0;
+                const int64_t uw = int64_t(it.frame_w) << 16, vh = int64_t(it.frame_h) << 16;
+                for (int x = x0; x < x1; ++x, u += it.ux, v += it.vx)
+                    if (u >= 0 && u < uw && v >= 0 && v < vh) draw(x, int(u >> 16), int(v >> 16));
+            }
         } else if (it.type == NodeType::TextureRect) {
             // Nearest sampling, modulate tints.
             const auto& t = *it.texture;
@@ -1218,6 +1877,17 @@ void compose_overlay_row(const std::vector<OverlayItem>& items, uint16_t* row, i
                 if (t.has_alpha && c == t.alpha_color) continue;
                 if (it.tint != 0xffffff) c = tint565(c, it.tint);
                 put(x, c, it.alpha);
+            }
+        } else if (it.stretched) {
+            // The editor's zoomed 2D view: each pixel takes its glyph pixel, so text keeps its size at any zoom.
+            const int columns = it.columns * font::Width, rows = int(it.lines.size()) * font::Height;
+            const int gy_all = (y - it.y) * rows / it.h;
+            const auto& glyphs = it.lines[size_t(gy_all / font::Height)];
+            const int gy = gy_all % font::Height;
+            for (int x = x0; x < x1; ++x) {
+                const int gx_all = (x - it.x) * columns / it.w;
+                const size_t g = size_t(gx_all / font::Width);
+                if (g < glyphs.size() && (font::Glyphs[glyphs[g]][gy] & (0x40 >> (gx_all % font::Width)))) put(x, it.color, it.alpha);
             }
         } else {
             const int cell = font::Height * it.scale;
@@ -1254,7 +1924,14 @@ void Runtime::draw_overlay() {
 }
 
 int Runtime::pick_overlay(int x, int y) const {
-    for (auto it = nodes_.rbegin(); it != nodes_.rend(); ++it) {
+    // The 2D view moved and zoomed them: as drawn, topmost first.
+    if (canvas_override()) {
+        for (auto it = overlay_.rbegin(); it != overlay_.rend(); ++it)
+            if (x >= it->x && y >= it->y && x < it->x + it->w && y < it->y + it->h) return int(it->id);
+        return -1;
+    }
+    for (size_t i = nodes_.size(); i-- > 0;) {
+        const Live* it = &nodes_[i];
         const auto& d = it->d;
         if (!is_control(d.type) || d.type == NodeType::Control || !it->world_visible) continue;
         int w = int(d.more().size.x), h = int(d.more().size.y);
@@ -1274,7 +1951,109 @@ int Runtime::pick_overlay(int x, int y) const {
         const Vec3& p = it->world.origin;
         if (x >= p.x && y >= p.y && x < p.x + w && y < p.y + h) return int(d.id);
     }
+    // Then the 2D sprites as last drawn, topmost first (rotated ones by their bounds).
+    for (auto it = overlay_.rbegin(); it != overlay_.rend(); ++it)
+        if (it->type == NodeType::Sprite2D && x >= it->x && y >= it->y && x < it->x + it->w && y < it->y + it->h) return int(it->id);
     return -1;
+}
+
+size_t MemoryReport::largest_scene() const {
+    size_t most = 0;
+    for (const auto& s : scenes) most = std::max(most, s.total());
+    return most;
+}
+
+namespace {
+// 32-bit sizes (arm-none-eabi, firmware config) plus newlib's 8 bytes per allocation.
+constexpr size_t Block = 8;
+constexpr size_t LiveBytes = 504, ExtrasBytes = 364 + Block, MotionBytes = 96 + Block, DescBytes = 184;
+constexpr size_t ObjectBytes = 188 + Block, MaterialBytes = 32 + Block, TextureBytes = 44 + Block, InstanceBytes = 68 + Block;
+constexpr size_t VertexBytes = 36, TriangleBytes = 16, QueueBytesPerTriangle = 129;
+constexpr size_t ParticleBytes = 40, EmitterBytes = 16 + Block, DrawerBytes = MaxParticles * 36 + 12 + Block;
+constexpr size_t OverlayBytes = 104, AssetBytes = 72;
+// The runtime, Jet's scene and rasteriser state and the VM before any content (fitted to a Nucleo-F746ZG's free heap).
+constexpr size_t EngineBytes = 26 * 1024;
+} // namespace
+
+MemoryReport Runtime::estimate_memory(bool textures_in_place) const {
+    MemoryReport report;
+    report.engine = EngineBytes;
+    // The device draws half-width interlaced fields, whatever this build draws.
+    report.field = size_t(width_ / 2) * size_t(height_ / 2) * 2;
+    report.frames = report.field + 2 * size_t(width_) * 2;
+    for (const auto& t : description_.textures) {
+        const size_t texels = size_t(t.width) * t.height;
+        report.textures += AssetBytes + t.palette.size() * 2 + (t.palette.empty() ? texels * 2 : textures_in_place ? 0 : texels);
+    }
+
+    // Compiled scripts: about twice their bytecode; instances count with their nodes.
+    std::vector<size_t> instance_bytes(description_.scripts.size(), 64);
+#ifndef JETSCRIPT_NO_COMPILER
+    for (size_t i = 0; i < description_.scripts.size(); ++i) {
+        const auto& file = description_.scripts[i];
+        const auto result = file.bytecode.empty() ? jetscript::compile(file.source, file.path, *host_)
+                                                  : jetscript::load_bytecode(file.bytecode.data(), file.bytecode.size(), *host_);
+        if (!result.script) continue;
+        report.scripts += jetscript::save_bytecode(*result.script).size() * 2 + 256;
+        instance_bytes[i] += result.script->members().size() * 16;
+    }
+#endif
+
+    auto scene = [&](const std::string& path, const std::vector<NodeDesc>& nodes) {
+        MemoryEstimate e;
+        e.scene = path;
+        e.loading = nodes.size() * DescBytes;
+        size_t triangles = 0;
+        bool drawer = false; // Jet's pool that draws the streaks, once
+        std::set<std::array<int32_t, 5>> shared;
+        for (const auto& n : nodes) {
+            e.nodes += LiveBytes;
+            if (uses_extras(n.type)) e.nodes += ExtrasBytes + n.more().text.size() + n.more().animations.size();
+            if (physics::is_collision_object(n.type)) e.nodes += MotionBytes;
+            if (n.script >= 0 && size_t(n.script) < instance_bytes.size()) e.nodes += instance_bytes[size_t(n.script)];
+            if (is_control(n.type) || n.type == NodeType::Sprite2D || n.type == NodeType::AnimatedSprite2D) e.nodes += OverlayBytes;
+            if (n.type == NodeType::CPUParticles3D) {
+                e.particles += EmitterBytes + size_t(n.more().amount) * ParticleBytes;
+                drawer = drawer || n.more().particle_style != ParticleStyle::Puff;
+            }
+            const bool mesh = n.type == NodeType::Sprite3D || (n.type == NodeType::MeshInstance3D && !(n.shape == Shape::Mesh && n.mesh < 0));
+            if (!mesh) continue;
+
+            // One Jet object per node; identical meshes (shape, detail, model and size) share their geometry.
+            NodeDesc d = n;
+            if (d.type == NodeType::Sprite3D) d.shape = Shape::Quad;
+            std::unique_ptr<Renderer::Object> geometry(make_mesh(d, nullptr));
+            const size_t tris = geometry ? geometry->triangles.size() : 0;
+            triangles += tris;
+            e.meshes += ObjectBytes + MaterialBytes + InstanceBytes + (n.texture >= 0 ? TextureBytes : 0);
+            // Reflective meshes keep geometry of their own.
+            const std::array<int32_t, 5> key{int32_t(d.shape), d.segments, d.mesh, int32_t(std::lround(n.scale.x * 100)),
+                                              int32_t(std::lround(n.scale.y * 100 + n.scale.z * 10000))};
+            if (geometry && (d.reflection || shared.insert(key).second))
+                e.meshes += ObjectBytes + geometry->vertices.size() * VertexBytes + tris * TriangleBytes + 2 * Block;
+        }
+        e.triangles = (triangles / 2 + 32) * QueueBytesPerTriangle;
+        if (drawer) e.particles += DrawerBytes;
+        for (const auto& a : description_.autoloads) e.nodes += LiveBytes + (a.script >= 0 ? instance_bytes[size_t(a.script)] : 0);
+        const size_t count = nodes.size() + description_.autoloads.size(); // in blocks of 8
+        e.nodes += ((count + 7) / 8 * 8 - count) * LiveBytes;
+        report.scenes.push_back(std::move(e));
+    };
+    scene(description_.path, description_.nodes);
+    for (const auto& s : description_.scenes) scene(s.path, s.nodes);
+    return report;
+}
+
+bool Runtime::drawn_rect(uint32_t id, int& x, int& y, int& w, int& h) const {
+    for (const auto& it : overlay_)
+        if (it.id == id) {
+            x = it.x;
+            y = it.y;
+            w = it.w;
+            h = it.h;
+            return true;
+        }
+    return false;
 }
 
 // Jet's per-frame queues would grow while drawing, each time holding the old and the doubled buffer for a moment:
@@ -1293,6 +2072,16 @@ void Runtime::reserve_triangle_queues() {
 }
 
 void Runtime::render() {
+    if (canvas_override()) {
+        // The editor's 2D view: the canvas on the scene's background colour, without the 3D world.
+        uint32_t background = 0x161c28;
+        for (const auto& n : nodes_)
+            if (n.d.type == NodeType::WorldEnvironment && !n.freed && n.in_tree) { background = n.d.more().background; break; }
+        std::fill(target_, target_ + size_t(buffer_width()) * buffer_rows(), rgb565(background));
+        particle_triangles_ = 0;
+        draw_overlay();
+        return;
+    }
     apply_camera();
     prepare_background();
     update_reflections();
@@ -1333,7 +2122,7 @@ void Runtime::set_framebuffer(uint16_t* buffer) {
 int Runtime::pick(int x, int y) {
     if (x < 0 || y < 0 || x >= width_ || y >= height_) return -1;
     const int control = pick_overlay(x, y);
-    if (control >= 0) return control;
+    if (control >= 0 || canvas_override()) return control;
 #if MAX_PICK_QUERIES == 0
     return -1; // device builds: no 3D picking
 #else

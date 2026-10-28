@@ -181,10 +181,13 @@ bool truthy(const Value& v) {
     case Type::Float: return Heap::f(v) != 0;
     case Type::String: return Heap::str(v) != nullptr;
     case Type::Vector3:
+    case Type::Vector2:
     case Type::Color: return Heap::comp(v, 0) != 0 || Heap::comp(v, 1) != 0 || Heap::comp(v, 2) != 0;
     case Type::Array: return !Heap::arr(v)->items.empty();
     case Type::Dictionary: return !Heap::dict(v)->entries.empty();
     case Type::Object: return Heap::o(v) != 0;
+    case Type::Callable:
+    case Type::Signal: return true;
     }
     return false;
 }
@@ -200,7 +203,9 @@ bool convert_to(Type t, Value& v) {
     case Type::Float:
         if (s == Type::Int) { Heap::set_float(v, int_to_real(Heap::i(v))); return true; }
         return false;
-    case Type::Object: return s == Type::Nil;
+    case Type::Object:
+    case Type::Callable:
+    case Type::Signal: return s == Type::Nil;
     default: return false;
     }
 }
@@ -212,6 +217,7 @@ Value type_default(Type t) {
     case Type::Float: return Value(Real(0));
     case Type::String: return Value(std::string_view());
     case Type::Vector3: return Value(Vector3());
+    case Type::Vector2: return Value(Vector2());
     case Type::Color: return Value(Color());
     case Type::Array: return Value::new_array();
     case Type::Dictionary: return Value::new_dictionary();
@@ -244,10 +250,13 @@ bool values_equal_budget(const Value& a, const Value& b, int depth, int& budget)
     case Type::Float: return Heap::f(a) == Heap::f(b);
     case Type::String: return Heap::sv(a) == Heap::sv(b);
     case Type::Vector3:
+    case Type::Vector2:
     case Type::Color:
         return Heap::comp(a, 0) == Heap::comp(b, 0) && Heap::comp(a, 1) == Heap::comp(b, 1) &&
                Heap::comp(a, 2) == Heap::comp(b, 2);
     case Type::Object: return Heap::o(a) == Heap::o(b);
+    case Type::Callable:
+    case Type::Signal: return Heap::bound_object(a) == Heap::bound_object(b) && Heap::bound_name(a) == Heap::bound_name(b);
     case Type::Array: {
         const ArrObj* x = Heap::arr(a);
         const ArrObj* y = Heap::arr(b);
@@ -396,6 +405,12 @@ static Vector3 splat(Real s) {
     return r;
 }
 static Value from_vec(Type t, const Vector3& v) {
+    if (t == Type::Vector2) {
+        Vector2 r;
+        r.x = v.x;
+        r.y = v.y;
+        return Value(r);
+    }
     if (t == Type::Color) {
         Color c;
         c.r = v.x;
@@ -510,8 +525,8 @@ bool binary_op(BinOp op, const Value& a, const Value& b, Value& out, std::string
         out = Value(text);
         return true;
     }
-    bool va = ta == Type::Vector3 || ta == Type::Color;
-    bool vb = tb == Type::Vector3 || tb == Type::Color;
+    bool va = ta == Type::Vector3 || ta == Type::Vector2 || ta == Type::Color;
+    bool vb = tb == Type::Vector3 || tb == Type::Vector2 || tb == Type::Color;
     if (va && vb && ta == tb) {
         switch (op) {
         case BinOp::Add:
@@ -565,7 +580,7 @@ bool unary_op(UnOp op, const Value& a, Value& out, std::string& err) {
     case UnOp::Neg:
         if (t == Type::Int) { out = Value(Int(0 - uint64_t(Heap::i(a)))); return true; }
         if (t == Type::Float) { out = Value(-Heap::f(a)); return true; }
-        if (t == Type::Vector3 || t == Type::Color) {
+        if (t == Type::Vector3 || t == Type::Vector2 || t == Type::Color) {
             Vector3 v = to_vec(a);
             v.x = -v.x;
             v.y = -v.y;
@@ -575,7 +590,7 @@ bool unary_op(UnOp op, const Value& a, Value& out, std::string& err) {
         }
         break;
     case UnOp::Pos:
-        if (t == Type::Int || t == Type::Float || t == Type::Vector3 || t == Type::Color) { out = a; return true; }
+        if (t == Type::Int || t == Type::Float || t == Type::Vector3 || t == Type::Vector2 || t == Type::Color) { out = a; return true; }
         break;
     case UnOp::BitNot:
         if (t == Type::Int) { out = Value(Int(~Heap::i(a))); return true; }
@@ -727,13 +742,13 @@ bool format_percent(std::string_view fmt, const Value& args, std::string& out, s
             break;
         }
         case 'v': {
-            if (arg.type() != Type::Vector3 && arg.type() != Type::Color && !arg.is_number())
+            if (arg.type() != Type::Vector3 && arg.type() != Type::Vector2 && arg.type() != Type::Color && !arg.is_number())
                 return fail("%v requires a vector or a number.");
             if (arg.is_number()) {
                 append_fixed(body, double(arg.as_real()), prec < 0 ? 6 : prec);
             } else {
                 body.push_back('(');
-                for (int k = 0; k < 3; ++k) {
+                for (int k = 0; k < (arg.type() == Type::Vector2 ? 2 : 3); ++k) {
                     if (k) body += ", ";
                     if (prec < 0) body += format_real(Heap::comp(arg, k));
                     else append_fixed(body, double(Heap::comp(arg, k)), prec);

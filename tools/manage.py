@@ -161,7 +161,8 @@ def release(jobs):
     # No neon_car: its car model and livery are not ours to redistribute.
     for path in ["LICENSE", "README.md", "docs", "hardware", "runtime", "cmake/JetSources.cmake", "firmware", "firmware_stm32",
                  "tools/tasks.py", "tools/hardware.py", "third_party/Jet/src", "third_party/Jet/LICENSE",
-                 "examples/first_world", "examples/jetrun", "examples/physics_demo", "examples/textured_boxes"]:
+                 "examples/first_world", "examples/jet_blaster", "examples/jetrun", "examples/physics_demo",
+                 "examples/textured_boxes"]:
         source, target = ROOT / path, out / path
         target.parent.mkdir(parents=True, exist_ok=True)
         if source.is_dir():

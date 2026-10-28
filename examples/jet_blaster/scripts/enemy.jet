@@ -1,0 +1,57 @@
+extends Area2D
+
+# Comes in from the right on a wave, fires at the ship now and then. Its mask sees the player's bullets.
+signal destroyed(enemy)
+
+var shot_scene = preload("res://enemy_shot.jetscene")
+var base_y := 120.0
+var speed := 50.0
+var amplitude := 30.0
+var phase := 0.0
+var hp := 1
+var age := 0.0
+var flash := 0.0
+
+@onready var body = $Body
+
+
+func setup(kind: int, y: float, delay: float, level: int) -> void:
+	base_y = y
+	speed = 45.0 + level * 5.0
+	position = Vector2(340.0 + delay * speed, y)
+	phase = randf() * TAU
+	amplitude = randf_range(15.0, 45.0)
+	hp = 1 if kind == 0 else 2
+	body.play("saucer" if kind == 0 else "bug")
+
+
+func _process(delta: float) -> void:
+	age += delta
+	position.x -= speed * delta
+	position.y = base_y + sin(age * 2.0 + phase) * amplitude
+	if position.x < -20.0:
+		queue_free()
+	elif position.x < 300.0 and randf() < 0.005:
+		shoot()
+
+	# A hit flashes it for a moment.
+	if flash > 0.0:
+		flash -= delta
+		body.modulate = Color(1.0, 0.5, 0.5) if flash > 0.0 else Color(1, 1, 1)
+
+
+func shoot() -> void:
+	var world = get_tree().current_scene
+	var shot = shot_scene.instantiate()
+	shot.position = position
+	shot.velocity = position.direction_to(world.get_node("Player").position) * 90.0
+	world.get_node("EnemyShots").add_child(shot)
+
+
+# A bullet: it goes, and the enemy loses a hit point.
+func _on_area_entered(bullet) -> void:
+	bullet.queue_free()
+	hp -= 1
+	flash = 0.12
+	if hp == 0:
+		destroyed.emit(self)

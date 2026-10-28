@@ -141,6 +141,9 @@ void bytecode_tests() {
         coverage_script,
         "extends Node3D\n@export var speed := 90.0\nfunc _process(delta):\n\trotation_degrees.y += speed * delta\n",
         "extends Node\nvar data := {}\nfunc _ready():\n\tfor i in 3:\n\t\tdata[i] = [i, str(i)]\n\tprint(data)\n",
+        // Vector2 constants and exports, and a PackedScene from preload().
+        "extends Sprite2D\n@export var velocity := Vector2(260, 0)\nconst HOME := Vector2(16, 8) * 2\n"
+        "var bullet = preload(\"res://b.jetscene\")\nfunc _process(delta):\n\tposition += velocity * delta + HOME * 0.0\n",
     };
     for (const char* source : sources) {
         auto compiled = jetscript::compile(source, "res://t.jet", host);
@@ -623,7 +626,7 @@ void model_tests() {
     const auto bytes = encode_pack(packed, error);
     if (bytes.empty()) std::cerr << "pack: " << error << '\n';
     Description back;
-    check(decode_pack(bytes.data(), bytes.size(), back, error), "pack v14 round trips");
+    check(decode_pack(bytes.data(), bytes.size(), back, error), "pack v16 round trips");
     check(back.meshes.size() == 2 && back.meshes[0].vertices.size() == model.meshes[0].vertices.size()
           && back.meshes[0].indices == model.meshes[0].indices, "pack keeps imported meshes");
     const auto& c = back.nodes[back.nodes.size() - 2];
@@ -1178,8 +1181,558 @@ void memory_tests() {
     for (int i = 0; i < 30; ++i) r.update(1.0f / 60);
     r.render();
     // Floor, ball, their shapes and the camera have extra fields; floor and ball are the bodies.
-    check(r.node_bytes() == r.node_count() * sizeof(Runtime::Live) + 5 * sizeof(NodeExtras) + 2 * sizeof(Runtime::Motion),
+    const size_t slots = (r.node_count() + 7) / 8 * 8; // nodes live in blocks of 8
+    check(r.node_bytes() == slots * sizeof(Runtime::Live) + 5 * sizeof(NodeExtras) + 2 * sizeof(Runtime::Motion),
           "meshes and sprites keep no extra fields or body state");
+
+    // The board estimate counts the device's half-width fields whatever this build draws.
+    // The editor estimates a loaded description: a package keeps only the scene being played.
+    Runtime full;
+    check(full.load(d, error), "scene for the estimate loads");
+    const auto report = full.estimate_memory(false);
+    check(report.field == size_t(DefaultWidth / 2) * (DefaultHeight / 2) * 2 && report.frames > report.field,
+          "estimate counts device-sized field buffers");
+    check(report.scenes.size() == 1 && report.largest_scene() == report.scenes[0].total() && report.scenes[0].meshes > 0,
+          "estimate covers the scene and its meshes");
+
+    // Identical meshes share their geometry; palette textures read in place cost only their palette.
+    auto estimate = [&](bool varied, bool in_place) {
+        Description e = floor_scene();
+        for (uint32_t i = 0; i < 10; ++i) {
+            const std::string name = "Cube" + std::to_string(i);
+            auto cube = node(40 + i, 0, NodeType::MeshInstance3D, name.c_str());
+            if (varied) cube.scale = {1.0f + float(i), 1, 1};
+            cube.texture = 0;
+            e.nodes.push_back(cube);
+        }
+        std::vector<uint8_t> pixels(64 * 64 * 4, 255);
+        TextureAsset texture;
+        make_texture("res://t.png", 64, 64, pixels.data(), texture, error);
+        e.textures.push_back(std::move(texture));
+        Runtime other;
+        check(other.load(e, error), "scene for the estimate loads");
+        return other.estimate_memory(in_place);
+    };
+    check(estimate(true, false).scenes[0].meshes > estimate(false, false).scenes[0].meshes, "identical meshes share geometry in the estimate");
+    check(estimate(false, true).textures + 64 * 64 / 2 < estimate(false, false).textures, "palette textures read in place cost less");
+
+    // Emitters keep only their amount of particles; streaks also need Jet's shared pool of 200.
+    auto particles = [&](ParticleStyle style) {
+        Description e = floor_scene();
+        auto emitter = node(50, 0, NodeType::CPUParticles3D, "Smoke");
+        emitter.extras().amount = 8;
+        emitter.extras().particle_style = style;
+        e.nodes.push_back(emitter);
+        Runtime other;
+        other.load(e, error);
+        return other.estimate_memory(false).scenes[0].particles;
+    };
+    check(particles(ParticleStyle::Puff) < 512 && particles(ParticleStyle::Sparks) > 7000 && particles(ParticleStyle::Sparks) < 8000,
+          "particle memory follows the amount");
+}
+
+// 2D bodies, areas and shapes: the 3D physics on the canvas plane, in pixels with y down.
+void physics2d_tests() {
+    auto shape2d = [](CollisionKind kind, Vec3 size, float radius = 10, float height = 30) {
+        NodeDesc n = node(0, 0, NodeType::CollisionShape2D, "Shape");
+        n.extras().collision = kind; n.extras().box_size = size; n.extras().radius = radius; n.extras().height = height;
+        return n;
+    };
+    // A 2000 px wide ground with its top at y = 400.
+    auto ground_scene = [&]() {
+        Description d;
+        d.nodes.push_back(node(1, -1, NodeType::Node2D, "World"));
+        add_body(d, 2, NodeType::StaticBody2D, "Ground", {0, 420, 0}, shape2d(CollisionKind::Box, {2000, 40, 0}));
+        return d;
+    };
+    auto logged = [](Runtime& r, const std::string& text) {
+        const auto log = run_log(r);
+        return std::find(log.begin(), log.end(), text) != log.end();
+    };
+
+    {   // A ball falls down the screen onto the ground, through a 3D floor it never meets.
+        Description d = ground_scene();
+        add_body(d, 10, NodeType::RigidBody2D, "Ball", {0, -50, 0}, shape2d(CollisionKind::Sphere, {20, 20, 0}, 10));
+        add_body(d, 20, NodeType::StaticBody3D, "Floor3D", {0, 0, 0}, shape(0, 0, CollisionKind::Box, {1000, 1, 1000}));
+        Runtime r;
+        check(start_scene(r, d), "2D physics scene starts");
+        simulate(r, 0.3f);
+        check(position_of(r, 10).y > -20, "a RigidBody2D falls towards +y (980 px/s²)");
+        simulate(r, 4);
+        check(std::abs(position_of(r, 10).y - 390) < 1.5f && std::abs(position_of(r, 10).x) < 0.5f, "the ball rests on the 2D ground, through the 3D floor");
+    }
+
+    // A character that walks right under gravity; it can jump once at the start.
+    const char* walker = "extends CharacterBody2D\n@export var jump := 0.0\nvar landed := false\n"
+        "func _ready():\n\tvelocity.y = -jump\n"
+        "func _physics_process(delta):\n\tvelocity.y += 980 * delta\n\tvelocity.x = 60\n\tmove_and_slide()\n"
+        "\tif is_on_floor() and not landed:\n\t\tlanded = true\n\t\tprint(\"landed \", get_floor_normal().is_equal_approx(Vector2.UP), \" \", velocity is Vector2)\n";
+    {
+        Description d = ground_scene();
+        const int c = add_body(d, 10, NodeType::CharacterBody2D, "Player", {0, 300, 0}, shape2d(CollisionKind::Capsule, {20, 20, 0}, 10, 30));
+        d.scripts.push_back({"res://walker.jet", walker, {}});
+        d.nodes[size_t(c)].script = 0;
+        Runtime r;
+        check(start_scene(r, d), "2D character scene starts");
+        simulate(r, 2);
+        check(std::abs(position_of(r, 10).y - 385) < 1 && std::abs(position_of(r, 10).x - 120) < 4, "a CharacterBody2D walks on the ground");
+        check(logged(r, "landed true true"), "is_on_floor(), get_floor_normal() is Vector2.UP, velocity is a Vector2");
+    }
+
+    // Jumping from the ground under a platform: through it when it's one-way, against it otherwise.
+    for (bool one_way : {true, false}) {
+        Description d = ground_scene();
+        const int c = add_body(d, 10, NodeType::CharacterBody2D, "Player", {0, 385, 0}, shape2d(CollisionKind::Capsule, {20, 20, 0}, 10, 30));
+        auto platform = shape2d(CollisionKind::Box, {400, 10, 0});
+        platform.extras().one_way = one_way;
+        add_body(d, 30, NodeType::StaticBody2D, "Platform", {0, 300, 0}, platform);
+        d.scripts.push_back({"res://walker.jet", walker, {}});
+        d.nodes[size_t(c)].script = 0;
+        d.nodes[size_t(c)].overrides.push_back({"jump", jetscript::Value(600.0)});
+        Runtime r;
+        start_scene(r, d);
+        simulate(r, 2);
+        const float y = position_of(r, 10).y;
+        check(one_way ? std::abs(y - 280) < 1 : std::abs(y - 385) < 1,
+              one_way ? "a one-way platform lets a jump through and holds the landing" : "a solid platform stops the jump");
+    }
+
+    {   // Areas: a ball falls through a zone, a moving area hits it; each sees the other kind.
+        Description d = ground_scene();
+        add_body(d, 10, NodeType::RigidBody2D, "Ball", {0, 100, 0}, shape2d(CollisionKind::Sphere, {20, 20, 0}, 10));
+        const int zone = add_body(d, 20, NodeType::Area2D, "Zone", {0, 200, 0}, shape2d(CollisionKind::Box, {100, 20, 0}));
+        const int bullet = add_body(d, 30, NodeType::Area2D, "Bullet", {-200, 200, 0}, shape2d(CollisionKind::Sphere, {20, 20, 0}, 4));
+        d.scripts.push_back({"res://zone.jet", "extends Area2D\nfunc _on_body_entered(body):\n\tprint(\"in \", body.name)\n"
+            "func _on_body_exited(body):\n\tprint(\"out \", body.name)\n"
+            "func _on_area_entered(area):\n\tprint(\"hit \", area.name, \" \", get_overlapping_areas().size(), \" \", overlaps_area(area))\n", {}});
+        d.scripts.push_back({"res://bullet.jet", "extends Area2D\nfunc _physics_process(delta):\n\tposition.x += 300 * delta\n", {}});
+        d.nodes[size_t(zone)].script = 0;
+        d.nodes[size_t(bullet)].script = 1;
+        Runtime r;
+        check(start_scene(r, d), "2D area scene starts");
+        simulate(r, 2);
+        const auto log = run_log(r);
+        auto has = [&](const char* text) { return std::find(log.begin(), log.end(), text) != log.end(); };
+        check(has("in Ball") && has("out Ball"), "Area2D calls _on_body_entered and _on_body_exited");
+        check(has("hit Bullet 1 true"), "Area2D sees other areas: _on_area_entered, get_overlapping_areas(), overlaps_area()");
+    }
+
+    {   // Validation: 2D shapes are in pixels and belong to 2D bodies.
+        Description d = ground_scene();
+        d.nodes.back().extras().box_size = {200000, 10, 0};
+        std::string error;
+        Runtime r;
+        check(!r.load(d, error), "a 2D shape over 100000 px is refused");
+    }
+}
+
+// PackedScene.instantiate(), add_child(), remove_child() and freeing what was spawned.
+void instancing_tests() {
+    std::string error;
+    auto logged = [](const std::vector<LogLine>& log, const std::string& text) {
+        return std::any_of(log.begin(), log.end(), [&](const LogLine& l) { return l.text.find(text) != std::string::npos; });
+    };
+
+    // A world that spawns a bullet a frame; each bullet (with a particle emitter) frees itself after 5 frames.
+    Description d = floor_scene();
+    d.path = "res://main.jetscene";
+    auto camera = node(4, 0, NodeType::Camera3D, "Camera3D");
+    camera.position = {0, 2, 8}; camera.extras().current = true;
+    d.nodes.push_back(camera);
+    d.nodes[0].script = 0;
+    d.scripts.push_back({"res://spawner.jet", "extends Node3D\nvar bullet = preload(\"res://bullet.jetscene\")\n"
+        "var spawned := 0\nvar readied := 0\nvar names := {}\nfunc _process(delta):\n"
+        "\tif spawned < 30:\n\t\tvar b = bullet.instantiate()\n\t\tb.position = Vector3(spawned % 5 - 2, 1, 0)\n"
+        "\t\tadd_child(b)\n\t\tnames[b.name] = true\n\t\tspawned += 1\n"
+        "\telif spawned == 30 and get_child_count() == 2:\n\t\tprint(\"all freed \", readied, \" names \", names.size())\n"
+        "\t\tspawned = 31\n", {}});
+    SceneDesc bullet;
+    bullet.path = "res://bullet.jetscene";
+    bullet.nodes.push_back(node(1, -1, NodeType::MeshInstance3D, "Bullet"));
+    bullet.nodes[0].script = 1;
+    bullet.nodes[0].scale = {0.3f, 0.3f, 0.3f};
+    auto sparks = node(2, 0, NodeType::CPUParticles3D, "Sparks");
+    sparks.extras().amount = 4;
+    bullet.nodes.push_back(sparks);
+    d.scenes.push_back(bullet);
+    d.scripts.push_back({"res://bullet.jet", "extends MeshInstance3D\nvar age := 0\nfunc _ready():\n\tget_parent().readied += 1\n"
+        "func _process(delta):\n\tage += 1\n\tif age == 5:\n\t\tqueue_free()\n", {}});
+
+    // Played from a package too, where the bullet scene is read from it at each instantiate().
+    const auto bytes = encode_pack(d, error);
+    for (int packed = 0; packed < 2; ++packed) {
+        Runtime r;
+        std::vector<ScriptDiagnostic> diagnostics;
+        const bool started = packed ? r.load_pack(bytes.data(), bytes.size(), error) && r.start(diagnostics) : start_scene(r, d);
+        check(started, "a scene that spawns scenes starts");
+        const size_t base = r.node_count();
+        int most = 0, drawn = 0;
+        std::vector<LogLine> log;
+        for (int i = 0; i < 60; ++i) {
+            r.update(1.0f / 60);
+            r.render();
+            most = std::max(most, int(r.node_count()));
+            drawn = std::max(drawn, r.triangles());
+            for (auto& line : r.take_log()) log.push_back(line);
+        }
+        check(logged(log, "all freed 30 names ") && !logged(log, "names 1\n") && r.node_count() == base && most > int(base) + 4
+              && most <= int(base) + 14 && drawn > 0 && r.live_particles() == 0,
+              packed ? "spawned scenes from a package are ready once, drawn, freed with their children, and leave nothing behind"
+                     : "spawned scenes are ready once, get distinct names, are drawn, freed with their children, and leave nothing behind");
+    }
+
+    // Outside the tree nothing runs or shows; add_child() under a later node; remove_child() and back; errors.
+    Description t = scene();
+    t.path = "res://main.jetscene";
+    t.nodes[0].script = 0;
+    t.scripts.push_back({"res://tree.jet", "extends Node3D\nvar scene = preload(\"res://thing.jetscene\")\n"
+        "var orphan\nvar a\nvar b\nvar frames := 0\nfunc _ready():\n\torphan = scene.instantiate()\n\ta = scene.instantiate()\n"
+        "\tb = scene.instantiate()\n\tb.position = Vector3(1, 0, 0)\n\ta.position = Vector3(0, 2, 0)\n\tb.add_child(a)\n"
+        "\tadd_child(b)\n\tprint(\"missing \", load(\"res://nope.jetscene\") == null)\n\tadd_child(b)\n"
+        "func _process(delta):\n\tframes += 1\n"
+        "\tif frames == 2:\n\t\tprint(\"global \", (a.global_position - Vector3(1, 2, 0)).length() < 0.001, \" \", a.get_parent() == b)\n"
+        "\t\tremove_child(b)\n\t\tprint(\"removed \", b.get_parent() == null)\n"
+        "\tif frames == 4:\n\t\tadd_child(b)\n"
+        "\tif frames == 6:\n\t\tprint(\"orphan \", orphan.processed, \" b \", b.processed, \" a \", a.processed)\n", {}});
+    SceneDesc thing;
+    thing.path = "res://thing.jetscene";
+    thing.nodes.push_back(node(1, -1, NodeType::MeshInstance3D, "Thing"));
+    thing.nodes[0].script = 1;
+    t.scenes.push_back(thing);
+    t.scripts.push_back({"res://thing.jet", "extends MeshInstance3D\nvar processed := 0\nfunc _process(delta):\n\tprocessed += 1\n", {}});
+    Runtime r;
+    check(start_scene(r, t), "a scene that builds a subtree starts");
+    std::vector<LogLine> log = r.take_log();
+    for (int i = 0; i < 6; ++i) {
+        r.update(1.0f / 60);
+        for (auto& line : r.take_log()) log.push_back(line);
+    }
+    check(logged(log, "missing true") && logged(log, "Resource file not found: res://nope.jetscene")
+          && logged(log, "already has a parent"), "load() of a missing scene is null; add_child() twice is an error");
+    check(logged(log, "global true true") && logged(log, "removed true"), "add_child() builds subtrees and reparents in any order");
+    check(logged(log, "orphan 0 b 3 a 3"), "nodes outside the tree don't run; remove_child() pauses them until add_child()");
+
+    // An instanced rigid body falls on the floor like one of the scene.
+    Description f = floor_scene();
+    f.path = "res://main.jetscene";
+    f.nodes[0].script = 0;
+    f.scripts.push_back({"res://drop.jet", "extends Node3D\nvar ball\nvar frames := 0\nfunc _ready():\n"
+        "\tball = preload(\"res://ball.jetscene\").instantiate()\n\tadd_child(ball)\n"
+        "func _process(delta):\n\tframes += 1\n\tif frames == 120:\n\t\tprint(\"rest \", abs(ball.position.y - 0.5) < 0.05)\n", {}});
+    SceneDesc ball;
+    ball.path = "res://ball.jetscene";
+    auto body = node(1, -1, NodeType::RigidBody3D, "Ball");
+    body.position = {0, 3, 0};
+    ball.nodes.push_back(body);
+    ball.nodes.push_back(shape(2, 0, CollisionKind::Sphere));
+    f.scenes.push_back(ball);
+    Runtime fall;
+    check(start_scene(fall, f), "a scene that drops an instanced body starts");
+    for (int i = 0; i < 120; ++i) fall.update(1.0f / 60);
+    check(has_log(fall, "rest true", false), "an instanced RigidBody3D collides with the scene");
+}
+
+// Node2D, Sprite2D, AnimatedSprite2D and Camera2D: drawn over the 3D scene, in canvas pixels.
+void twod_tests() {
+    std::string error;
+    // A 4x2 sheet of two frames: frame 0 is red then green, frame 1 is blue.
+    const uint32_t red = 0xff0000ff, green = 0xff00ff00, blue = 0xffff0000;
+    const std::vector<uint32_t> rgba = {red, green, blue, blue, red, green, blue, blue};
+    TextureAsset sheet;
+    check(make_texture("res://sheet.png", 4, 2, reinterpret_cast<const uint8_t*>(rgba.data()), sheet, error), "2D sheet converts");
+    const uint16_t r565 = rgb565(0xff0000), g565 = rgb565(0x00ff00), b565 = rgb565(0x0000ff);
+    auto at = [](Runtime& r, int x, int y) { r.render(); return r.pixels()[size_t(y) * size_t(r.width()) + size_t(x)]; };
+
+    // A 2x2 frame at 10x: 20x20 pixels, red on the left, green on the right.
+    Description d;
+    d.nodes.push_back(node(1, -1, NodeType::Node2D, "World"));
+    auto ship = node(2, 0, NodeType::Sprite2D, "Ship");
+    ship.texture = 0; ship.hframes = 2; ship.color = 0xffffff; ship.position = {100, 80, 0}; ship.scale = {10, 10, 1};
+    d.nodes.push_back(ship);
+    d.textures.push_back(sheet);
+    Runtime r;
+    check(r.load(d, error), "a 2D scene loads");
+    check(at(r, 95, 80) == r565 && at(r, 105, 80) == g565 && at(r, 85, 80) != r565 && at(r, 115, 80) != g565,
+          "Sprite2D draws its frame centred on its position");
+    {   // The editor's 2D view: zoom 2 from (50, 40), so the 20 px sprite spans 80-120 on the screen; no 3D.
+        r.set_editor_canvas(true, 2, {50, 40, 0});
+        check(at(r, 85, 80) == r565 && at(r, 115, 80) == g565 && at(r, 75, 80) != r565 && r.pick(85, 80) == 2,
+              "the editor's 2D view moves and zooms the canvas; picking follows it");
+        r.set_editor_canvas(false);
+        check(at(r, 95, 80) == r565, "back to the game's view of the canvas");
+        Runtime world;
+        check(world.load(scene(), error), "3D scene loads");
+        world.set_editor_canvas(true);
+        check(lit(frame(world)) == 0, "the 2D view leaves the 3D world out");
+        // A Label at text scale 2 seen at zoom 0.5 shrinks to scale 1 (not to whole pixels only).
+        Description hud;
+        hud.nodes.push_back(node(1, -1, NodeType::Control, "HUD"));
+        auto label = node(2, 0, NodeType::Label, "Score");
+        label.position = {40, 20, 0}; label.extras().text = "HI"; label.extras().text_scale = 2; label.color = 0xffffff;
+        hud.nodes.push_back(label);
+        Runtime ui;
+        check(ui.load(hud, error), "HUD loads");
+        ui.set_editor_canvas(true, 0.5f, {});
+        frame(ui);
+        int x = 0, y = 0, w = 0, h = 0;
+        check(ui.drawn_rect(2, x, y, w, h) && x == 20 && y == 10 && w == 2 * 7 && h == 15, "Labels follow the 2D view's zoom");
+        const auto pixels = frame(ui);
+        check(std::count(pixels.begin(), pixels.end(), rgb565(0xffffff)) > 20, "zoomed Labels are drawn");
+    }
+
+    auto variant = [&](Runtime& x, auto change) {
+        Description v = d;
+        change(v);
+        x.load(v, error);
+    };
+    Runtime flipped;
+    variant(flipped, [](Description& v) { v.nodes[1].flip_h = true; });
+    check(at(flipped, 95, 80) == g565 && at(flipped, 105, 80) == r565, "flip_h mirrors the frame");
+    Runtime corner;
+    variant(corner, [](Description& v) { v.nodes[1].centered = false; v.nodes[1].offset[0] = 2; });
+    check(at(corner, 125, 85) == r565 && at(corner, 135, 85) == g565, "centered off and offset (in the node's scaled space) move the frame");
+    Runtime turned;
+    variant(turned, [](Description& v) { v.nodes[1].rotation.z = 90; });
+    check(at(turned, 100, 75) == r565 && at(turned, 100, 85) == g565 && at(turned, 95, 80) != r565,
+          "rotation turns the sprite clockwise, as y grows downwards");
+    Runtime moved;
+    variant(moved, [](Description& v) { v.nodes[0].position = {50, 0, 0}; });
+    check(at(moved, 145, 80) == r565 && at(moved, 95, 80) != r565, "a child moves with its Node2D parent");
+    Runtime hidden;
+    variant(hidden, [](Description& v) { v.nodes[0].visible = false; });
+    check(at(hidden, 95, 80) != r565, "a hidden Node2D hides its children");
+
+    // Draw order: z_index first, then the tree.
+    Runtime layered;
+    variant(layered, [](Description& v) {
+        auto cover = v.nodes[1];
+        cover.id = 3; cover.name = "Cover"; cover.frame = 1;
+        v.nodes.push_back(cover);
+    });
+    check(at(layered, 95, 80) == b565, "a later sibling covers an earlier one");
+    Runtime raised;
+    variant(raised, [](Description& v) {
+        v.nodes[1].z_index = 1;
+        auto cover = v.nodes[1];
+        cover.id = 3; cover.name = "Cover"; cover.frame = 1; cover.z_index = 0;
+        v.nodes.push_back(cover);
+    });
+    check(at(raised, 95, 80) == r565, "z_index draws in front of later siblings");
+
+    // The current Camera2D shows its position at the screen centre; zoom scales.
+    Runtime followed;
+    variant(followed, [](Description& v) {
+        v.nodes[1].position = {1000, 1000, 0};
+        auto camera = node(3, 0, NodeType::Camera2D, "Camera2D");
+        camera.position = {1000, 1000, 0}; camera.extras().current = true; camera.extras().zoom[0] = camera.extras().zoom[1] = 2;
+        v.nodes.push_back(camera);
+    });
+    const int cx = Width / 2, cy = Height / 2;
+    check(at(followed, cx - 15, cy) == r565 && at(followed, cx + 15, cy) == g565 && at(followed, cx - 25, cy) != r565,
+          "Camera2D centres the view on itself, zoom scales it");
+
+    // Animations, autoplay and the script API.
+    Description a = d;
+    a.nodes[1].type = NodeType::AnimatedSprite2D;
+    a.nodes[1].extras().animations = "spin 0-1 10, hit 1 5 once";
+    a.nodes[1].script = 0;
+    a.scripts.push_back({"res://ship.jet", "extends AnimatedSprite2D\nvar frames := 0\nfunc _ready():\n"
+        "\tposition = Vector2(30, 40)\n\trotation = PI / 2\n\tget_parent().position = Vector2(50, 0)\n"
+        "\tprint(\"pos \", position, \" deg \", round(rotation_degrees), \" global \", global_position, \" anim \", animation, \" \", is_playing())\n"
+        "func _process(delta):\n\tframes += 1\n\tif frames == 9:\n\t\tprint(\"frame \", frame)\n\t\tplay(\"hit\")\n"
+        "\tif frames == 30:\n\t\tprint(\"hit \", frame, \" \", is_playing())\n", {}});
+    Runtime animated;
+    std::vector<ScriptDiagnostic> diagnostics;
+    check(animated.load(a, error) && animated.start(diagnostics), "an AnimatedSprite2D scene starts");
+    for (int i = 0; i < 30; ++i) animated.update(1.0f / 60);
+    check(has_log(animated, "pos (30.0, 40.0) deg 90.0 global (80.0, 40.0) anim spin true", false), "Node2D properties are Vector2s and radians; autoplay starts the first animation");
+    Description bad = a;
+    bad.nodes[1].extras().animations = "spin 0-5 10";
+    check(!animated.load(bad, error), "animations past the sheet's frames are rejected");
+
+    Runtime timing;
+    check(timing.load(a, error) && timing.start(diagnostics), "the animation scene starts again");
+    std::vector<LogLine> log;
+    for (int i = 0; i < 30; ++i) {
+        timing.update(1.0f / 60);
+        for (auto& line : timing.take_log()) log.push_back(line);
+    }
+    auto logged = [&](const std::string& text) {
+        return std::any_of(log.begin(), log.end(), [&](const LogLine& l) { return l.text.find(text) != std::string::npos; });
+    };
+    check(logged("frame 1") && logged("hit 1 false"), "animations advance at their fps; a once animation stops on its last frame");
+
+    // The package keeps the 2D fields.
+    Description packed = a;
+    packed.nodes[1].z_index = -3; packed.nodes[1].centered = false; packed.nodes[1].offset[1] = 7;
+    auto camera = node(3, 0, NodeType::Camera2D, "Camera2D");
+    camera.extras().current = true; camera.extras().zoom[0] = 3;
+    packed.nodes.push_back(camera);
+    const auto bytes = encode_pack(packed, error);
+    Description back;
+    check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[1].type == NodeType::AnimatedSprite2D
+          && back.nodes[1].z_index == -3 && !back.nodes[1].centered && back.nodes[1].offset[1] == 7
+          && back.nodes[1].more().animations == "spin 0-1 10, hit 1 5 once" && back.nodes[2].more().zoom[0] == 3
+          && back.nodes[2].more().current, "the package keeps the 2D fields");
+}
+
+// Godot's signals on engine nodes, and the Timer.
+void signal_tests() {
+    std::string error;
+    auto count = [](const std::vector<std::string>& log, const std::string& text) { return std::count(log.begin(), log.end(), text); };
+    auto errors = [](const std::vector<std::string>& log) {
+        return std::count_if(log.begin(), log.end(), [](const std::string& line) { return line.rfind("E ", 0) == 0; });
+    };
+
+    {   // A repeating Timer that autostarts, and a one-shot one started from a script.
+        Description d;
+        d.nodes.push_back(node(1, -1, NodeType::Node, "Main"));
+        auto every = node(2, 0, NodeType::Timer, "Every");
+        every.extras().lifetime = 0.5f; every.extras().autoplay = true;
+        d.nodes.push_back(every);
+        auto once = node(3, 0, NodeType::Timer, "Once");
+        once.extras().lifetime = 5; once.extras().one_shot = true; once.extras().autoplay = false;
+        d.nodes.push_back(once);
+        d.nodes[0].script = 0;
+        d.scripts.push_back({"res://main.jet",
+            "extends Node\nvar ticks := 0\n"
+            "func _ready():\n\t$Every.timeout.connect(_on_every)\n\t$Once.timeout.connect(_on_once)\n"
+            "\tprint(\"before \", $Once.is_stopped(), \" \", $Every.is_stopped())\n"
+            "\t$Once.start(0.2)\n\tprint(\"once \", $Once.wait_time, \" \", $Once.is_stopped())\n"
+            "func _on_every():\n\tticks += 1\n\tprint(\"tick \", ticks)\n"
+            "\tif ticks == 3:\n\t\t$Every.stop()\n\t\tprint(\"stopped \", $Every.is_stopped(), \" \", $Every.time_left)\n"
+            "func _on_once():\n\tprint(\"once done \", $Once.is_stopped())\n", {}});
+        Runtime r;
+        check(start_scene(r, d), "Timer scene starts");
+        simulate(r, 3);
+        const auto log = run_log(r);
+        check(count(log, "before true false") == 1, "autostart starts a Timer, the others wait for start()");
+        check(count(log, "once 0.2 false") == 1, "start(time) sets wait_time and starts the Timer");
+        check(count(log, "tick 1") == 1 && count(log, "tick 3") == 1 && count(log, "tick 4") == 0,
+              "a repeating Timer emits timeout every wait_time until stop()");
+        check(count(log, "stopped true 0.0") == 1, "after stop(): is_stopped() and time_left 0");
+        check(count(log, "once done true") == 1, "a one-shot Timer emits timeout once and stops");
+        check(errors(log) == 0, "no errors from the Timer scene");
+
+        const auto bytes = encode_pack(d, error);
+        Description back;
+        check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[1].type == NodeType::Timer
+              && back.nodes[1].more().lifetime == 0.5f && back.nodes[1].more().autoplay && back.nodes[2].more().one_shot,
+              "the package keeps a Timer's wait_time, autostart and one_shot");
+        Description bad = d;
+        bad.nodes[1].extras().lifetime = 0;
+        check(!r.load(bad, error), "a Timer's wait_time must be positive");
+    }
+
+    {   // Area signals reach any node; a script connected to its own _on_body_entered runs it once.
+        auto rect = [](float w, float h) {
+            NodeDesc n = node(0, 0, NodeType::CollisionShape2D, "Shape");
+            n.extras().box_size = {w, h, 0};
+            return n;
+        };
+        auto circle = [](float radius) {
+            NodeDesc n = node(0, 0, NodeType::CollisionShape2D, "Shape");
+            n.extras().collision = CollisionKind::Sphere; n.extras().box_size = {20, 20, 0}; n.extras().radius = radius;
+            return n;
+        };
+        Description d;
+        d.nodes.push_back(node(1, -1, NodeType::Node2D, "World"));
+        add_body(d, 2, NodeType::StaticBody2D, "Ground", {0, 420, 0}, rect(2000, 40));
+        add_body(d, 10, NodeType::RigidBody2D, "Ball", {0, 100, 0}, circle(10));
+        add_body(d, 20, NodeType::Area2D, "Zone", {0, 200, 0}, rect(100, 20));
+        const int own = add_body(d, 30, NodeType::Area2D, "Own", {0, 300, 0}, rect(100, 20));
+        d.nodes[0].script = 0;
+        d.nodes[size_t(own)].script = 1;
+        d.scripts.push_back({"res://world.jet", "extends Node2D\nfunc _ready():\n\t$Zone.body_entered.connect(_on_zone)\n"
+            "\t$Zone.body_exited.connect(_on_zone_left)\nfunc _on_zone(body):\n\tprint(\"zone \", body.name)\n"
+            "func _on_zone_left(body):\n\tprint(\"left \", body.name)\n", {}});
+        d.scripts.push_back({"res://own.jet", "extends Area2D\nfunc _ready():\n\tbody_entered.connect(_on_body_entered)\n"
+            "func _on_body_entered(body):\n\tprint(\"own \", body.name)\n", {}});
+        Runtime r;
+        check(start_scene(r, d), "area signal scene starts");
+        simulate(r, 2);
+        const auto log = run_log(r);
+        check(count(log, "zone Ball") == 1 && count(log, "left Ball") == 1, "Area2D's body_entered and body_exited reach a node connected to them");
+        check(count(log, "own Ball") == 1, "an area's _on_body_entered connected to its own signal runs once");
+    }
+
+    {   // animation_finished, the particles' finished, and connections to a freed node are dropped.
+        const uint32_t red = 0xff0000ff, blue = 0xffff0000;
+        const std::vector<uint32_t> rgba = {red, blue, red, blue};
+        TextureAsset sheet;
+        check(make_texture("res://sheet.png", 2, 2, reinterpret_cast<const uint8_t*>(rgba.data()), sheet, error), "sheet converts");
+        Description d;
+        d.nodes.push_back(node(1, -1, NodeType::Node, "Main"));
+        auto ship = node(2, 0, NodeType::AnimatedSprite2D, "Ship");
+        ship.texture = 0; ship.hframes = 2; ship.extras().animations = "hit 0-1 10 once";
+        d.nodes.push_back(ship);
+        auto burst = node(3, 0, NodeType::CPUParticles3D, "Burst");
+        burst.extras().one_shot = true; burst.extras().lifetime = 0.2f; burst.extras().amount = 4;
+        d.nodes.push_back(burst);
+        auto timer = node(4, 0, NodeType::Timer, "Timer");
+        timer.extras().lifetime = 0.1f; timer.extras().autoplay = true;
+        d.nodes.push_back(timer);
+        d.nodes.push_back(node(5, 0, NodeType::Node2D, "Gone"));
+        d.textures.push_back(sheet);
+        d.nodes[0].script = 0;
+        d.scripts.push_back({"res://main.jet", "extends Node\nfunc _ready():\n"
+            "\t$Ship.animation_finished.connect(_on_ship)\n\t$Burst.finished.connect(_on_burst)\n"
+            "\t$Timer.timeout.connect($Gone.hide)\n\t$Gone.queue_free()\n"
+            "func _on_ship():\n\tprint(\"ship done \", $Ship.frame)\nfunc _on_burst():\n\tprint(\"burst done\")\n", {}});
+        Runtime r;
+        check(start_scene(r, d), "signal scene starts");
+        simulate(r, 1);
+        const auto log = run_log(r);
+        check(count(log, "ship done 1") == 1, "AnimatedSprite2D emits animation_finished at the end of a \"once\" animation");
+        check(count(log, "burst done") == 1, "a one-shot CPUParticles3D emits finished");
+        check(errors(log) == 0, "a freed node's connections are dropped with it");
+    }
+
+    {   // Connections made in the editor: the scene's own, and those of an instantiated scene, through a package.
+        Description d;
+        d.nodes.push_back(node(1, -1, NodeType::Node, "Main"));
+        auto timer = node(2, 0, NodeType::Timer, "Timer");
+        timer.extras().lifetime = 0.1f; timer.extras().autoplay = true;
+        d.nodes.push_back(timer);
+        d.nodes[0].script = 0;
+        d.scripts.push_back({"res://main.jet", "extends Node\nvar ticks := 0\nvar part = preload(\"res://part.jetscene\")\n"
+            "func _ready():\n\tprint(\"ready \", $Timer.timeout.is_connected(_on_timer_timeout))\n"
+            "func _on_timer_timeout():\n\tticks += 1\n\tif ticks == 3:\n\t\tadd_child(part.instantiate())\n"
+            "func _on_first():\n\tprint(\"first\")\n", {}});
+        d.connections.push_back({1, 0, "timeout", "_on_timer_timeout", 0});
+        d.connections.push_back({1, 0, "timeout", "_on_first", 4});
+        d.connections.push_back({1, 0, "timeout", "_missing", 0});
+        SceneDesc part;
+        part.path = "res://part.jetscene";
+        part.nodes.push_back(node(1, -1, NodeType::Node, "Part"));
+        auto clock = node(2, 0, NodeType::Timer, "Clock");
+        clock.extras().lifetime = 0.05f; clock.extras().autoplay = true; clock.extras().one_shot = true;
+        part.nodes.push_back(clock);
+        part.nodes[0].script = 1;
+        part.connections.push_back({1, 0, "timeout", "_on_clock_timeout", 0});
+        d.scenes.push_back(part);
+        d.scripts.push_back({"res://part.jet", "extends Node\nfunc _on_clock_timeout():\n\tprint(\"part \", name)\n", {}});
+
+        const auto bytes = encode_pack(d, error);
+        Description back;
+        check(decode_pack(bytes.data(), bytes.size(), back, error) && back.connections.size() == 3 && back.connections[1].flags == 4
+              && back.scenes[0].connections.size() == 1 && back.scenes[0].connections[0].method == "_on_clock_timeout",
+              "the package keeps the scenes' signal connections (v16)");
+        Runtime r;
+        std::vector<ScriptDiagnostic> diagnostics;
+        check(r.load_pack(bytes.data(), bytes.size(), error) && r.start(diagnostics), "connected scene starts from its package");
+        simulate(r, 1);
+        const auto log = run_log(r);
+        check(count(log, "ready true") == 1, "editor connections are made before _ready()");
+        check(count(log, "first") == 1, "a one-shot editor connection runs once");
+        check(count(log, "part Part") == 1, "an instantiated scene brings its own connections");
+        check(std::count_if(log.begin(), log.end(), [](const std::string& line) {
+                  return line.find("Timer.timeout -> Main._missing()") != std::string::npos && line.rfind("E ", 0) == 0;
+              }) == 1, "a connection to a missing method is reported once, at the start");
+        Description bad = d;
+        bad.connections.push_back({5, 0, "timeout", "_on_timer_timeout", 0});
+        check(!r.load(bad, error), "a connection to a node that isn't there is refused");
+    }
 }
 
 int main(int argc, char** argv) {
@@ -1192,6 +1745,10 @@ int main(int argc, char** argv) {
     scene_tests();
     sprite_tests();
     memory_tests();
+    instancing_tests();
+    twod_tests();
+    physics2d_tests();
+    signal_tests();
     Runtime runtime;
     const Description base = scene();
     check(runtime.load(base, error), "valid scene loads");
@@ -1449,5 +2006,5 @@ int main(int argc, char** argv) {
     }
 
     if (failures) { std::cerr << failures << " runtime test(s) failed\n"; return 1; }
-    std::cout << "PASS: hierarchy, Godot transforms, validation, picking, scripts, input, queue_free, errors, bytecode, textures, materials, sky, OBJ import, quantization, Quad/Torus, reflections, 2D nodes, draw order, resolution, physics, particles, input map, scenes, autoloads, Sprite3D, plain Control, slim nodes, pack v14\n";
+    std::cout << "PASS: hierarchy, Godot transforms, validation, picking, scripts, input, queue_free, errors, bytecode, textures, materials, sky, OBJ import, quantization, Quad/Torus, reflections, 2D nodes, draw order, resolution, physics, particles, input map, scenes, autoloads, Sprite3D, plain Control, slim nodes, RAM estimate, instantiate, 2D nodes, 2D physics, signals, Timer, scene connections, pack v16\n";
 }

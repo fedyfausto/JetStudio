@@ -1,0 +1,10 @@
+extends Area2D
+
+# Flies straight on and goes away once off the screen.
+@export var velocity := Vector2(260, 0)
+
+
+func _process(delta: float) -> void:
+	position += velocity * delta
+	if position.x < -16.0 or position.x > 336.0 or position.y < -16.0 or position.y > 256.0:
+		queue_free()

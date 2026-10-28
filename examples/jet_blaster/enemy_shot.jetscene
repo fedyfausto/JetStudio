@@ -1,0 +1,31 @@
+{
+	"format": "jetscene",
+	"version": 2,
+	"root": {
+		"id": 3,
+		"name": "Shot",
+		"type": "Area2D",
+		"script": "res://scripts/bullet.jet",
+		"script_properties": {},
+		"collision_layer": 8,
+		"collision_mask": 0,
+		"monitoring": false,
+		"children": [
+			{
+				"id": 1,
+				"name": "Sprite",
+				"type": "Sprite2D",
+				"texture": "res://textures/shot.png",
+				"children": []
+			},
+			{
+				"id": 2,
+				"name": "Shape",
+				"type": "CollisionShape2D",
+				"shape": "Circle",
+				"radius": 2.5,
+				"children": []
+			}
+		]
+	}
+}

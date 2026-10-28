@@ -11,16 +11,19 @@ signal visibility_toggled(id: int)
 signal copy_path_requested(id: int)
 signal file_dropped(id: int, path: String)
 signal reorder_requested(id: int, delta: int)
+signal signals_requested(id: int)
+signal change_type_requested(id: int)
 
 const Document := preload("res://scripts/scene_document.gd")
 const Style := preload("res://scripts/theme.gd")
 const Icons := preload("res://scripts/icons.gd")
 
-enum { BUTTON_SCRIPT = 1, BUTTON_VISIBLE = 2, BUTTON_WARNING = 3 }
-enum { MENU_ADD, MENU_RENAME, MENU_DUPLICATE, MENU_UP, MENU_DOWN, MENU_ATTACH, MENU_DETACH, MENU_PATH, MENU_DELETE }
+enum { BUTTON_SCRIPT = 1, BUTTON_VISIBLE = 2, BUTTON_WARNING = 3, BUTTON_SIGNALS = 4 }
+enum { MENU_ADD, MENU_RENAME, MENU_DUPLICATE, MENU_UP, MENU_DOWN, MENU_ATTACH, MENU_DETACH, MENU_PATH, MENU_DELETE, MENU_CHANGE_TYPE }
 
 var tree: Tree
 var read_only := false
+var connections := [] # the scene's signal connections, for the icon of the nodes that emit them
 var _root: Dictionary = {}
 var _selected := 0
 var _collapsed := {}
@@ -108,6 +111,12 @@ func rebuild(root: Dictionary, selected: int, locked: bool) -> void:
 		var warnings := Document.configuration_warnings(root, node)
 		if not warnings.is_empty():
 			item.add_button(0, Icons.get_icon("NodeWarning"), BUTTON_WARNING, false, "\n\n".join(warnings))
+		var outgoing := connections.filter(func(c): return int(c.from) == id)
+		if not outgoing.is_empty():
+			var lines := outgoing.map(func(c):
+				var target := Document.find(root, int(c.to))
+				return "%s → %s :: %s()" % [c["signal"], target.get("name", "?"), c.method])
+			item.add_button(0, Icons.get_icon("Signals"), BUTTON_SIGNALS, false, "Node has connections:\n" + "\n".join(lines))
 		var script_path := str(node.get("script", ""))
 		if not script_path.is_empty():
 			item.add_button(0, Icons.get_icon("Script"), BUTTON_SCRIPT, false, "Open Script: " + script_path)
@@ -185,6 +194,7 @@ func _on_edited() -> void:
 func _on_button(item: TreeItem, _column: int, id: int, _mouse: int) -> void:
 	var node_id := int(item.get_metadata(0))
 	if id == BUTTON_SCRIPT: script_requested.emit(node_id, "open")
+	elif id == BUTTON_SIGNALS: signals_requested.emit(node_id)
 	elif id == BUTTON_VISIBLE and not read_only: visibility_toggled.emit(node_id)
 	elif id == BUTTON_WARNING:
 		var node := Document.find(_root, node_id)
@@ -206,6 +216,7 @@ func _show_menu(at: Vector2) -> void:
 	_menu.add_icon_item(Icons.get_icon("MoveUp"), "Move Up  (Ctrl+↑)", MENU_UP)
 	_menu.add_icon_item(Icons.get_icon("MoveDown"), "Move Down  (Ctrl+↓)", MENU_DOWN)
 	_menu.add_separator()
+	_menu.add_icon_item(Icons.get_icon("Reload"), "Change Type...", MENU_CHANGE_TYPE)
 	_menu.add_icon_item(Icons.get_icon("ScriptCreate"), "Attach Script...", MENU_ATTACH)
 	if has_script: _menu.add_icon_item(Icons.get_icon("ScriptRemove"), "Detach Script", MENU_DETACH)
 	_menu.add_icon_item(Icons.get_icon("CopyNodePath"), "Copy Node Path  (Ctrl+Shift+C)", MENU_PATH)
@@ -213,7 +224,7 @@ func _show_menu(at: Vector2) -> void:
 	_menu.add_icon_item(Icons.get_icon("Remove"), "Delete Node  (Del)", MENU_DELETE)
 	for id in [MENU_RENAME, MENU_DUPLICATE, MENU_UP, MENU_DOWN, MENU_DELETE]:
 		_menu.set_item_disabled(_menu.get_item_index(id), read_only or is_root)
-	for id in [MENU_ADD, MENU_ATTACH, MENU_DETACH]:
+	for id in [MENU_ADD, MENU_ATTACH, MENU_DETACH, MENU_CHANGE_TYPE]:
 		var index := _menu.get_item_index(id)
 		if index >= 0: _menu.set_item_disabled(index, read_only)
 	_menu.set_item_disabled(_menu.get_item_index(MENU_RENAME), read_only)
@@ -232,6 +243,7 @@ func _on_menu(id: int) -> void:
 		MENU_DETACH: script_requested.emit(_selected, "detach")
 		MENU_PATH: copy_path_requested.emit(_selected)
 		MENU_DELETE: delete_requested.emit(_selected)
+		MENU_CHANGE_TYPE: change_type_requested.emit(_selected)
 
 func _tree_input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.pressed or event.echo or read_only: return

@@ -1,0 +1,49 @@
+extends Area2D
+
+# Up and down with the two buttons; it fires on its own. Its mask sees enemies and their shots.
+signal hit(by)
+
+const SHOT_LAYER := 8
+
+@export var speed := 110.0
+@export var fire_every := 0.16
+
+var bullet_scene = preload("res://bullet.jetscene")
+var active := false
+var cooldown := 0.0
+var invincible := 0.0
+
+@onready var ship = $Ship
+@onready var bullets = $"../Bullets"
+
+
+func _process(delta: float) -> void:
+	if not active:
+		return
+	var direction := Input.get_axis("move_up", "move_down")
+	position.y = clampf(position.y + direction * speed * delta, 18.0, 222.0)
+	if direction < 0.0:
+		ship.play("up")
+	elif direction > 0.0:
+		ship.play("down")
+	else:
+		ship.play("fly")
+
+	cooldown -= delta
+	if cooldown <= 0.0:
+		cooldown = fire_every
+		var bullet = bullet_scene.instantiate()
+		bullet.position = position + Vector2(14, 1)
+		bullets.add_child(bullet)
+
+	# Blinks while it can't be hit.
+	if invincible > 0.0:
+		invincible -= delta
+		alpha = 0.3 if int(invincible * 12.0) % 2 == 0 else 1.0
+	else:
+		alpha = 1.0
+
+
+func _on_area_entered(area) -> void:
+	if active and invincible <= 0.0:
+		hit.emit(area)

@@ -33,9 +33,11 @@ func _process(delta):
 | --- | --- | --- |
 | `float` | 64-bit | **32-bit** (ESP32-S3 FPU is single precision) |
 | `int` | 64-bit | 64-bit |
-| Classes | `class_name`, inner classes, `preload` | not supported yet |
-| Signals, `await`, lambdas | supported | not supported yet (clear compile error) |
-| Typed arrays, `Callable` | supported | not supported |
+| Classes | `class_name`, inner classes | not supported yet |
+| `preload()` | a constant, loaded with the script | a function: the scene is looked up when the line runs |
+| `await`, lambdas | supported | not supported yet (clear compile error) |
+| Signals | declared, connected in the editor or in scripts | the same; `CONNECT_DEFERRED` and `Callable.bind()` not supported yet |
+| Typed arrays | supported | not supported |
 | Static typing | checked | annotations accepted; `int`/`float` variables convert on assignment, other mismatches are runtime errors |
 
 Unsupported constructs produce a compile error naming the feature, never a crash.
@@ -66,6 +68,7 @@ extends Node3D                 # optional, must be first statement; default base
 const MAX_SPEED = 10.0
 enum State { IDLE, RUN = 5, JUMP }   # State.IDLE == 0, State.RUN == 5, State.JUMP == 6
 enum { A, B }                        # unnamed enum: A and B become constants
+signal hit(damage)                   # see Signals
 @export var health := 3
 @export_range(0, 100) var volume = 50
 @export_range(0.0, 1.0, 0.05) var ratio := 0.5
@@ -91,8 +94,65 @@ func name(arg1, arg2 := 2, arg3: float = 1.0) -> void:
 | `_ready()` | once, after the whole scene is created; children before parents |
 | `_process(delta)` | every frame, parents before children, `delta` in seconds |
 | `_physics_process(delta)` | at a fixed 60 Hz (up to 4 times per frame), before `_process`; move bodies here |
-| `_on_body_entered(body)` | Area3D scripts: a body started overlapping the area (after the physics step) |
-| `_on_body_exited(body)` | Area3D scripts: a body stopped overlapping the area |
+| `_on_body_entered(body)` | Area3D/Area2D scripts: a body started overlapping the area (after the physics step) |
+| `_on_body_exited(body)` | Area3D/Area2D scripts: a body stopped overlapping the area |
+| `_on_area_entered(area)` | Area3D/Area2D scripts: another area in its mask started overlapping it |
+| `_on_area_exited(area)` | Area3D/Area2D scripts: that area stopped overlapping it |
+
+The area callbacks come with the `body_entered`, `body_exited`, `area_entered` and `area_exited`
+signals (see Signals): an area's script that connects one of them to its own `_on_...` method gets
+one call, not two.
+
+## Signals
+
+As in Godot 4. A script declares its signals at the top level; the engine's nodes have their own.
+
+```gdscript
+extends Area2D
+
+signal destroyed(enemy)          # argument names are documentation
+var hp := 2
+
+func _on_area_entered(bullet):
+	hp -= 1
+	if hp == 0:
+		destroyed.emit(self)     # or emit_signal("destroyed", self)
+```
+
+```gdscript
+func spawn():
+	var enemy = enemy_scene.instantiate()
+	add_child(enemy)
+	enemy.destroyed.connect(_on_enemy_destroyed)
+	$Timer.timeout.connect(_on_timeout, CONNECT_ONE_SHOT)
+
+func _on_enemy_destroyed(enemy):
+	score += 100
+```
+
+- A function or an engine method named without calling it is a `Callable` (`_on_timeout`,
+  `$Door.hide`, `Callable(node, "method")`); a signal named the same way is a `Signal` value.
+- `Signal`: `emit(...)`, `connect(callable, flags = 0)` (returns `OK`), `disconnect(callable)`,
+  `is_connected(callable)`, `get_name()`, `get_object()`, `is_null()`.
+- `Callable`: `call(...)`, `callv(array)`, `get_object()`, `get_method()`, `is_valid()`, `is_null()`.
+- Every object: `connect(signal, callable, flags = 0)`, `disconnect(signal, callable)`,
+  `is_connected(signal, callable)`, `emit_signal(signal, ...)`, `has_signal(signal)`.
+- Flags: `CONNECT_ONE_SHOT` (disconnects after the first emission) and `CONNECT_PERSIST`
+  (accepted, it means nothing at run time). `CONNECT_DEFERRED` is refused for now: callables
+  always run when the signal is emitted.
+- The callables run in the order they were connected, with the signal's arguments. An error in
+  one of them is reported and the others still run.
+- Connecting a signal twice to the same callable, connecting a signal the object doesn't have,
+  disconnecting what isn't connected or emitting an unknown signal are runtime errors.
+- Engine signals: `body_entered(body)`, `body_exited(body)`, `area_entered(area)`,
+  `area_exited(area)` (Area3D, Area2D), `timeout()` (Timer), `animation_finished()`
+  (AnimatedSprite2D, at the end of an animation that doesn't loop), `finished()` (CPUParticles3D,
+  at the end of a one-shot cycle).
+- The connections belong to the VM, not to the nodes: they cost nothing until used, and a freed
+  node's connections go with it.
+- Connections made in the editor's Signals dock are saved with the scene and made when it starts or is
+  instantiated, after the scripts' member initializers and before `_ready()`. One whose method is
+  missing is reported in the Output and skipped.
 
 ## Statements
 
@@ -151,11 +211,14 @@ This also works through nodes: `$Cube.position.y = 2`.
 | `int` | 64-bit |
 | `float` | 32-bit |
 | `String` | immutable, UTF-8 |
+| `Vector2` | `x y`; 2D positions and directions (y grows downwards) |
 | `Vector3` | `x y z`; arithmetic with vectors and scalars |
 | `Color` | `r g b` (0..1); `a` reads as 1.0 |
 | `Array` | reference type, mixed values, negative indices count from the end |
-| `Dictionary` | reference type, insertion ordered, keys: `int float bool String Vector3` |
+| `Dictionary` | reference type, insertion ordered, keys: `int float bool String Vector2 Vector3` |
 | Objects | engine nodes and singletons (`Input`) |
+| `Callable` | an object's method, by name (see Signals) |
+| `Signal` | an object's signal, by name (see Signals) |
 
 ### Vector3
 
@@ -164,6 +227,15 @@ FORWARD BACK` (`FORWARD` is `(0, 0, -1)`, as in Godot). Methods: `length()`,
 `length_squared()`, `normalized()`, `dot(v)`, `cross(v)`, `distance_to(v)`,
 `distance_squared_to(v)`, `lerp(v, t)`, `move_toward(v, delta)`, `abs()`,
 `rotated(axis, angle)`, `angle_to(v)`, `is_zero_approx()`, `is_equal_approx(v)`.
+
+### Vector2
+
+Constructor `Vector2()`, `Vector2(x, y)`. Constants `ZERO ONE UP DOWN LEFT RIGHT`, with Godot's 2D
+directions (`UP` is `(0, -1)`). Methods: `length()`, `length_squared()`, `normalized()`, `dot(v)`,
+`cross(v)` (a float), `distance_to(v)`, `distance_squared_to(v)`, `direction_to(v)`, `lerp(v, t)`,
+`move_toward(v, delta)`, `abs()`, `floor()`, `ceil()`, `round()`, `sign()`, `rotated(angle)`,
+`angle()`, `angle_to(v)`, `angle_to_point(v)`, `orthogonal()`, `aspect()`, `limit_length(len)`,
+`is_zero_approx()`, `is_equal_approx(v)`. Angles are radians, clockwise on the screen.
 
 ### Color
 
@@ -201,8 +273,11 @@ a missing key is a runtime error (use `get`).
 `clampf`, `clampi`, `lerp`, `lerpf`, `inverse_lerp`, `move_toward`, `wrapf`, `wrapi`,
 `fmod`, `fposmod`, `posmod`, `snapped`, `is_equal_approx`, `is_zero_approx`,
 `randomize()`, `seed(n)`, `randf()`, `randi()`, `randf_range(a, b)`,
-`randi_range(a, b)`, `is_instance_valid(obj)`, `typeof(x)` (returns a type name String).
-Constants: `PI`, `TAU`, `INF`, `NAN`.
+`randi_range(a, b)`, `is_instance_valid(obj)`, `typeof(x)` (returns a type name String),
+`load(path)` and `preload(path)` (a scene of the project as a `PackedScene`; `null` and an error if there is none).
+Constants: `PI`, `TAU`, `INF`, `NAN`, `OK` (0), `FAILED` (1), `ERR_CANT_OPEN` (19),
+`ERR_INVALID_PARAMETER` (31), `CONNECT_DEFERRED`, `CONNECT_PERSIST`, `CONNECT_ONE_SHOT`,
+`CONNECT_REFERENCE_COUNTED`.
 
 ## Engine API
 
@@ -210,7 +285,11 @@ The engine classes form this hierarchy. Properties use Godot names.
 
 - **Node**: `name` (read only), `get_node(path)`, `get_node_or_null(path)`,
   `get_parent()`, `get_children()`, `get_child(i)`, `get_child_count()`,
-  `find_child(name)`, `queue_free()`, `get_tree()`.
+  `find_child(name)`, `queue_free()`, `get_tree()`, `add_child(node)`, `remove_child(node)`.
+  `add_child()` puts a node made by `instantiate()` (or taken out with `remove_child()`) under this one;
+  if this node is in the scene, the new subtree enters it and gets `_ready()`, children first. A sibling
+  with the same name gets a number (`Bullet`, `Bullet2`...). Nodes outside the scene don't run or show.
+  `queue_free()` releases the node and its children at the end of the frame.
 - **Node3D** (extends Node): `position`, `rotation` (radians), `rotation_degrees`,
   `scale`, `visible`, `global_position`, `translate(offset)`, `rotate_x(rad)`,
   `rotate_y(rad)`, `rotate_z(rad)`, `look_at(target)`, `show()`, `hide()`,
@@ -236,18 +315,49 @@ The engine classes form this hierarchy. Properties use Godot names.
   `bounce`, `apply_central_impulse(v)`, `apply_impulse(v, position)` (the position
   is ignored: boxes do not tumble), `apply_central_force(v)` (for the next step).
 - **Area3D** (extends CollisionObject3D): `monitoring`, `get_overlapping_bodies()`,
-  `has_overlapping_bodies()`, `overlaps_body(body)`.
+  `has_overlapping_bodies()`, `overlaps_body(body)`, `get_overlapping_areas()`,
+  `has_overlapping_areas()`, `overlaps_area(area)`. With `monitoring` off it detects nothing,
+  but other areas still detect it.
 - **CollisionShape3D** (extends Node3D): `disabled`.
 - **CPUParticles3D** (extends Node3D; drawn by Jet's particle system): `emitting`,
-  `amount` (int 1-200), `lifetime`, `one_shot`, `explosiveness`, `lifetime_randomness`,
+  `amount` (int 1-200, about 40 bytes of RAM each), `lifetime`, `one_shot`, `explosiveness`, `lifetime_randomness`,
   `direction`, `spread` (degrees), `gravity`, `initial_velocity_min`,
   `initial_velocity_max`, `damping_min`, `damping_max`, `color`, `alpha` (Puff style),
   `restart()`. With `one_shot` `emitting` becomes false at the
   end of the cycle; setting it to true starts a new cycle. Particles live in world
   space: moving the node does not move the ones already emitted.
+- **Node2D** (extends Node; drawn over the 3D scene and under the Controls, in canvas pixels with y
+  growing downwards): `position`, `global_position`, `scale` (Vector2), `rotation` (radians, clockwise),
+  `rotation_degrees`, `z_index`, `visible`, `modulate`, `alpha` (Godot's `modulate.a`, inherited by the
+  2D children), `translate(v)`, `rotate(radians)`, `look_at(point)`, `show()`, `hide()`,
+  `is_visible_in_tree()`. A 2D node under a 2D parent moves, turns and hides with it. Higher `z_index`
+  (added to the parent's) is drawn in front; with the same z, the later node in the tree.
+- **Sprite2D** (extends Node2D): `frame`, `hframes`, `vframes`, `flip_h`, `flip_v`, `centered`,
+  `offset` (Vector2, in the node's scaled space). One frame of its texture's sprite sheet.
+- **AnimatedSprite2D** (extends Node2D): `play(name = "")`, `stop()`, `is_playing()`, `animation`,
+  `frame`, `speed_scale`, `flip_h`, `flip_v`, `centered`, `offset`. Its animations are frame ranges of
+  one sprite sheet, written in the Inspector as `idle 0-3 8, run 4-9 12, die 10-14 10 once` (name,
+  frames, frames per second, `once` when it doesn't loop); with Autoplay the first (or the chosen) one
+  starts on its own.
+- **Camera2D** (extends Node2D): `offset`, `zoom` (Vector2), `enabled`, `make_current()`. The current
+  Camera2D shows its position at the screen centre; without one the canvas origin is the top-left corner.
+- **2D physics**: the 3D physics nodes' 2D versions, in canvas pixels with y down. **CollisionObject2D**
+  (extends Node2D): `collision_layer`, `collision_mask`. **StaticBody2D**: `friction`, `bounce`.
+  **CharacterBody2D**: `velocity` (Vector2), `floor_max_angle`, `move_and_slide()`, `is_on_floor()`,
+  `is_on_wall()`, `is_on_ceiling()`, `get_floor_normal()` (Vector2; `Vector2.UP` on flat ground).
+  **RigidBody2D**: `linear_velocity` (Vector2), `angular_velocity` (float, rad/s), `mass`,
+  `gravity_scale` (gravity is 980 px/s² down), `freeze`, `sleeping`, `friction`, `bounce`,
+  `apply_central_impulse(v)`, `apply_impulse(v, position)`, `apply_central_force(v)` with Vector2.
+  **Area2D**: as Area3D. **CollisionShape2D** (extends Node2D): `disabled`, `one_way_collision`
+  (bodies land on it from its -y side and pass through from below). A 2D shape belongs to the nearest
+  2D body or area above it and never meets 3D shapes.
+- **Timer** (extends Node): `wait_time` (seconds), `one_shot`, `autostart`, `paused`, `time_left`
+  (read only), `start(time_sec = -1)` (a positive time becomes the new `wait_time`), `stop()`,
+  `is_stopped()`. Emits `timeout` when the time is up, at most once per frame; a repeating Timer
+  starts again with what was left over. Autostart starts it when it enters the scene.
 - **Control** (extends Node; 2D nodes drawn over the 3D scene, in screen pixels
-  of the display, 320×240 unless the project hardware sets another resolution): `position` and `size` (Vector3, x and y used;
-  position is relative to a parent Control), `visible`, `alpha`, `show()`, `hide()`. A plain Control draws
+  of the display, 320×240 unless the project hardware sets another resolution): `position` and `size` (Vector2, a Vector3
+  is accepted too; position is relative to a parent Control), `visible`, `alpha`, `show()`, `hide()`. A plain Control draws
   nothing: it groups other 2D nodes (a HUD), which are hidden with it and inherit its `alpha`.
 - **Label** (extends Control): `text`, `color`. Built-in 7×15 bitmap font
   (ASCII and Latin-1 accented letters), `\n` starts a new line.
@@ -256,6 +366,17 @@ The engine classes form this hierarchy. Properties use Godot names.
 - **Autoloads** (Project Settings > Autoload): scripts that live across scene changes.
   Any script reaches one by its name as a global (`Game.score += 1`) or as
   `get_node("/root/Game")`. Their `_ready()` runs before the first scene's.
+- **PackedScene** (from `load()`/`preload()`): `instantiate()` returns the root of a new copy of the scene,
+  outside the tree, with its scripts' member variables set (`_ready()` waits for `add_child()`):
+
+  ```gdscript
+  var bullet_scene = preload("res://bullet.jetscene")
+
+  func shoot():
+      var bullet = bullet_scene.instantiate()
+      bullet.position = position
+      get_parent().add_child(bullet)
+  ```
 - **SceneTree** (from any node: `get_tree()`): `change_scene_to_file(path)` and
   `reload_current_scene()` return `OK` (0) or `ERR_CANT_OPEN` (19) when the project has no
   such scene; the change happens at the end of the frame. `current_scene` is the root node of

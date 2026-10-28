@@ -37,6 +37,12 @@ Color col3(Real r, Real g, Real b) {
     c.b = b;
     return c;
 }
+Vector2 vec2(Real x, Real y) {
+    Vector2 v;
+    v.x = x;
+    v.y = y;
+    return v;
+}
 Vector3 vsub(const Vector3& a, const Vector3& b) { return vec3(a.x - b.x, a.y - b.y, a.z - b.z); }
 Vector3 vadd(const Vector3& a, const Vector3& b) { return vec3(a.x + b.x, a.y + b.y, a.z + b.z); }
 Vector3 vmul(const Vector3& a, Real s) { return vec3(a.x * s, a.y * s, a.z * s); }
@@ -216,6 +222,11 @@ bool map_numeric(BuiltinCtx& ctx, const char* name, const Value& v, Value& out, 
         out = Value(vec3(ff(x.x), ff(x.y), ff(x.z)));
         return true;
     }
+    case Type::Vector2: {
+        Vector2 x = Heap::vec2(v);
+        out = Value(vec2(ff(x.x), ff(x.y)));
+        return true;
+    }
     default: return util_type_error(ctx, name, 0, v, "float");
     }
 }
@@ -365,6 +376,11 @@ bool bf_clamp(BuiltinCtx& ctx, const Value* a, int, Value& out) {
         out = Value(vec3(clampr(v.x, lo.x, hi.x), clampr(v.y, lo.y, hi.y), clampr(v.z, lo.z, hi.z)));
         return true;
     }
+    if (a[0].type() == Type::Vector2 && a[1].type() == Type::Vector2 && a[2].type() == Type::Vector2) {
+        Vector2 v = Heap::vec2(a[0]), lo = Heap::vec2(a[1]), hi = Heap::vec2(a[2]);
+        out = Value(vec2(clampr(v.x, lo.x, hi.x), clampr(v.y, lo.y, hi.y)));
+        return true;
+    }
     for (int i = 0; i < 3; ++i)
         if (!is_num(a[i])) return util_type_error(ctx, "clamp", i, a[i], "float");
     if (a[0].type() == Type::Int && a[1].type() == Type::Int && a[2].type() == Type::Int) {
@@ -393,10 +409,11 @@ bool bf_lerp(BuiltinCtx& ctx, const Value* a, int, Value& out) {
     Real t = 0;
     if (!get_real(ctx, "lerp", a, 2, t)) return false;
     Type ta = a[0].type();
-    if ((ta == Type::Vector3 || ta == Type::Color) && a[1].type() == ta) {
+    if ((ta == Type::Vector3 || ta == Type::Vector2 || ta == Type::Color) && a[1].type() == ta) {
         Real r[3];
         for (int k = 0; k < 3; ++k) r[k] = Heap::comp(a[0], k) + (Heap::comp(a[1], k) - Heap::comp(a[0], k)) * t;
         if (ta == Type::Color) out = Value(col3(r[0], r[1], r[2]));
+        else if (ta == Type::Vector2) out = Value(vec2(r[0], r[1]));
         else out = Value(vec3(r[0], r[1], r[2]));
         return true;
     }
@@ -548,6 +565,22 @@ bool bf_randi_range(BuiltinCtx& ctx, const Value* a, int, Value& out) {
     out = Value(Int(uint64_t(x) + (span ? r % span : r)));
     return true;
 }
+// load() and preload(): the package's scenes, as PackedScene. A missing one is null and an error, as in Godot.
+bool bf_load(BuiltinCtx& ctx, const Value* a, int, Value& out) {
+    if (a[0].type() != Type::String) {
+        ctx.error = "Invalid argument for \"load()\": expected a path (String).";
+        return false;
+    }
+    const ObjectId id = ctx.host ? ctx.host->resource(a[0].as_string()) : 0;
+    if (id) {
+        out = Value::object(id);
+    } else {
+        out = Value();
+        if (ctx.host) ctx.host->print("ERROR: Resource file not found: " + std::string(a[0].as_string()) + ".", true);
+    }
+    return true;
+}
+
 bool bf_is_instance_valid(BuiltinCtx& ctx, const Value* a, int, Value& out) {
     out = Value(a[0].type() == Type::Object && ctx.host && !ctx.host->class_of(Heap::o(a[0])).empty());
     return true;
@@ -592,6 +625,23 @@ bool bf_vector3(BuiltinCtx& ctx, const Value* a, int n, Value& out) {
         return true;
     }
     return fail(ctx, "No constructor of \"Vector3\" matches the given arguments (expected (), (Vector3) or (x, y, z)).");
+}
+bool bf_vector2(BuiltinCtx& ctx, const Value* a, int n, Value& out) {
+    if (n == 0) {
+        out = Value(Vector2());
+        return true;
+    }
+    if (n == 1 && a[0].type() == Type::Vector2) {
+        out = a[0];
+        return true;
+    }
+    if (n == 2) {
+        Real x = 0, y = 0;
+        if (!get_real(ctx, "Vector2", a, 0, x) || !get_real(ctx, "Vector2", a, 1, y)) return false;
+        out = Value(vec2(x, y));
+        return true;
+    }
+    return fail(ctx, "No constructor of \"Vector2\" matches the given arguments (expected (), (Vector2) or (x, y)).");
 }
 bool bf_color(BuiltinCtx& ctx, const Value* a, int n, Value& out) {
     if ((n == 1 || n == 2) && a[0].type() == Type::Color) {
@@ -639,9 +689,19 @@ bool bf_dictionary(BuiltinCtx& ctx, const Value* a, int n, Value& out) {
     return util_type_error(ctx, "Dictionary", 0, a[0], "Dictionary");
 }
 
+// Callable(object, "method") and Signal(object, "name"); the VM checks the name when it's used.
+bool bound(BuiltinCtx& ctx, const char* what, const Value* a, Value& out, bool signal) {
+    if (a[0].type() != Type::Object) return util_type_error(ctx, what, 0, a[0], "Object");
+    if (a[1].type() != Type::String || Heap::sv(a[1]).empty()) return util_type_error(ctx, what, 1, a[1], "String");
+    out = signal ? Value::signal(Heap::o(a[0]), Heap::sv(a[1])) : Value::callable(Heap::o(a[0]), Heap::sv(a[1]));
+    return true;
+}
+bool bf_callable(BuiltinCtx& ctx, const Value* a, int, Value& out) { return bound(ctx, "Callable", a, out, false); }
+bool bf_signal(BuiltinCtx& ctx, const Value* a, int, Value& out) { return bound(ctx, "Signal", a, out, true); }
+
 constexpr SType U = kUnknown;
 constexpr SType T_NIL = SType(Type::Nil), T_BOOL = SType(Type::Bool), T_INT = SType(Type::Int),
-                T_FLOAT = SType(Type::Float), T_STR = SType(Type::String), T_VEC = SType(Type::Vector3),
+                T_FLOAT = SType(Type::Float), T_STR = SType(Type::String), T_VEC = SType(Type::Vector3), T_VEC2 = SType(Type::Vector2),
                 T_COL = SType(Type::Color), T_ARR = SType(Type::Array), T_DICT = SType(Type::Dictionary);
 
 const BuiltinFunc kFuncs[] = {
@@ -720,13 +780,18 @@ const BuiltinFunc kFuncs[] = {
     {"randf_range", 2, 2, T_FLOAT, 0, bf_randf_range},
     {"randi_range", 2, 2, T_INT, 0, bf_randi_range},
     {"is_instance_valid", 1, 1, T_BOOL, 0, bf_is_instance_valid},
+    {"load", 1, 1, SType(Type::Object), 0, bf_load},
+    {"preload", 1, 1, SType(Type::Object), 0, bf_load},
     {"typeof", 1, 1, T_STR, kPure, bf_typeof},
     {"char", 1, 1, T_STR, kPure, bf_char},
     {"assert", 1, 2, T_NIL, 0, bf_assert},
     {"Vector3", 0, 3, T_VEC, kPure, bf_vector3},
+    {"Vector2", 0, 2, T_VEC2, kPure, bf_vector2},
     {"Color", 1, 4, T_COL, kPure, bf_color},
     {"Array", 0, 1, T_ARR, 0, bf_array},
     {"Dictionary", 0, 1, T_DICT, 0, bf_dictionary},
+    {"Callable", 2, 2, SType(Type::Callable), 0, bf_callable},
+    {"Signal", 2, 2, SType(Type::Signal), 0, bf_signal},
 };
 
 enum BM : int {
@@ -739,6 +804,7 @@ enum BM : int {
     BM_append, BM_push_back, BM_push_front, BM_pop_back, BM_pop_front, BM_insert, BM_remove_at, BM_erase,
     BM_has, BM_clear, BM_front, BM_back, BM_duplicate, BM_reverse, BM_sort, BM_pick_random, BM_slice, BM_max,
     BM_min, BM_resize, BM_fill, BM_append_array, BM_get, BM_keys, BM_values, BM_merge, BM_find_key,
+    BM_angle, BM_orthogonal, BM_aspect, BM_angle_to_point,
     BM_COUNT
 };
 
@@ -752,6 +818,7 @@ const char* const kMethodNames[] = {
     "append", "push_back", "push_front", "pop_back", "pop_front", "insert", "remove_at", "erase",
     "has", "clear", "front", "back", "duplicate", "reverse", "sort", "pick_random", "slice", "max",
     "min", "resize", "fill", "append_array", "get", "keys", "values", "merge", "find_key",
+    "angle", "orthogonal", "aspect", "angle_to_point",
 };
 static_assert(sizeof(kMethodNames) / sizeof(kMethodNames[0]) == BM_COUNT, "method name table out of sync");
 
@@ -893,6 +960,88 @@ int vector3_method(MCall& c) {
         Real l = vlen(v);
         if (l > 0 && t < l) v = vmul(v, t / l);
         c.out = Value(v);
+        return kOk;
+    }
+    default: return kNoMethod;
+    }
+}
+
+// Godot's Vector2: y grows downwards, so rotated() and angle() turn clockwise on the screen.
+int vector2_method(MCall& c) {
+    const Vector2 v2 = Heap::vec2(c.self);
+    const Vector3 v = vec3(v2.x, v2.y, 0);
+    Vector2 w2;
+    Real t = 0;
+    auto other = [&](int i) {
+        if (c.args[i].type() != Type::Vector2) return c.type_error(i, "Vector2");
+        w2 = Heap::vec2(c.args[i]);
+        return true;
+    };
+    auto put = [&](const Vector3& r) { c.out = Value(vec2(r.x, r.y)); };
+    switch (c.id) {
+    case BM_length: if (!c.arity(0, 0)) return kFail; c.out = Value(vlen(v)); return kOk;
+    case BM_length_squared: if (!c.arity(0, 0)) return kFail; c.out = Value(vdot(v, v)); return kOk;
+    case BM_normalized: if (!c.arity(0, 0)) return kFail; put(vnorm(v)); return kOk;
+    case BM_dot: if (!c.arity(1, 1) || !other(0)) return kFail; c.out = Value(v2.x * w2.x + v2.y * w2.y); return kOk;
+    case BM_cross: if (!c.arity(1, 1) || !other(0)) return kFail; c.out = Value(v2.x * w2.y - v2.y * w2.x); return kOk;
+    case BM_distance_to:
+        if (!c.arity(1, 1) || !other(0)) return kFail;
+        c.out = Value(vlen(vec3(w2.x - v2.x, w2.y - v2.y, 0)));
+        return kOk;
+    case BM_distance_squared_to: {
+        if (!c.arity(1, 1) || !other(0)) return kFail;
+        const Vector3 d = vec3(w2.x - v2.x, w2.y - v2.y, 0);
+        c.out = Value(vdot(d, d));
+        return kOk;
+    }
+    case BM_direction_to: if (!c.arity(1, 1) || !other(0)) return kFail; put(vnorm(vec3(w2.x - v2.x, w2.y - v2.y, 0))); return kOk;
+    case BM_lerp:
+        if (!c.arity(2, 2) || !other(0) || !c.real(1, t)) return kFail;
+        c.out = Value(vec2(v2.x + (w2.x - v2.x) * t, v2.y + (w2.y - v2.y) * t));
+        return kOk;
+    case BM_move_toward: {
+        if (!c.arity(2, 2) || !other(0) || !c.real(1, t)) return kFail;
+        const Vector3 d = vec3(w2.x - v2.x, w2.y - v2.y, 0);
+        const Real len = vlen(d);
+        c.out = len <= t || len < kCmpEpsilon ? Value(w2) : Value(vec2(v2.x + d.x * t / len, v2.y + d.y * t / len));
+        return kOk;
+    }
+    case BM_abs: if (!c.arity(0, 0)) return kFail; c.out = Value(vec2(std::fabs(v2.x), std::fabs(v2.y))); return kOk;
+    case BM_floor: if (!c.arity(0, 0)) return kFail; c.out = Value(vec2(std::floor(v2.x), std::floor(v2.y))); return kOk;
+    case BM_ceil: if (!c.arity(0, 0)) return kFail; c.out = Value(vec2(std::ceil(v2.x), std::ceil(v2.y))); return kOk;
+    case BM_round: if (!c.arity(0, 0)) return kFail; c.out = Value(vec2(std::round(v2.x), std::round(v2.y))); return kOk;
+    case BM_sign: if (!c.arity(0, 0)) return kFail; c.out = Value(vec2(fsign(v2.x), fsign(v2.y))); return kOk;
+    case BM_rotated: {
+        if (!c.arity(1, 1) || !c.real(0, t)) return kFail;
+        const Real cs = std::cos(t), sn = std::sin(t);
+        c.out = Value(vec2(v2.x * cs - v2.y * sn, v2.x * sn + v2.y * cs));
+        return kOk;
+    }
+    case BM_angle: if (!c.arity(0, 0)) return kFail; c.out = Value(Real(std::atan2(v2.y, v2.x))); return kOk;
+    case BM_angle_to:
+        if (!c.arity(1, 1) || !other(0)) return kFail;
+        c.out = Value(Real(std::atan2(v2.x * w2.y - v2.y * w2.x, v2.x * w2.x + v2.y * w2.y)));
+        return kOk;
+    case BM_angle_to_point:
+        if (!c.arity(1, 1) || !other(0)) return kFail;
+        c.out = Value(Real(std::atan2(w2.y - v2.y, w2.x - v2.x)));
+        return kOk;
+    case BM_orthogonal: if (!c.arity(0, 0)) return kFail; c.out = Value(vec2(v2.y, -v2.x)); return kOk;
+    case BM_aspect: if (!c.arity(0, 0)) return kFail; c.out = Value(Real(v2.x / v2.y)); return kOk;
+    case BM_is_zero_approx:
+        if (!c.arity(0, 0)) return kFail;
+        c.out = Value(std::fabs(v2.x) < kCmpEpsilon && std::fabs(v2.y) < kCmpEpsilon);
+        return kOk;
+    case BM_is_equal_approx:
+        if (!c.arity(1, 1) || !other(0)) return kFail;
+        c.out = Value(approx_eq(v2.x, w2.x) && approx_eq(v2.y, w2.y));
+        return kOk;
+    case BM_limit_length: {
+        if (!c.arity(0, 1)) return kFail;
+        t = 1;
+        if (c.argc == 1 && !c.real(0, t)) return kFail;
+        const Real l = vlen(v);
+        c.out = l > 0 && t < l ? Value(vec2(v2.x * t / l, v2.y * t / l)) : Value(v2);
         return kOk;
     }
     default: return kNoMethod;
@@ -1164,6 +1313,7 @@ bool sort_less(const Value& a, const Value& b) {
     case Type::String: return Heap::sv(a) < Heap::sv(b);
     case Type::Bool: return !Heap::b(a) && Heap::b(b);
     case Type::Vector3:
+    case Type::Vector2:
     case Type::Color:
         for (int k = 0; k < 3; ++k) {
             Real x = Heap::comp(a, k), y = Heap::comp(b, k);
@@ -1461,6 +1611,7 @@ int call_builtin_method(BuiltinCtx& ctx, int id, const Value& self, const Value*
     MCall c{ctx, id, self, args, argc, out};
     switch (self.type()) {
     case Type::Vector3: return vector3_method(c);
+    case Type::Vector2: return vector2_method(c);
     case Type::Color: return color_method(c);
     case Type::String: return string_method(c);
     case Type::Array: return array_method(c);
@@ -1476,17 +1627,20 @@ Value sample_value(Type t) {
     case Type::Float: return Value(Real(1.5f));
     case Type::String: return Value("a");
     case Type::Vector3: return Value(vec3(1, 1, 1));
+    case Type::Vector2: return Value(vec2(1, 1));
     case Type::Color: return Value(col3(1, 1, 1));
     case Type::Array: return Value::new_array();
     case Type::Dictionary: return Value::new_dictionary();
     case Type::Object: return Value::object(1);
+    case Type::Callable: return Value::callable(1, "a");
+    case Type::Signal: return Value::signal(1, "a");
     default: return Value();
     }
 }
 
 bool builtin_method_exists(Type receiver, int id) {
     if (id < 0 || id >= BM_COUNT) return false;
-    if (receiver != Type::Vector3 && receiver != Type::Color && receiver != Type::String && receiver != Type::Array &&
+    if (receiver != Type::Vector3 && receiver != Type::Vector2 && receiver != Type::Color && receiver != Type::String && receiver != Type::Array &&
         receiver != Type::Dictionary)
         return false;
     BuiltinCtx ctx; // no host or rng: the call only tells whether the type has this method
@@ -1496,8 +1650,18 @@ bool builtin_method_exists(Type receiver, int id) {
 
 SType builtin_method_return(Type receiver, int id) {
     const SType F = SType(Type::Float), I = SType(Type::Int), B = SType(Type::Bool), S = SType(Type::String),
-                V = SType(Type::Vector3), C = SType(Type::Color), A = SType(Type::Array), D = SType(Type::Dictionary);
+                V = SType(Type::Vector3), C = SType(Type::Color), A = SType(Type::Array), D = SType(Type::Dictionary),
+                V2 = SType(Type::Vector2);
     switch (receiver) {
+    case Type::Vector2:
+        switch (id) {
+        case BM_length: case BM_length_squared: case BM_dot: case BM_cross: case BM_distance_to: case BM_distance_squared_to:
+        case BM_angle_to: case BM_angle: case BM_angle_to_point: case BM_aspect: return F;
+        case BM_normalized: case BM_lerp: case BM_move_toward: case BM_abs: case BM_rotated: case BM_direction_to:
+        case BM_floor: case BM_ceil: case BM_round: case BM_sign: case BM_limit_length: case BM_orthogonal: return V2;
+        case BM_is_zero_approx: case BM_is_equal_approx: return B;
+        default: return kUnknown;
+        }
     case Type::Vector3:
         switch (id) {
         case BM_length: case BM_length_squared: case BM_dot: case BM_distance_to: case BM_distance_squared_to:
@@ -1567,6 +1731,17 @@ static const NamedColor kColors[] = {
 };
 
 bool builtin_type_constant(Type t, std::string_view name, Value& out) {
+    if (t == Type::Vector2) {
+        // 2D: y grows downwards, so UP is (0, -1).
+        struct V { const char* n; Real x, y; };
+        static const V vs[] = {{"ZERO", 0, 0}, {"ONE", 1, 1}, {"UP", 0, -1}, {"DOWN", 0, 1}, {"LEFT", -1, 0}, {"RIGHT", 1, 0}};
+        for (const V& v : vs)
+            if (name == v.n) {
+                out = Value(vec2(v.x, v.y));
+                return true;
+            }
+        return false;
+    }
     if (t == Type::Vector3) {
         struct V { const char* n; Real x, y, z; };
         static const V vs[] = {{"ZERO", 0, 0, 0},  {"ONE", 1, 1, 1},      {"UP", 0, 1, 0},
@@ -1594,6 +1769,15 @@ bool builtin_global_constant(std::string_view name, Value& out) {
     else if (name == "TAU") out = Value(kTau);
     else if (name == "INF") out = Value(Real(HUGE_VALF));
     else if (name == "NAN") out = Value(Real(std::nanf("")));
+    // Godot's error codes and connect() flags that scripts compare with or pass
+    else if (name == "OK") out = Value(Int(0));
+    else if (name == "FAILED") out = Value(Int(1));
+    else if (name == "ERR_CANT_OPEN") out = Value(Int(19));
+    else if (name == "ERR_INVALID_PARAMETER") out = Value(Int(31));
+    else if (name == "CONNECT_DEFERRED") out = Value(Int(1));
+    else if (name == "CONNECT_PERSIST") out = Value(Int(2));
+    else if (name == "CONNECT_ONE_SHOT") out = Value(Int(4));
+    else if (name == "CONNECT_REFERENCE_COUNTED") out = Value(Int(8));
     else return false;
     return true;
 }
@@ -1602,8 +1786,9 @@ bool builtin_type_from_name(std::string_view name, Type& out, bool& variant) {
     variant = false;
     static const struct { const char* n; Type t; } names[] = {
         {"bool", Type::Bool},     {"int", Type::Int},         {"float", Type::Float},
-        {"String", Type::String}, {"Vector3", Type::Vector3}, {"Color", Type::Color},
+        {"String", Type::String}, {"Vector3", Type::Vector3}, {"Vector2", Type::Vector2}, {"Color", Type::Color},
         {"Array", Type::Array},   {"Dictionary", Type::Dictionary}, {"Object", Type::Object},
+        {"Callable", Type::Callable}, {"Signal", Type::Signal},
     };
     for (const auto& e : names)
         if (name == e.n) {

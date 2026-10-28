@@ -285,6 +285,7 @@ func _script_value(var_name: String) -> Variant:
 ## Scene documents store vectors as arrays and colours as 0xRRGGBB integers.
 static func _plain(value: Variant) -> Variant:
 	if value is Vector3: return [value.x, value.y, value.z]
+	if value is Vector2: return [value.x, value.y]
 	if value is Color: return value.to_rgba32() >> 8
 	return value
 
@@ -298,7 +299,7 @@ func _script_row(parent: VBoxContainer, export: Dictionary) -> void:
 	if prop.type == "":
 		return
 	var editor := _make_editor(prop, _script_value(var_name), func(value, final): script_property_edited.emit(var_name, value, final))
-	_row(parent, var_name.capitalize(), "%s: %s (line %d)" % [var_name, export.type, int(export.get("line", 0))], editor.control, "script:" + var_name, prop.type == "vector3")
+	_row(parent, var_name.capitalize(), "%s: %s (line %d)" % [var_name, export.type, int(export.get("line", 0))], editor.control, "script:" + var_name, prop.type in ["vector3", "vector2"])
 	_updaters["script:" + var_name] = editor.update
 	_revert["script:" + var_name].pressed.connect(func(): script_property_edited.emit(var_name, null, true))
 
@@ -309,6 +310,7 @@ func _export_type(type: String) -> String:
 		"float": return "float"
 		"String": return "string"
 		"Vector3": return "vector3"
+		"Vector2": return "vector2"
 		"Color": return "color"
 	return ""
 

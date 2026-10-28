@@ -14,10 +14,13 @@ const char* type_name(Type t) {
     case Type::Float: return "float";
     case Type::String: return "String";
     case Type::Vector3: return "Vector3";
+    case Type::Vector2: return "Vector2";
     case Type::Color: return "Color";
     case Type::Array: return "Array";
     case Type::Dictionary: return "Dictionary";
     case Type::Object: return "Object";
+    case Type::Callable: return "Callable";
+    case Type::Signal: return "Signal";
     }
     return "Nil";
 }
@@ -153,6 +156,7 @@ uint32_t hash_value(const Value& v) {
         return s->hash;
     }
     case Type::Vector3:
+    case Type::Vector2:
     case Type::Color: {
         uint64_t h = real_bits(Heap::comp(v, 0));
         h = h * 31 + real_bits(Heap::comp(v, 1));
@@ -162,6 +166,11 @@ uint32_t hash_value(const Value& v) {
     case Type::Object: return mix64(uint64_t(Heap::o(v)) ^ 0xabcdefull);
     case Type::Array:
     case Type::Dictionary: return mix64(reinterpret_cast<uintptr_t>(Heap::p(v)));
+    case Type::Callable:
+    case Type::Signal: {
+        const std::string_view name = Heap::bound_name(v);
+        return mix64(uint64_t(Heap::bound_object(v)) << 32 ^ hash_bytes(name.data(), name.size()) ^ uint64_t(v.type()));
+    }
     }
     return 0;
 }
@@ -177,12 +186,15 @@ bool key_equal(const Value& a, const Value& b) {
     case Type::Float: return real_same(Heap::f(a), Heap::f(b));
     case Type::String: return Heap::sv(a) == Heap::sv(b);
     case Type::Vector3:
+    case Type::Vector2:
     case Type::Color:
         return real_same(Heap::comp(a, 0), Heap::comp(b, 0)) && real_same(Heap::comp(a, 1), Heap::comp(b, 1)) &&
                real_same(Heap::comp(a, 2), Heap::comp(b, 2));
     case Type::Object: return Heap::o(a) == Heap::o(b);
     case Type::Array:
     case Type::Dictionary: return Heap::p(a) == Heap::p(b);
+    case Type::Callable:
+    case Type::Signal: return Heap::bound_object(a) == Heap::bound_object(b) && Heap::bound_name(a) == Heap::bound_name(b);
     }
     return false;
 }
@@ -325,6 +337,13 @@ void append_value(std::string& out, const Value& v, const Host* host, int depth,
         if (quoted) append_quoted(out, Heap::sv(v));
         else out += Heap::sv(v);
         return;
+    case Type::Vector2:
+        out.push_back('(');
+        out += format_real(Heap::comp(v, 0));
+        out += ", ";
+        out += format_real(Heap::comp(v, 1));
+        out.push_back(')');
+        return;
     case Type::Vector3:
         out.push_back('(');
         out += format_real(Heap::comp(v, 0));
@@ -371,6 +390,13 @@ void append_value(std::string& out, const Value& v, const Host* host, int depth,
         if (Heap::o(v) == 0) { out += "<null>"; return; }
         if (host) out += host->describe(Heap::o(v));
         else { out += "<Object#"; out += format_int(Int(Heap::o(v))); out += ">"; }
+        return;
+    case Type::Callable:
+    case Type::Signal:
+        if (host) out += host->describe(Heap::bound_object(v));
+        else { out += "<Object#"; out += format_int(Int(Heap::bound_object(v))); out += ">"; }
+        out += "::";
+        out += Heap::bound_name(v);
         return;
     }
 }
@@ -427,6 +453,7 @@ Value::Value(Int i) : type_(Type::Int) { u_.i = i; }
 Value::Value(Real f) : type_(Type::Float), f_(f) {}
 Value::Value(double f) : type_(Type::Float), f_(Real(f)) {}
 Value::Value(const Vector3& v) : type_(Type::Vector3), f_(v.x) { u_.f[0] = v.y; u_.f[1] = v.z; }
+Value::Value(const Vector2& v) : type_(Type::Vector2), f_(v.x) { u_.f[0] = v.y; u_.f[1] = 0; }
 Value::Value(const Color& c) : type_(Type::Color), f_(c.r) { u_.f[0] = c.g; u_.f[1] = c.b; }
 Value::Value(const char* s) : type_(Type::String) {
     u_.p = s ? detail::new_string(s, std::strlen(s)) : nullptr;
@@ -437,6 +464,18 @@ Value::Value(const std::string& s) : type_(Type::String) { u_.p = detail::new_st
 Value Value::object(ObjectId id) {
     Value v;
     if (id) { v.type_ = Type::Object; v.u_.o = id; }
+    return v;
+}
+
+Value Value::callable(ObjectId id, std::string_view method) {
+    Value v, name(method.empty() ? std::string_view("?") : method);
+    Heap::init_bound(v, Type::Callable, id, name);
+    return v;
+}
+
+Value Value::signal(ObjectId id, std::string_view name) {
+    Value v, text(name.empty() ? std::string_view("?") : name);
+    Heap::init_bound(v, Type::Signal, id, text);
     return v;
 }
 
@@ -477,9 +516,12 @@ Real Value::as_real() const {
     return 0;
 }
 Vector3 Value::as_vector3() const { return type_ == Type::Vector3 ? Heap::vec(*this) : Vector3(); }
+Vector2 Value::as_vector2() const { return type_ == Type::Vector2 ? Heap::vec2(*this) : Vector2(); }
 Color Value::as_color() const { return type_ == Type::Color ? Heap::col(*this) : Color(); }
 std::string_view Value::as_string() const { return Heap::sv(*this); }
 ObjectId Value::as_object() const { return type_ == Type::Object ? u_.o : 0; }
+ObjectId Value::bound_object() const { return Heap::is_bound(type_) ? Heap::bound_object(*this) : 0; }
+std::string_view Value::bound_name() const { return Heap::is_bound(type_) ? Heap::bound_name(*this) : std::string_view(); }
 
 size_t Value::array_size() const { return type_ == Type::Array ? Heap::arr(*this)->items.size() : 0; }
 Value Value::array_get(size_t index) const {

@@ -50,9 +50,18 @@ func _ready() -> void:
 	box.add_child(_description)
 	confirmed.connect(_confirm)
 
-func open() -> void:
+## Also picks a new scene's root and a node's new type (Change Type, which starts on the current one).
+func open(dialog_title: String = "Create New Node", ok_text: String = "Create", current_type: String = "") -> void:
+	title = dialog_title
+	ok_button_text = ok_text
 	_search.text = ""
 	_fill()
+	if not current_type.is_empty():
+		var item := _tree.get_root()
+		while item != null and str(item.get_metadata(0)) != current_type: item = item.get_next_in_tree()
+		if item != null:
+			item.select(0)
+			_tree.scroll_to_item(item)
 	popup_centered(Vector2i(460, 560))
 	_search.grab_focus()
 

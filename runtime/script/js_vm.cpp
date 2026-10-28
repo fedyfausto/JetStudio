@@ -1,5 +1,6 @@
 #include "js_internal.hpp"
 
+#include <algorithm>
 #include <unordered_map>
 
 namespace jetscript {
@@ -38,6 +39,14 @@ struct Frame {
     bool receiver; // result replaces the receiver slot below the arguments
 };
 
+// A signal of `source` calls `method` on `target` (both names are Strings).
+struct Connection {
+    ObjectId source = 0, target = 0;
+    Value signal, method;
+    bool one_shot = false;
+};
+constexpr size_t kMaxConnections = 4096;
+
 // Frames live on the heap, so script-to-script calls never recurse on the C++ stack.
 struct Exec {
     std::vector<Value> stack;
@@ -47,6 +56,23 @@ struct Exec {
 } // namespace detail
 
 using namespace detail;
+
+bool class_lists(const Host& host, ObjectId id, std::string_view name, bool signal) {
+    std::string_view c = host.class_of(id);
+    for (int guard = 0; guard < 64 && !c.empty(); ++guard) {
+        const ClassInfo* ci = host.find_class(c);
+        if (!ci) return false;
+        if (signal) {
+            for (const SignalInfo& s : ci->signals)
+                if (s.name == name) return true;
+        } else {
+            for (const MethodInfo& m : ci->methods)
+                if (m.name == name) return true;
+        }
+        c = ci->base;
+    }
+    return false;
+}
 
 struct VMState {
     explicit VMState(Host& h) : host(h) {
@@ -66,6 +92,7 @@ struct VMState {
     int64_t budget = 0;
     Rng rng;
     BuiltinCtx bctx;
+    std::vector<Connection> connections;
 
     Instance* find(ObjectId id) const {
         auto it = instances.find(id);
@@ -88,6 +115,19 @@ struct VMState {
     bool get_index(const Value& base, const Value& idx, Value& out, std::string& err);
     bool set_index(Value& base, const Value& idx, const Value& v, std::string& err);
     bool set_var(Instance* inst, uint32_t index, const Value& v, std::string& err);
+
+    // Signals (VMState::emit and friends below)
+    bool class_has(ObjectId id, std::string_view name, bool signal) const;
+    bool has_signal(ObjectId id, std::string_view name) const;
+    bool has_method(ObjectId id, std::string_view name) const;
+    std::string bound_text(ObjectId id, std::string_view name) const;
+    int find_connection(ObjectId source, std::string_view signal, ObjectId target, std::string_view method) const;
+    bool connect(ObjectId source, const Value& signal, ObjectId target, const Value& method, Int flags, std::string& err);
+    bool disconnect(ObjectId source, std::string_view signal, ObjectId target, std::string_view method, std::string& err);
+    void emit(ObjectId source, std::string_view signal, const Value* args, int argc);
+    bool call_bound(ObjectId target, std::string_view method, const Value* args, int argc, Value& out, std::string& err);
+    bool signal_call(int sm, std::string_view name, const Value& recv, const Value* args, int argc, Value& out,
+                     std::string& err);
 };
 
 VMState::~VMState() {
@@ -170,7 +210,7 @@ bool VMState::is_class(ObjectId id, std::string_view cls) const {
 }
 
 static bool is_value_type(const Value& v) {
-    return v.type() == Type::Vector3 || v.type() == Type::Color || v.type() == Type::String;
+    return v.type() == Type::Vector3 || v.type() == Type::Vector2 || v.type() == Type::Color || v.type() == Type::String;
 }
 
 static std::string key_text(const Value& k) {
@@ -217,6 +257,12 @@ bool VMState::get_named(Instance* self, uint32_t ne, const Value& base, Value& o
             return true;
         }
         break;
+    case Type::Vector2:
+        if (e.field >= 0 && e.field <= 1) {
+            out = Value(Heap::comp(base, e.field));
+            return true;
+        }
+        break;
     case Type::Color:
         if (e.field >= 3) {
             out = Value(e.field == 6 ? Real(1) : Heap::comp(base, e.field - 3));
@@ -244,6 +290,10 @@ bool VMState::get_named(Instance* self, uint32_t ne, const Value& base, Value& o
                 out = inst->sd->consts[c.index].second;
                 return true;
             }
+            if (c.kind == 3 || c.kind == 4) {
+                out = c.kind == 3 ? Value::callable(id, e.name) : Value::signal(id, e.name);
+                return true;
+            }
         }
         if (e.pid >= 0) {
             err.clear();
@@ -253,6 +303,15 @@ bool VMState::get_named(Instance* self, uint32_t ne, const Value& base, Value& o
                 if (err.empty()) err = "Error reading property '" + e.name + "'.";
                 return false;
             }
+        }
+        // $Timer.timeout, $Enemy.queue_free
+        if (class_has(id, e.name, true)) {
+            out = Value::signal(id, e.name);
+            return true;
+        }
+        if (e.mid >= 0 && class_has(id, e.name, false)) {
+            out = Value::callable(id, e.name);
+            return true;
         }
         break;
     }
@@ -267,6 +326,12 @@ bool VMState::set_named(Instance* self, uint32_t ne, Value& base, const Value& v
     switch (base.type()) {
     case Type::Vector3:
         if (e.field >= 0 && e.field <= 2 && v.is_number()) {
+            Heap::set_comp(base, e.field, v.as_real());
+            return true;
+        }
+        break;
+    case Type::Vector2:
+        if (e.field >= 0 && e.field <= 1 && v.is_number()) {
             Heap::set_comp(base, e.field, v.as_real());
             return true;
         }
@@ -359,14 +424,16 @@ bool VMState::get_index(const Value& base, const Value& idx, Value& out, std::st
         return true;
     }
     case Type::Vector3:
+    case Type::Vector2:
     case Type::Color: {
         int f = -1;
         if (idx.type() == Type::String) {
             f = find_builtin_field(Heap::sv(idx));
             if (base.type() == Type::Vector3 && f > 2) f = -1;
+            if (base.type() == Type::Vector2 && f > 1) f = -1;
             if (base.type() == Type::Color) f = f >= 3 ? f - 3 : -1;
         } else if (index_int(idx, i)) {
-            Int n = base.type() == Type::Vector3 ? 3 : 4;
+            Int n = base.type() == Type::Vector3 ? 3 : base.type() == Type::Vector2 ? 2 : 4;
             if (i < 0 || i >= n) {
                 err = "Out of bounds get index '" + format_int(i) + "' (on base: '" + type_name(base.type()) + "').";
                 return false;
@@ -399,7 +466,7 @@ bool VMState::get_index(const Value& base, const Value& idx, Value& out, std::st
     default: break;
     }
     if (base.type() == Type::Array || base.type() == Type::String ||
-        ((base.type() == Type::Vector3 || base.type() == Type::Color) && idx.type() != Type::String)) {
+        ((base.type() == Type::Vector3 || base.type() == Type::Vector2 || base.type() == Type::Color) && idx.type() != Type::String)) {
         err = std::string("Invalid index type '") + type_name(idx.type()) + "' for a base of type '" + type_name(base.type()) + "'.";
         return false;
     }
@@ -462,14 +529,16 @@ bool VMState::set_index(Value& base, const Value& idx, const Value& v, std::stri
         return true;
     }
     case Type::Vector3:
+    case Type::Vector2:
     case Type::Color: {
         int f = -1;
         if (idx.type() == Type::String) {
             f = find_builtin_field(Heap::sv(idx));
             if (base.type() == Type::Vector3 && f > 2) f = -1;
+            if (base.type() == Type::Vector2 && f > 1) f = -1;
             if (base.type() == Type::Color) f = f >= 3 ? f - 3 : -1;
         } else if (index_int(idx, i)) {
-            Int n = base.type() == Type::Vector3 ? 3 : 4;
+            Int n = base.type() == Type::Vector3 ? 3 : base.type() == Type::Vector2 ? 2 : 4;
             if (i < 0 || i >= n) {
                 err = "Out of bounds set index '" + format_int(i) + "' (on base: '" + type_name(base.type()) + "').";
                 return false;
@@ -505,6 +574,239 @@ bool VMState::set_index(Value& base, const Value& idx, const Value& v, std::stri
     return false;
 }
 
+bool VMState::class_has(ObjectId id, std::string_view name, bool signal) const {
+    return signal ? host.has_signal(id, name) : host.has_method(id, name);
+}
+
+bool VMState::has_signal(ObjectId id, std::string_view name) const {
+    if (Instance* inst = find(id)) {
+        const SymEntry* s = inst->sd->find_symbol(name);
+        if (s && s->kind == SymKind::Signal) return true;
+    }
+    return class_has(id, name, true);
+}
+
+bool VMState::has_method(ObjectId id, std::string_view name) const {
+    if (Instance* inst = find(id)) {
+        const SymEntry* s = inst->sd->find_symbol(name);
+        if (s && s->kind == SymKind::Func) return true;
+    }
+    return class_has(id, name, false);
+}
+
+std::string VMState::bound_text(ObjectId id, std::string_view name) const {
+    return host.describe(id) + "::" + std::string(name);
+}
+
+int VMState::find_connection(ObjectId source, std::string_view signal, ObjectId target, std::string_view method) const {
+    for (size_t i = 0; i < connections.size(); ++i) {
+        const Connection& c = connections[i];
+        if (c.source == source && c.target == target && Heap::sv(c.signal) == signal && Heap::sv(c.method) == method)
+            return int(i);
+    }
+    return -1;
+}
+
+bool VMState::connect(ObjectId source, const Value& signal, ObjectId target, const Value& method, Int flags, std::string& err) {
+    const std::string_view sig = Heap::sv(signal), name = Heap::sv(method);
+    const std::string_view cls = host.class_of(source);
+    if (cls.empty()) {
+        err = "Attempt to connect signal '" + std::string(sig) + "' of a previously freed instance.";
+        return false;
+    }
+    if (!has_signal(source, sig)) {
+        err = "In Object of type '" + std::string(cls) + "': Attempt to connect nonexistent signal '" + std::string(sig) +
+              "' to callable '" + bound_text(target, name) + "'.";
+        return false;
+    }
+    if (flags & ~Int(2 | 4)) {
+        err = (flags & 1) ? "CONNECT_DEFERRED is not supported yet in JetScript: the callable runs when the signal is emitted."
+                          : "Only the connect() flags CONNECT_ONE_SHOT and CONNECT_PERSIST are supported in JetScript.";
+        return false;
+    }
+    if (host.class_of(target).empty()) {
+        err = "Cannot connect to '" + std::string(sig) + "': the callable's object was freed.";
+        return false;
+    }
+    if (!has_method(target, name)) {
+        err = "Cannot connect to '" + std::string(sig) + "': '" + host.describe(target) + "' has no method '" + std::string(name) + "'.";
+        return false;
+    }
+    if (find_connection(source, sig, target, name) >= 0) {
+        err = "Signal '" + std::string(sig) + "' is already connected to given callable '" + bound_text(target, name) + "' in that object.";
+        return false;
+    }
+    if (connections.size() >= kMaxConnections) {
+        err = "Too many signal connections (maximum " + format_int(Int(kMaxConnections)) + ").";
+        return false;
+    }
+    Connection c;
+    c.source = source;
+    c.target = target;
+    c.signal = signal;
+    c.method = method;
+    c.one_shot = (flags & 4) != 0;
+    connections.push_back(std::move(c));
+    return true;
+}
+
+bool VMState::disconnect(ObjectId source, std::string_view signal, ObjectId target, std::string_view method, std::string& err) {
+    const int i = find_connection(source, signal, target, method);
+    if (i < 0) {
+        err = "Attempt to disconnect a nonexistent connection from '" + host.describe(source) + "'. Signal: '" +
+              std::string(signal) + "', callable: '" + bound_text(target, method) + "'.";
+        return false;
+    }
+    connections.erase(connections.begin() + i);
+    return true;
+}
+
+// Callees are gathered first: they may connect and disconnect while the signal is being emitted.
+void VMState::emit(ObjectId source, std::string_view signal, const Value* args, int argc) {
+    std::vector<std::pair<ObjectId, Value>> calls;
+    size_t keep = 0;
+    for (size_t i = 0; i < connections.size(); ++i) {
+        Connection& c = connections[i];
+        const bool match = c.source == source && Heap::sv(c.signal) == signal;
+        if (match) calls.emplace_back(c.target, c.method);
+        if (match && c.one_shot) continue;
+        if (keep != i) connections[keep] = std::move(c);
+        ++keep;
+    }
+    connections.resize(keep);
+
+    for (const auto& call : calls) {
+        Value out;
+        std::string err;
+        const std::string_view method = Heap::sv(call.second);
+        if (!call_bound(call.first, method, args, argc, out, err))
+            record("Error calling from signal '" + std::string(signal) + "' to callable '" + bound_text(call.first, method) +
+                       "': " + err,
+                   find(call.first), Heap::str(call.second)->chars());
+    }
+}
+
+// A script function's errors are recorded by invoke(); an engine method's come back in err.
+bool VMState::call_bound(ObjectId target, std::string_view method, const Value* args, int argc, Value& out, std::string& err) {
+    if (Instance* inst = find(target)) {
+        const SymEntry* s = inst->sd->find_symbol(method);
+        if (s && s->kind == SymKind::Func) {
+            invoke(inst, &inst->sd->funcs[s->index], args, argc, &out);
+            return true;
+        }
+    }
+    if (host.class_of(target).empty()) {
+        err = "Attempt to call function '" + std::string(method) + "' on a previously freed instance.";
+        return false;
+    }
+    const int mid = host.method_id(method);
+    err.clear();
+    const Status st = mid >= 0 ? host.call_method(target, mid, args, argc, out, err) : Status::NotFound;
+    if (st == Status::Ok) return true;
+    if (st == Status::NotFound || err.empty())
+        err = "Invalid call. Nonexistent function '" + std::string(method) + "' in base '" + type_desc(Value::object(target)) + "'.";
+    return false;
+}
+
+// Godot's connect(), disconnect(), is_connected(), emit_signal() and has_signal() on objects,
+// and the methods of Signal and Callable values.
+bool VMState::signal_call(int sm, std::string_view name, const Value& recv, const Value* args, int argc, Value& out,
+                          std::string& err) {
+    const Type rt = recv.type();
+    const std::string base = type_name(rt);
+    int lo = 0, hi = 0;
+    SType ret = kUnknown;
+    if (!signal_method_info(sm, rt, lo, hi, ret)) {
+        err = "Invalid call. Nonexistent function '" + std::string(name) + "' in base '" + base + "'.";
+        return false;
+    }
+    if (argc < lo || (hi >= 0 && argc > hi)) {
+        err = "Invalid call to function '" + std::string(name) + "' in base '" + base + "'. Expected " +
+              format_int(argc < lo ? lo : hi) + " arguments.";
+        return false;
+    }
+    auto bad_arg = [&](int i, const char* expected) {
+        err = "Invalid type in function '" + std::string(name) + "' in base '" + base + "'. Cannot convert argument " +
+              format_int(i + 1) + " from " + type_name(args[i].type()) + " to " + expected + ".";
+        return false;
+    };
+    auto name_of = [](const Value& bound) {
+        Value text = Heap::make(Type::String, Heap::str(bound));
+        Heap::retain(text);
+        return text;
+    };
+
+    // The signal the call is about (source and name), then its callable argument (target and method).
+    ObjectId source = 0, target = 0;
+    Value signal, method;
+    int next = 0;
+    if (rt == Type::Object) {
+        source = Heap::o(recv);
+        if (args[0].type() != Type::String || Heap::sv(args[0]).empty()) return bad_arg(0, "StringName");
+        signal = args[0];
+        next = 1;
+    } else if (rt == Type::Signal) {
+        source = Heap::bound_object(recv);
+        signal = name_of(recv);
+    } else {
+        target = Heap::bound_object(recv);
+        method = name_of(recv);
+    }
+    if (sm == SM_connect || sm == SM_disconnect || sm == SM_is_connected) {
+        if (args[next].type() != Type::Callable) return bad_arg(next, "Callable");
+        target = Heap::bound_object(args[next]);
+        method = name_of(args[next]);
+    }
+    if (sm <= SM_emit && host.class_of(source).empty()) {
+        err = "Attempt to call function '" + std::string(name) + "' on a previously freed instance.";
+        return false;
+    }
+
+    switch (sm) {
+    case SM_connect: {
+        Int flags = 0;
+        if (argc > next + 1) {
+            if (args[next + 1].type() != Type::Int) return bad_arg(next + 1, "int");
+            flags = Heap::i(args[next + 1]);
+        }
+        if (!connect(source, signal, target, method, flags, err)) return false;
+        out = Value(Int(0));
+        return true;
+    }
+    case SM_disconnect: return disconnect(source, Heap::sv(signal), target, Heap::sv(method), err);
+    case SM_is_connected: out = Value(find_connection(source, Heap::sv(signal), target, Heap::sv(method)) >= 0); return true;
+    case SM_has_signal: out = Value(has_signal(source, Heap::sv(signal))); return true;
+    case SM_emit_signal:
+    case SM_emit:
+        if (!has_signal(source, Heap::sv(signal))) {
+            err = "Can't emit non-existing signal \"" + std::string(Heap::sv(signal)) + "\".";
+            return false;
+        }
+        if (!connections.empty()) emit(source, Heap::sv(signal), args + next, argc - next);
+        if (sm == SM_emit_signal) out = Value(Int(0));
+        return true;
+    case SM_get_name: out = signal; return true;
+    case SM_get_method: out = method; return true;
+    case SM_get_object: {
+        const ObjectId id = rt == Type::Signal ? source : target;
+        out = host.class_of(id).empty() ? Value() : Value::object(id);
+        return true;
+    }
+    case SM_is_null: out = Value(false); return true;
+    case SM_is_valid: out = Value(!host.class_of(target).empty() && has_method(target, Heap::sv(method))); return true;
+    case SM_call: return call_bound(target, Heap::sv(method), args, argc, out, err);
+    case SM_callv: {
+        if (args[0].type() != Type::Array) return bad_arg(0, "Array");
+        const Value list = args[0]; // the callee may change the array
+        const std::vector<Value> items = Heap::arr(list)->items;
+        return call_bound(target, Heap::sv(method), items.data(), int(items.size()), out, err);
+    }
+    default: break;
+    }
+    err = "Invalid call. Nonexistent function '" + std::string(name) + "' in base '" + base + "'.";
+    return false;
+}
+
 bool VMState::invoke(Instance* inst, const FunctionData* fn, const Value* args, int argc, Value* result) {
     if (depth >= kMaxReentry) {
         record("Too many nested script calls from the engine (maximum " + format_int(kMaxReentry) + ").", inst, fn->name.c_str());
@@ -520,8 +822,10 @@ bool VMState::invoke(Instance* inst, const FunctionData* fn, const Value* args, 
     if (int(execs.size()) <= depth) execs.emplace_back(new Exec());
     Exec& ex = *execs[size_t(depth)];
     ++depth;
+    // Nested entries (signals, _ready() from add_child()) usually run short callbacks: their stack starts smaller.
     size_t need = size_t(fn->frame_size) + 1;
-    if (ex.stack.size() < need) ex.stack.resize(need < 256 ? 256 : need);
+    const size_t initial = depth == 1 ? 256 : 64;
+    if (ex.stack.size() < need) ex.stack.resize(need < initial ? initial : need);
     for (int i = 0; i < argc; ++i) ex.stack[size_t(i)] = args[i];
     Frame f;
     f.fn = fn;
@@ -606,6 +910,11 @@ bool VMState::execute(Exec& ex, Value* result) {
         case Op::PushInt: Heap::init_int(*sp++, sarg_of(ins)); break;
         case Op::PushConst: Heap::push_copy(*sp++, K[arg_of(ins)]); break;
         case Op::PushSelf: Heap::init_object(*sp++, self->id); break;
+        case Op::PushBound: {
+            const uint32_t a = arg_of(ins);
+            Heap::init_bound(*sp++, (a & 1) ? Type::Signal : Type::Callable, self->id, K[a >> 1]);
+            break;
+        }
         case Op::Pop: Heap::release(*--sp); break;
         case Op::Dup:
             Heap::push_copy(*sp, sp[-1]);
@@ -989,6 +1298,13 @@ bool VMState::execute(Exec& ex, Value* result) {
                                         format_int(argc < callee->nrequired ? callee->nrequired : callee->nparams) + " arguments.");
                         }
                     }
+                    if (!callee && e.smethod >= 0 && e.smethod <= SM_has_signal) {
+                        Value out;
+                        if (!signal_call(e.smethod, e.name, recv, sp - argc, argc, out, err)) goto fail;
+                        for (int k = 0; k <= argc; ++k) Heap::release(*--sp);
+                        Heap::push_move(*sp++, out);
+                        break;
+                    }
                     if (!callee) {
                         Status st = Status::NotFound;
                         Value out;
@@ -1005,6 +1321,12 @@ bool VMState::execute(Exec& ex, Value* result) {
                     }
                 } else if (recv.type() == Type::Nil) {
                     JS_FAIL("Cannot call method '" + e.name + "' on a null value.");
+                } else if (Heap::is_bound(recv.type())) {
+                    Value out;
+                    if (!signal_call(e.smethod, e.name, recv, sp - argc, argc, out, err)) goto fail;
+                    for (int k = 0; k <= argc; ++k) Heap::release(*--sp);
+                    Heap::push_move(*sp++, out);
+                    break;
                 } else {
                     Value out;
                     bctx.error.clear();
@@ -1050,6 +1372,12 @@ bool VMState::execute(Exec& ex, Value* result) {
             int argc = int(arg_of(ins));
             const NameEntry& e = sd->names[*pc++];
             Value out;
+            if (e.smethod >= 0 && e.smethod <= SM_has_signal) {
+                if (!signal_call(e.smethod, e.name, Value::object(self->id), sp - argc, argc, out, err)) goto fail;
+                for (int k = 0; k < argc; ++k) Heap::release(*--sp);
+                Heap::push_move(*sp++, out);
+                break;
+            }
             err.clear();
             Status st = e.mid >= 0 ? host.call_method(self->id, e.mid, sp - argc, argc, out, err) : Status::NotFound;
             if (st != Status::Ok) {
@@ -1218,6 +1546,7 @@ bool VM::attach(ObjectId object, std::shared_ptr<const Script> script) {
 void VM::detach(ObjectId object) { state_->remove_instance(object); }
 
 void VM::clear() {
+    state_->connections.clear();
     std::vector<ObjectId> ids;
     ids.reserve(state_->instances.size());
     for (const auto& kv : state_->instances) ids.push_back(kv.first);
@@ -1287,6 +1616,34 @@ bool VM::call(ObjectId object, std::string_view function, const Value* args, int
     if (!sym || sym->kind != SymKind::Func) return true;
     if (count < 0 || (count > 0 && !args)) count = 0;
     return s.invoke(inst, &inst->sd->funcs[sym->index], args, count, result);
+}
+
+bool VM::connect(ObjectId source, std::string_view signal, ObjectId target, std::string_view method, uint32_t flags,
+                 std::string& error) {
+    return state_->connect(source, Value(signal), target, Value(method), Int(flags), error);
+}
+
+bool VM::is_connected(ObjectId source, std::string_view signal, ObjectId target, std::string_view method) const {
+    return state_->find_connection(source, signal, target, method) >= 0;
+}
+
+bool VM::has_connections(ObjectId source) const {
+    for (const Connection& c : state_->connections)
+        if (c.source == source) return true;
+    return false;
+}
+
+void VM::emit_signal(ObjectId source, std::string_view signal, const Value* args, int count) {
+    if (state_->connections.empty()) return;
+    if (count < 0 || (count > 0 && !args)) count = 0;
+    state_->emit(source, signal, args, count);
+}
+
+void VM::forget(ObjectId object) {
+    auto& list = state_->connections;
+    list.erase(std::remove_if(list.begin(), list.end(),
+                              [&](const Connection& c) { return c.source == object || c.target == object; }),
+               list.end());
 }
 
 std::vector<RuntimeError> VM::take_errors() {

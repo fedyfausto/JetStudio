@@ -13,9 +13,10 @@ using Real = float; // ESP32-S3 has a single precision FPU.
 using ObjectId = uint32_t; // Host object handle; 0 is never a valid object.
 
 struct Vector3 { Real x = 0, y = 0, z = 0; };
+struct Vector2 { Real x = 0, y = 0; };
 struct Color { Real r = 0, g = 0, b = 0; };
 
-enum class Type : uint8_t { Nil, Bool, Int, Float, String, Vector3, Color, Array, Dictionary, Object };
+enum class Type : uint8_t { Nil, Bool, Int, Float, String, Vector3, Color, Array, Dictionary, Object, Vector2, Callable, Signal };
 const char* type_name(Type);
 
 namespace detail { struct Heap; }
@@ -32,11 +33,15 @@ public:
     Value(Real);
     Value(double);
     Value(const Vector3&);
+    Value(const Vector2&);
     Value(const Color&);
     Value(const char*);
     Value(std::string_view);
     Value(const std::string&);
     static Value object(ObjectId);
+    // Godot's Callable (an object's method) and Signal (an object's signal), by name.
+    static Value callable(ObjectId, std::string_view method);
+    static Value signal(ObjectId, std::string_view name);
     static Value new_array();
     static Value new_dictionary();
     Value(const Value&);
@@ -53,9 +58,12 @@ public:
     Int as_int() const;               // Int, or Float truncated; 0 otherwise
     Real as_real() const;             // Float, or Int converted; 0 otherwise
     Vector3 as_vector3() const;       // zero vector unless Vector3
+    Vector2 as_vector2() const;       // zero vector unless Vector2
     Color as_color() const;           // black unless Color
     std::string_view as_string() const; // empty unless String
     ObjectId as_object() const;       // 0 unless Object
+    ObjectId bound_object() const;    // Callable and Signal: their object, 0 otherwise
+    std::string_view bound_name() const; // and their method or signal name
 
     // Array helpers for hosts; they do nothing on other types.
     size_t array_size() const;
@@ -69,6 +77,7 @@ private:
     friend struct detail::Heap;
     // 16 bytes on 32 and 64 bit targets: tag, one float (Float, Vector3.x, Color.r) and an 8 byte payload.
     // Payload: Int, bool, ObjectId, the other two vector/color components, or the heap object (null for an empty string).
+    // Callable and Signal keep their object's id in the float's place and the name as a string in the payload.
     union Payload { Int i; void* p; ObjectId o; bool b; Real f[2]; };
     Type type_ = Type::Nil;
     Real f_ = 0;
@@ -78,13 +87,19 @@ private:
 struct PropertyInfo { std::string name; Type type = Type::Nil; bool read_only = false; };
 // max_args < 0: variadic.
 struct MethodInfo { std::string name; int min_args = 0, max_args = 0; Type return_type = Type::Nil; };
+struct SignalInfo { std::string name; std::vector<std::string> arguments; };
 struct ClassInfo {
     std::string name, base; // base is empty for the root class
     std::vector<PropertyInfo> properties;
     std::vector<MethodInfo> methods;
+    std::vector<SignalInfo> signals; // the ones the engine emits
 };
 
 enum class Status : uint8_t { Ok, NotFound, Error };
+
+class Host;
+// Whether the ClassInfo of the object's class or of one of its bases lists this signal (or method).
+bool class_lists(const Host& host, ObjectId id, std::string_view name, bool signal);
 
 // Implemented by the engine, always called on the thread that runs the VM.
 class Host {
@@ -104,8 +119,14 @@ public:
     virtual Status set_property(ObjectId, int property, const Value& value, std::string& error) = 0;
     virtual Status call_method(ObjectId, int method, const Value* args, int count,
                                Value& result, std::string& error) = 0;
+    // An engine object's own signals and methods (connect() and Callables check them). By default they are looked up
+    // in the ClassInfo, which a host may build only for the compiler: a device host should answer from its own tables.
+    virtual bool has_signal(ObjectId id, std::string_view name) const { return class_lists(*this, id, name, true); }
+    virtual bool has_method(ObjectId id, std::string_view name) const { return class_lists(*this, id, name, false); }
     // Text for str(object), e.g. "Cube:<MeshInstance3D#3>".
     virtual std::string describe(ObjectId) const = 0;
+    // load()/preload(): the resource at path as an object, 0 when there is none.
+    virtual ObjectId resource(std::string_view path) const { (void)path; return 0; }
     // print()/printerr(): one call per line, without the trailing newline.
     virtual void print(std::string_view text, bool is_error) = 0;
 };
@@ -135,6 +156,7 @@ public:
     const std::vector<ExportInfo>& exports() const;
     const std::vector<MemberInfo>& members() const; // variables, constants and enum values
     const std::vector<FunctionInfo>& functions() const;
+    const std::vector<SignalInfo>& signals() const;
     bool has_function(std::string_view name) const;
     const ScriptData& data() const { return *data_; }
 private:
@@ -196,6 +218,18 @@ public:
     // Calls any script function. A missing function is not an error (returns true).
     bool call(ObjectId object, std::string_view function, const Value* args = nullptr,
               int count = 0, Value* result = nullptr);
+
+    // Godot's signals. Connections live here, not in the objects, so a signal nobody listens to costs one check.
+    // flags: 0 or Godot's CONNECT_ONE_SHOT (4); CONNECT_PERSIST (2) is accepted and means nothing at run time.
+    bool connect(ObjectId source, std::string_view signal, ObjectId target, std::string_view method, uint32_t flags,
+                 std::string& error);
+    bool is_connected(ObjectId source, std::string_view signal, ObjectId target, std::string_view method) const;
+    bool has_connections(ObjectId source) const;
+    // For the engine's own signals (an area's body_entered, a Timer's timeout): calls what is connected, in order.
+    // The signal isn't checked, and errors in the callees are recorded like those of any other call.
+    void emit_signal(ObjectId source, std::string_view signal, const Value* args = nullptr, int count = 0);
+    // Drops the connections from and to an object that no longer exists. clear() drops them all.
+    void forget(ObjectId object);
 
     // Errors recorded since the last call, oldest first.
     std::vector<RuntimeError> take_errors();

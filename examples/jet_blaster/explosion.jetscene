@@ -1,0 +1,22 @@
+{
+	"format": "jetscene",
+	"version": 2,
+	"root": {
+		"id": 1,
+		"name": "Explosion",
+		"type": "AnimatedSprite2D",
+		"texture": "res://textures/explosion.png",
+		"hframes": 6,
+		"animations": "boom 0-5 16 once",
+		"children": []
+	},
+	"connections": [
+		{
+			"from": 1,
+			"signal": "animation_finished",
+			"to": 1,
+			"method": "queue_free",
+			"flags": 0
+		}
+	]
+}

@@ -11,15 +11,18 @@ const Viewport3D := preload("res://scripts/viewport_3d.gd")
 const ScriptEditor := preload("res://scripts/script_editor.gd")
 const CreateNodeDialog := preload("res://scripts/create_node_dialog.gd")
 const AttachScriptDialog := preload("res://scripts/attach_script_dialog.gd")
+const SignalsDock := preload("res://scripts/signals_dock.gd")
+const ConnectDialog := preload("res://scripts/connect_dialog.gd")
+const NewSceneDialog := preload("res://scripts/new_scene_dialog.gd")
 const ProjectManager := preload("res://scripts/project_manager.gd")
 const SerialMonitor := preload("res://scripts/serial_monitor.gd")
 const ProjectSettingsDialog := preload("res://scripts/project_settings_dialog.gd")
 const Hardware := preload("res://scripts/hardware.gd")
 const Actions := preload("res://scripts/input_map.gd")
-const VERSION := "0.3.1"
+const VERSION := "0.5.0"
 const SETTINGS := "user://editor.cfg"
 
-enum Screen { VIEW_3D, SCRIPT, GAME }
+enum Screen { VIEW_3D, SCRIPT, GAME, VIEW_2D }
 
 var bridge: Object
 var project = Project.new()
@@ -55,13 +58,15 @@ var _quick_action := Callable()
 var scene_dock: SceneDock
 var filesystem: FileSystemDock
 var inspector: Inspector
+var signals_dock: SignalsDock
+var right_tabs: TabBar # Inspector | Node, as in Godot
 var viewport: Viewport3D
 var script_editor: ScriptEditor
 var game_view: TextureRect
 var game_label: Label
 var scene_tabs: TabBar
 var screens: Control
-var screen_buttons := []
+var screen_buttons := {} # Screen -> its button
 var bottom_tabs: TabBar
 var bottom_card: PanelContainer
 var output: RichTextLabel
@@ -84,6 +89,8 @@ var center_split: VSplitContainer
 # Dialogs
 var create_dialog: CreateNodeDialog
 var attach_dialog: AttachScriptDialog
+var connect_dialog: ConnectDialog
+var new_scene_dialog: NewSceneDialog
 var project_manager: ProjectManager
 var save_dialog: FileDialog
 var export_dialog: FileDialog
@@ -125,6 +132,8 @@ func _ready() -> void:
 		serial_monitor.set_preferences(str(settings.get_value("serial", "port", "")), int(settings.get_value("serial", "baud", 115200)))
 	script_editor.bridge = bridge
 	script_editor.class_db = bridge.class_db()
+	signals_dock.class_db = script_editor.class_db
+	connect_dialog.class_db = script_editor.class_db
 	_log("Jet Studio %s  ·  Godot UI + C++ runtime + Jet renderer  ·  JetScript" % VERSION, Style.ACCENT)
 	_log("3D view: middle button orbits · Shift+middle pans · right + WASD/QE flies · wheel zooms · F focuses · Alt+left = middle")
 	if _smoke:
@@ -287,8 +296,8 @@ func _build_ui() -> void:
 	segment_row.add_theme_constant_override("separation", 2)
 	segments.add_child(segment_row)
 	var group := ButtonGroup.new()
-	for item in [["3D", "Node3D", Screen.VIEW_3D, "3D View (Ctrl+F2)"], ["Script", "Script", Screen.SCRIPT, "Script Editor (Ctrl+F3)"],
-			["Game", "Game", Screen.GAME, "Running Game (Ctrl+F4)"]]:
+	for item in [["2D", "Node2D", Screen.VIEW_2D, "2D View (Ctrl+F1)"], ["3D", "Node3D", Screen.VIEW_3D, "3D View (Ctrl+F2)"],
+			["Script", "Script", Screen.SCRIPT, "Script Editor (Ctrl+F3)"], ["Game", "Game", Screen.GAME, "Running Game (Ctrl+F4)"]]:
 		var button := Button.new()
 		button.theme_type_variation = "MainScreenButton"
 		button.text = item[0]
@@ -300,7 +309,7 @@ func _build_ui() -> void:
 		var id: int = item[2]
 		button.pressed.connect(func(): _set_screen(id))
 		segment_row.add_child(button)
-		screen_buttons.append(button)
+		screen_buttons[id] = button
 	var right_spacer := Control.new()
 	right_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(right_spacer)
@@ -492,7 +501,28 @@ func _build_ui() -> void:
 	bottom_bar.add_child(clear_button)
 	inspector = Inspector.new()
 	inspector.custom_minimum_size.x = 300
-	right_split.add_child(_dock("Inspector", inspector))
+	signals_dock = SignalsDock.new()
+	signals_dock.visible = false
+	signals_dock.method_exists = _method_exists
+	var right_card := PanelContainer.new()
+	right_card.theme_type_variation = "Card"
+	right_split.add_child(right_card)
+	var right_box := VBoxContainer.new()
+	right_box.add_theme_constant_override("separation", 8)
+	right_card.add_child(right_box)
+	right_tabs = TabBar.new()
+	right_tabs.focus_mode = Control.FOCUS_NONE
+	right_tabs.add_tab("Inspector")
+	right_tabs.add_tab("Signals")
+	right_tabs.set_tab_tooltip(1, "The selected node's signals and their connections")
+	right_tabs.tab_changed.connect(func(i):
+		inspector.visible = i == 0
+		signals_dock.visible = i == 1
+		_refresh_inspector())
+	right_box.add_child(right_tabs)
+	for dock in [inspector, signals_dock]:
+		dock.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		right_box.add_child(dock)
 	var footer := HBoxContainer.new()
 	footer.add_theme_constant_override("separation", 14)
 	layout.add_child(footer)
@@ -514,7 +544,10 @@ func _build_ui() -> void:
 	footer.add_child(version)
 	# Signals
 	scene_dock.node_selected.connect(_select)
-	scene_dock.add_requested.connect(func(parent): _add_parent = parent; create_dialog.open())
+	scene_dock.add_requested.connect(func(parent): _open_create("add", parent))
+	scene_dock.change_type_requested.connect(func(id):
+		var node := Document.find(_root_node(), id)
+		if not node.is_empty(): _open_create("change", id, "Change Type of %s" % node.name, "Change", str(node.type)))
 	scene_dock.rename_requested.connect(_rename_node)
 	scene_dock.move_requested.connect(_move_node)
 	scene_dock.delete_requested.connect(_request_delete)
@@ -537,6 +570,12 @@ func _build_ui() -> void:
 		filesystem.refresh()
 		_log("Main scene: " + path, Style.ACCENT))
 	filesystem.message.connect(func(text, is_error): _log(text, Style.ERROR if is_error else Style.MUTED))
+	signals_dock.connect_requested.connect(_connect_requested)
+	signals_dock.disconnect_requested.connect(_remove_connection)
+	signals_dock.method_requested.connect(_goto_method)
+	scene_dock.signals_requested.connect(func(id):
+		_select(id)
+		right_tabs.current_tab = 1)
 	inspector.property_edited.connect(_property_edited)
 	inspector.script_property_edited.connect(_script_property_edited)
 	inspector.script_action.connect(func(action): _script_action_for(_tab().selected if current >= 0 else 0, action))
@@ -570,14 +609,28 @@ func _build_ui() -> void:
 		_log("Script saved: " + path)
 		_upload())
 	script_editor.script_info_changed.connect(func(path, _info):
-		if current >= 0:
+		if current >= 0 and not playing:
 			var node := Document.find(_root_node(), _tab().selected)
-			if not node.is_empty() and str(node.get("script", "")) == path and not playing: _refresh_inspector())
+			# The Signals dock marks connections whose method is missing from any script.
+			if (not node.is_empty() and str(node.get("script", "")) == path) or signals_dock.visible: _refresh_inspector())
 	script_editor.new_script_requested.connect(func(): _new_script_file("res://scripts"))
 	script_editor.message.connect(func(text, is_error): _log(text, Style.ERROR if is_error else Style.MUTED))
 	_set_screen(Screen.VIEW_3D)
 
-var _add_parent := 0
+var _add_parent := 0 # the node the Create Node dialog is for
+var _create_mode := "add" # what it is for: add (a child), root (of a new scene) or change (Change Type)
+var _new_scene_folder := ""
+
+func _on_type_chosen(type: String) -> void:
+	match _create_mode:
+		"root": _create_scene(type, _new_scene_folder)
+		"change": _change_type(_add_parent, type)
+		_: _add_node(type, _add_parent)
+
+func _open_create(mode: String, id: int, title: String = "Create New Node", ok: String = "Create", current_type: String = "") -> void:
+	_create_mode = mode
+	_add_parent = id
+	create_dialog.open(title, ok, current_type)
 
 func load_image_texture(path: String) -> Texture2D:
 	var image := Image.load_from_file(path)
@@ -605,12 +658,21 @@ func _menu(bar: HBoxContainer, title: String, items: Array) -> void:
 
 func _build_dialogs() -> void:
 	create_dialog = CreateNodeDialog.new()
-	create_dialog.type_chosen.connect(func(type): _add_node(type, _add_parent))
+	create_dialog.type_chosen.connect(_on_type_chosen)
+	new_scene_dialog = NewSceneDialog.new()
+	new_scene_dialog.root_chosen.connect(func(type):
+		if type.is_empty(): _open_create("root", 0, "Pick the Root Node of the Scene", "Create")
+		else: _create_scene(type, _new_scene_folder))
+	add_child(new_scene_dialog)
 	add_child(create_dialog)
 	attach_dialog = AttachScriptDialog.new()
 	attach_dialog.project = project
 	attach_dialog.script_chosen.connect(_on_attach_chosen)
 	add_child(attach_dialog)
+	connect_dialog = ConnectDialog.new()
+	connect_dialog.script_functions = func(path): return _script_info(path).get("functions", []).map(func(f): return str(f.name))
+	connect_dialog.connection_chosen.connect(func(target_id, method, flags): _add_connection(_connecting["signal"], _connecting.arguments, target_id, method, flags))
+	add_child(connect_dialog)
 	project_manager = ProjectManager.new()
 	project_manager.example_folder = _example_folder()
 	project_manager.open_requested.connect(_open_project)
@@ -827,7 +889,7 @@ func _open_project(folder: String) -> void:
 		if project.exists(path): _open_scene(path, false)
 	if tabs.is_empty():
 		if not project.main_scene().is_empty() and project.exists(project.main_scene()): _open_scene(project.main_scene(), false)
-		else: _new_scene()
+		else: _create_scene("Node3D")
 	var views: Dictionary = state.get("views", {})
 	for tab in tabs:
 		if views.has(tab.path): tab.view = views[tab.path]
@@ -835,6 +897,7 @@ func _open_project(folder: String) -> void:
 	for path in state.get("scripts", []):
 		if project.exists(path): script_editor.open_script(path)
 	_set_screen(int(state.get("screen", Screen.VIEW_3D)) if int(state.get("screen", 0)) != Screen.GAME else Screen.VIEW_3D)
+	_view_for_scene()
 
 func _state_path() -> String:
 	return project.root.path_join(".jetstudio/editor_state.json")
@@ -938,18 +1001,67 @@ func _switch_tab(index: int) -> void:
 	_switching = false
 	if tabs[index].view.is_empty(): viewport.reset_view()
 	else: viewport.load_state(tabs[index].view)
+	_view_for_scene()
 	_upload()
 	_refresh_all()
 
+## Asks for the root, as Godot's Scene dock does for a new scene.
+## As in Godot, a 2D or UI scene shows in the 2D view and a 3D one in the 3D view.
+func _view_for_scene() -> void:
+	if current < 0 or not screen in [Screen.VIEW_2D, Screen.VIEW_3D]: return
+	var root_type := str(_root_node().type)
+	if Document.is_2d(root_type) or Document.is_control(root_type): _set_screen(Screen.VIEW_2D)
+	elif Document.is_3d(root_type): _set_screen(Screen.VIEW_3D)
+
 func _new_scene(folder: String = "") -> void:
-	var doc := Document.new_scene("Node3D", "World")
-	var env := Document.new_node("WorldEnvironment", 2, "WorldEnvironment")
-	var sun := Document.new_node("DirectionalLight3D", 3, "Sun")
-	sun.rotation = [-50.0, -35.0, 0.0]
-	doc.root.children = [env, sun]
+	_new_scene_folder = folder
+	new_scene_dialog.open()
+
+func _create_scene(type: String, folder: String = "") -> void:
+	var doc := Document.new_scene(type, type)
+	if type == "Node3D":
+		# Light and environment, so the first meshes aren't drawn in the dark.
+		var env := Document.new_node("WorldEnvironment", 2, "WorldEnvironment")
+		var sun := Document.new_node("DirectionalLight3D", 3, "Sun")
+		sun.rotation = [-50.0, -35.0, 0.0]
+		doc.root.children = [env, sun]
+	elif type == "Control":
+		doc.root.size = [viewport.W, viewport.H] # the whole screen
 	_add_tab("", doc, "")
 	if not folder.is_empty(): save_dialog.current_dir = project.to_abs(folder)
-	_log("New scene created. Add nodes with the + button of the Scene dock (Ctrl+A).")
+	_log("New scene with a %s root. Add nodes with the + button of the Scene dock (Ctrl+A)." % type)
+
+## Godot's Change Type: name, children, script and the shared properties stay; connections of signals it no longer has go.
+func _change_type(id: int, new_type: String) -> void:
+	var node := Document.find(_root_node(), id)
+	if playing or node.is_empty() or str(node.type) == new_type: return
+	var old_type := str(node.type)
+	_change("", true, func():
+		var n := Document.find(_root_node(), id)
+		Document.change_type(n, new_type)
+		var kept := _signal_names(n)
+		_tab().doc.connections = Document.connections(_tab().doc).filter(func(c): return int(c.from) != id or str(c["signal"]) in kept)
+	, true)
+	if id == int(_root_node().id): scene_tabs.set_tab_icon(current, Icons.for_node(new_type))
+	_status("%s is now a %s (was %s)." % [node.name, new_type, old_type])
+	var path := str(node.get("script", ""))
+	var base := str(_script_info(path).get("base", "")) if not path.is_empty() else ""
+	if not base.is_empty() and not Document.inherits(new_type, base):
+		_log("%s's script extends %s, which a %s isn't: change the script's extends or detach it." % [node.name, base, new_type], Style.WARNING)
+
+## The signals a node has: its script's and its classes'.
+func _signal_names(node: Dictionary) -> Array:
+	var names := []
+	for sig in _script_info(str(node.get("script", ""))).get("signals", []): names.append(str(sig.name))
+	var cls := str(node.type)
+	while not cls.is_empty():
+		var found := {}
+		for c in script_editor.class_db:
+			if c.name == cls: found = c
+		if found.is_empty(): break
+		for sig in found.get("signals", []): names.append(str(sig.name))
+		cls = str(found.base)
+	return names
 
 func _open_file(path: String) -> void:
 	match path.get_extension():
@@ -1040,7 +1152,7 @@ func _close_tab(index: int, force: bool = false) -> void:
 	scene_tabs.remove_tab(index)
 	_switching = false
 	current = -1
-	if tabs.is_empty(): _new_scene()
+	if tabs.is_empty(): _create_scene("Node3D")
 	else: _switch_tab(mini(index, tabs.size() - 1))
 
 func _refresh_title() -> void:
@@ -1154,6 +1266,7 @@ const HEAVY_TEXTURE := 96 * 1024 # above this, adding a texture offers to compre
 const BOARD_TEXTURE_SIDE := 256
 const BOARD_TRIANGLES := 3000 # above this, adding a model warns about the frame rate on the board
 var _pack_textures := [] # textures of the last exported package
+var _pack_memory := {} # its RAM estimate on the board (bridge.memory_estimate)
 var _kept_textures := {} # textures the user chose to keep as they are, this session
 var _compression := {} # res path -> import settings waiting for the user's answer
 var _after_compression := Callable()
@@ -1285,6 +1398,54 @@ func _pack_plan(pack_size: int) -> Dictionary:
 	for path in entries:
 		if entries[path].settings != _import_settings(path): plan[path] = entries[path]
 	return {"size": size, "plan": plan}
+
+## The game's RAM on the board, from the last export: an estimate, logged before building.
+## Without PSRAM it says whether it fits with both field buffers, with one (slower), or not at all.
+func _report_memory() -> void:
+	if _pack_memory.is_empty(): return
+	var hw := Hardware.settings(project.config)
+	var board: Dictionary = Hardware.boards.get(str(hw.board), {})
+	var heaviest := {}
+	for scene in _pack_memory.scenes:
+		if heaviest.is_empty() or int(scene.total) > int(heaviest.total): heaviest = scene
+	var shared: int = int(_pack_memory.engine) + int(_pack_memory.frames) + int(_pack_memory.textures) + int(_pack_memory.scripts)
+	var need := shared + int(heaviest.get("total", 0))
+	var field := int(_pack_memory.field)
+	var buffers := int(_pack_memory.frames) + field
+
+	var kb := func(bytes: int) -> String: return "%d KB" % ceili(bytes / 1024.0)
+	var detail := "textures %s, scripts %s, frame buffers %s; heaviest scene %s: nodes %s, meshes %s, triangle queues %s, particles %s" % [
+		kb.call(int(_pack_memory.textures)), kb.call(int(_pack_memory.scripts)), kb.call(buffers),
+		str(heaviest.get("scene", "")).get_file(), kb.call(int(heaviest.get("nodes", 0))), kb.call(int(heaviest.get("meshes", 0))),
+		kb.call(int(heaviest.get("triangles", 0))), kb.call(int(heaviest.get("particles", 0)))]
+	var extra := "Plus what scripts create while playing (spawned scenes, arrays)."
+
+	# The ESP32 keeps the frame buffers in internal RAM and loads the scene into PSRAM.
+	if board.has("psram"):
+		var megabytes := int(str(board.psram).to_int())
+		var in_psram := need + field - buffers
+		if in_psram <= megabytes * 1024 * 1024:
+			_log("RAM (estimate): about %s in PSRAM (of %d MB) and %s of frame buffers in internal RAM (%s). %s" % [
+				kb.call(in_psram), megabytes, kb.call(buffers), detail, extra], Style.MUTED)
+		else:
+			_log("RAM (estimate): about %s, the board has %d MB of PSRAM: the game probably won't start (%s)." % [
+				kb.call(in_psram), megabytes, detail], Style.ERROR)
+		return
+
+	# What's left of the RAM for the heap: the firmware's own variables and the stack take about 32 KB.
+	var ram := int(str(board.get("ram", "0")).to_int()) * 1024
+	var available := ram - 32 * 1024
+	if need + field <= available * 9 / 10:
+		_log("RAM (estimate): about %s of %s (%s). %s" % [kb.call(need + field), kb.call(available), detail, extra], Style.MUTED)
+	elif need + field <= available:
+		_log("RAM (estimate): about %s of %s, close to the limit (%s). %s If it runs out, drawing waits for the display (slower)." % [
+			kb.call(need + field), kb.call(available), detail, extra], Style.WARNING)
+	elif need <= available:
+		_log("RAM (estimate): about %s of %s: it fits with one field buffer, so drawing waits for the display (slower). %s." % [
+			kb.call(need), kb.call(available), detail], Style.WARNING)
+	else:
+		_log("RAM (estimate): about %s, the board has %s: the game probably won't start (%s). Use smaller textures, fewer nodes or simpler meshes." % [
+			kb.call(need), kb.call(available), detail], Style.ERROR)
 
 ## Stops a board build whose package is over the limit, offering the compression that makes it fit.
 func _fits_board(pack_path: String, action: String) -> bool:
@@ -1424,6 +1585,7 @@ func _import_summary(path: String) -> String:
 
 func _file_selected(path: String) -> void:
 	if Document.import_kind(path).is_empty() or not FileAccess.file_exists(project.to_abs(path)): return
+	right_tabs.current_tab = 0 # the import settings are in the Inspector
 	inspector.edit_import(path, _import_settings(path), _import_summary(path))
 
 func _save_import(path: String, settings: Dictionary) -> bool:
@@ -1454,12 +1616,21 @@ func _refresh_all() -> void:
 	if current < 0: return
 	var tab := _tab()
 	if Document.find(tab.doc.root, tab.selected).is_empty(): tab.selected = int(tab.doc.root.id)
+	scene_dock.connections = Document.connections(tab.doc)
 	scene_dock.rebuild(tab.doc.root, tab.selected, playing)
 	_refresh_inspector()
 	viewport.set_scene(tab.doc.root, tab.selected, playing)
 	var names := []
 	Document.walk(tab.doc.root, func(n, _p, _d): names.append(str(n.name)))
 	script_editor.set_scene_node_names(names)
+	var connected := {}
+	for c in Document.connections(tab.doc):
+		var source := Document.find(tab.doc.root, int(c.from))
+		var path := str(Document.find(tab.doc.root, int(c.to)).get("script", ""))
+		if path.is_empty() or source.is_empty(): continue
+		if not connected.has(path): connected[path] = {}
+		connected[path][str(c.method)] = "%s.%s" % [source.name, c["signal"]]
+	script_editor.set_connected_methods(connected)
 	_refresh_title()
 	_update_controls()
 	needs_render = true
@@ -1467,7 +1638,9 @@ func _refresh_all() -> void:
 func _refresh_inspector() -> void:
 	if current < 0: return
 	var node := Document.find(_root_node(), _tab().selected)
-	inspector.edit(node, _script_info(str(node.get("script", ""))), playing)
+	var info := _script_info(str(node.get("script", "")))
+	if inspector.visible: inspector.edit(node, info, playing)
+	if signals_dock.visible: signals_dock.edit(_tab().doc, node, info, playing)
 
 func _script_info(path: String) -> Dictionary:
 	if path.is_empty() or bridge == null: return {}
@@ -1490,7 +1663,8 @@ func _select(id: int) -> void:
 
 func _set_screen(value: int) -> void:
 	screen = value
-	viewport.visible = value == Screen.VIEW_3D
+	viewport.visible = value == Screen.VIEW_3D or value == Screen.VIEW_2D
+	if viewport.visible: viewport.set_mode_2d(value == Screen.VIEW_2D)
 	script_editor.visible = value == Screen.SCRIPT
 	game_view.get_parent().get_parent().visible = value == Screen.GAME
 	screen_buttons[value].button_pressed = true
@@ -1631,8 +1805,68 @@ func _delete_node(id: int) -> void:
 	_change("", true, func():
 		var p := Document.parent_of(_root_node(), id)
 		Document.children(p).erase(Document.find(_root_node(), id))
+		Document.prune_connections(_tab().doc) # as in Godot, the deleted nodes' connections go with them
 		_tab().selected = int(p.id)
 	, true)
+
+# ------------------------------------------------------------------ signal connections (Signals dock)
+
+var _connecting := {} # the signal the Connect dialog is for: {signal, arguments}
+
+func _connect_requested(signal_name: String, arguments: Array) -> void:
+	if playing or current < 0: return
+	_connecting = {"signal": signal_name, "arguments": arguments}
+	connect_dialog.open(_tab().doc, Document.find(_root_node(), _tab().selected), signal_name)
+
+## Connects the selected node's signal; a missing method is added to the receiver's script, which opens there (Godot does the same).
+func _add_connection(signal_name: String, arguments: Array, target_id: int, method: String, flags: int) -> void:
+	var from_id: int = _tab().selected
+	if Document.find_connection(_tab().doc, from_id, signal_name, target_id, method) >= 0: return
+	_change("", true, func():
+		Document.connections(_tab().doc).append({"from": from_id, "signal": signal_name, "to": target_id, "method": method, "flags": flags})
+	, true)
+	var target := Document.find(_root_node(), target_id)
+	_status("Connected %s.%s to %s.%s()." % [Document.find(_root_node(), from_id).name, signal_name, target.name, method])
+	var path := str(target.get("script", ""))
+	if path.is_empty(): return
+	var line := 0
+	for f in _script_info(path).get("functions", []):
+		if str(f.name) == method: line = int(f.line)
+	if line == 0: line = script_editor.add_function(path, method, arguments)
+	_open_script_at(path, line)
+
+func _remove_connection(index: int) -> void:
+	if playing or current < 0 or index < 0 or index >= Document.connections(_tab().doc).size(): return
+	var c: Dictionary = Document.connections(_tab().doc)[index]
+	_change("", true, func(): Document.connections(_tab().doc).remove_at(index), true)
+	_status("Disconnected %s from %s()." % [c["signal"], c.method])
+
+func _goto_method(target_id: int, method: String) -> void:
+	var path := str(Document.find(_root_node(), target_id).get("script", ""))
+	if path.is_empty(): return
+	for f in _script_info(path).get("functions", []):
+		if str(f.name) == method:
+			_open_script_at(path, int(f.line))
+			return
+	_open_script_at(path, 0)
+
+## For the Signals dock: a connection's method is in the receiver's script, or is one of its engine methods.
+func _method_exists(target: Dictionary, method: String) -> bool:
+	if target.is_empty(): return false
+	var path := str(target.get("script", ""))
+	if not path.is_empty():
+		for f in _script_info(path).get("functions", []):
+			if str(f.name) == method: return true
+	var cls := str(target.type)
+	while not cls.is_empty():
+		var found := {}
+		for c in script_editor.class_db:
+			if c.name == cls: found = c
+		if found.is_empty(): return false
+		for m in found.methods:
+			if str(m.name) == method: return true
+		cls = str(found.base)
+	return false
 
 func _duplicate_node(id: int) -> void:
 	if playing or current < 0 or id <= 0 or id == int(_root_node().id): return
@@ -1645,10 +1879,25 @@ func _duplicate_node(id: int) -> void:
 		return
 	var copy := Document.copy_with_new_ids(node, Document.next_id(root))
 	copy.name = Document.unique_name(parent, str(node.name))
+	# As in Godot, the copies keep the connections of the nodes they copy.
+	var new_ids := {}
+	var old := []
+	Document.walk(node, func(n, _p, _d): old.append(int(n.id)))
+	var index := [0]
+	Document.walk(copy, func(n, _p, _d):
+		new_ids[old[index[0]]] = int(n.id)
+		index[0] += 1)
 	_change("", true, func():
 		var p := Document.parent_of(_root_node(), id)
 		var list := Document.children(p)
 		list.insert(list.find(Document.find(_root_node(), id)) + 1, copy)
+		var links := Document.connections(_tab().doc)
+		for c in links.duplicate():
+			if new_ids.has(int(c.from)):
+				var twin: Dictionary = c.duplicate()
+				twin.from = new_ids[int(c.from)]
+				twin.to = new_ids.get(int(c.to), int(c.to))
+				links.append(twin)
 		_tab().selected = int(copy.id)
 	, true)
 
@@ -1764,13 +2013,13 @@ func _file_dropped(id: int, path: String) -> void:
 				n.background_mode = "Panorama"
 			, true)
 			_status("Panorama %s set." % path.get_file())
-		"TextureRect", "Sprite3D":
+		"TextureRect", "Sprite3D", "Sprite2D", "AnimatedSprite2D":
 			_change("", true, func(): Document.find(_root_node(), id).texture = path, true)
 			_status("Texture %s applied to %s." % [path.get_file(), node.name])
 		_:
 			_status("Drag images onto a MeshInstance3D or a WorldEnvironment.")
 	_select(id)
-	if str(node.type) in ["MeshInstance3D", "WorldEnvironment", "TextureRect", "Sprite3D"]: _offer_compression([path])
+	if str(node.type) in ["MeshInstance3D", "WorldEnvironment", "TextureRect", "Sprite3D", "Sprite2D", "AnimatedSprite2D"]: _offer_compression([path])
 
 ## A Node3D with one MeshInstance3D per OBJ part and the MTL materials, like Godot's imported scenes.
 func _instantiate_model(parent_id: int, path: String, at: Variant = null) -> void:
@@ -2073,6 +2322,7 @@ func _render() -> void:
 	needs_render = false
 	var game := playing and screen == Screen.GAME
 	bridge.use_editor_camera(not game)
+	bridge.set_editor_canvas(screen == Screen.VIEW_2D, viewport.canvas_zoom, viewport.canvas_origin)
 	if not game: bridge.set_editor_camera(viewport.view_origin, viewport.view_rotation(), viewport.view_fov)
 	var texture: Texture2D = bridge.render_frame()
 	if game: game_view.texture = texture
@@ -2095,8 +2345,12 @@ func _show_live_values() -> void:
 		if live.has(key) and Document.is_3d(str(node.type)):
 			var v: Vector3 = live[key]
 			shown[key] = [v.x, v.y, v.z]
-	if live.has("position") and Document.is_control(str(node.type)):
+	if live.has("position") and (Document.is_control(str(node.type)) or Document.is_2d(str(node.type))):
 		shown.position = [live.position.x, live.position.y]
+	if Document.is_2d(str(node.type)):
+		if live.has("rotation"): shown.rotation_degrees = live.rotation.z
+		if live.has("scale"): shown.scale = [live.scale.x, live.scale.y]
+		if live.has("frame"): shown.frame = live.frame
 	if live.has("visible"): shown.visible = live.visible
 	inspector.refresh_values(shown)
 
@@ -2141,6 +2395,9 @@ func _scene_pack(path: String) -> PackedByteArray:
 	var error: String = bridge.load_scene(doc, sources, assets)
 	var pack: PackedByteArray = bridge.export_pack() if error.is_empty() else PackedByteArray()
 	if not error.is_empty(): _fail("Invalid scene: " + error)
+	elif not pack.is_empty():
+		# The STM32 firmware reads palette textures from the flash instead of copying them.
+		_pack_memory = bridge.memory_estimate(Hardware.platform(Hardware.settings(project.config)) == "stm32")
 	_upload()
 	return pack
 
@@ -2190,6 +2447,7 @@ func _start_task(action: String) -> void:
 	_job_offset = 0
 	var target := "device" if target_select.selected > 0 else "desktop"
 	if target == "device" and not _fits_board(_job_prefix + ".jetpack", action): return
+	if target == "device": _report_memory()
 	var profile := _profile()
 	# The uploader needs the USB port; the Serial monitor gets it back after the flash.
 	if action == "flash": _serial_was_open = serial_monitor.suspend()
@@ -2302,6 +2560,7 @@ func _shortcut_input(event: InputEvent) -> void:
 	elif key == KEY_F6 and not ctrl: _play(true)
 	elif key == KEY_F7 and not ctrl: _toggle_pause()
 	elif key == KEY_F8 and not ctrl: _stop()
+	elif ctrl and key == KEY_F1: _set_screen(Screen.VIEW_2D)
 	elif ctrl and key == KEY_F2: _set_screen(Screen.VIEW_3D)
 	elif ctrl and key == KEY_F3: _set_screen(Screen.SCRIPT)
 	elif ctrl and key == KEY_F4: _set_screen(Screen.GAME)
@@ -2328,9 +2587,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if event.shift_pressed: _redo()
 		else: _undo()
 	elif ctrl and event.keycode == KEY_Y: _redo()
-	elif ctrl and event.keycode == KEY_A and screen == Screen.VIEW_3D and current >= 0:
-		_add_parent = _tab().selected
-		create_dialog.open()
+	elif ctrl and event.keycode == KEY_A and screen in [Screen.VIEW_2D, Screen.VIEW_3D] and current >= 0:
+		_open_create("add", _tab().selected)
 	else: return
 	get_viewport().set_input_as_handled()
 
@@ -2362,9 +2620,15 @@ func _capture_and_quit(path: String) -> void:
 	# Test-only arguments that set up the state to capture.
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--select="): _select(int(arg.trim_prefix("--select=")))
-		elif arg.begins_with("--open-script="): _open_script_at(arg.trim_prefix("--open-script="), 0)
+		elif arg.begins_with("--open-script="): # path, or path:line
+			var target := arg.trim_prefix("--open-script=")
+			var line := target.get_slice(":", target.get_slice_count(":") - 1)
+			if line.is_valid_int(): _open_script_at(target.trim_suffix(":" + line), int(line))
+			else: _open_script_at(target, 0)
 		elif arg.begins_with("--inspect-file="): _file_selected(arg.trim_prefix("--inspect-file="))
 		elif arg.begins_with("--bottom-tab="): bottom_tabs.current_tab = int(arg.trim_prefix("--bottom-tab="))
+		elif arg.begins_with("--right-tab="): right_tabs.current_tab = int(arg.trim_prefix("--right-tab="))
+		elif arg.begins_with("--dialog=connect:"): _connect_requested(arg.trim_prefix("--dialog=connect:"), [])
 		elif arg == "--serial-sample":
 			for line in ["I (412) JetStudio: Scene loaded: 104 nodes, 92 meshes, 1 scripts; 320x240 RGB565; buffers 307200 bytes",
 					"I (2911) JetStudio: Frame 38.20 ms (scripts 1.10 ms); 362 raster tris; free heap 241388, PSRAM 7612044",
@@ -2376,7 +2640,11 @@ func _capture_and_quit(path: String) -> void:
 				serial_monitor.feed((line + "\r\n").to_utf8_buffer())
 		elif arg.begins_with("--screen="): _set_screen(int(arg.trim_prefix("--screen=")))
 		elif arg == "--play": _play(false)
-		elif arg == "--dialog=create": create_dialog.open()
+		elif arg == "--dialog=create": _open_create("add", _tab().selected)
+		elif arg == "--dialog=new-scene": _new_scene()
+		elif arg == "--dialog=change-type":
+			var node := Document.find(_root_node(), _tab().selected)
+			_open_create("change", int(node.id), "Change Type of %s" % node.name, "Change", str(node.type))
 		elif arg == "--dialog=attach": _script_action_for(_tab().selected, "attach")
 		elif arg == "--dialog=projects": _show_project_manager()
 		elif arg == "--dialog=help": help_dialog.popup_centered(Vector2i(640, 520))
@@ -2532,7 +2800,7 @@ func _run_smoke() -> void:
 	var pack_path := _root_dir().path_join(".cache/tests/smoke.jetpack")
 	_check(_export_to(pack_path), "export .jetpack")
 	var bytes := FileAccess.get_file_as_bytes(pack_path)
-	_check(bytes.size() > 100 and bytes.slice(0, 5) == PackedByteArray([74, 69, 84, 80, 14]), "package header JETP v14")
+	_check(bytes.size() > 100 and bytes.slice(0, 5) == PackedByteArray([74, 69, 84, 80, 16]), "package header JETP v16")
 	# 2D nodes
 	_add_node("ColorRect", int(_root_node().id))
 	var rect_id: int = _tab().selected
@@ -2589,6 +2857,132 @@ func _run_smoke() -> void:
 	_check(Document.configuration_warnings(test_root, lonely).size() == 1 and Document.configuration_warnings(test_root, stray).size() == 1
 		and Document.configuration_warnings(_root_node(), Document.find(_root_node(), body_id)).is_empty(),
 		"configuration warnings: body without shape, shape without body")
+
+	# 2D physics: a ball falls on a ground; shapes draw their outline
+	_add_node("StaticBody2D", int(_root_node().id))
+	var ground_id: int = _tab().selected
+	_property_edited("position", [160.0, 200.0], true)
+	_add_node("CollisionShape2D", ground_id)
+	var ground_shape_id: int = _tab().selected
+	_property_edited("size", [300.0, 20.0], true)
+	_add_node("RigidBody2D", int(_root_node().id))
+	var ball_id: int = _tab().selected
+	_property_edited("position", [160.0, 100.0], true)
+	_add_node("CollisionShape2D", ball_id)
+	_property_edited("shape", "Circle", true)
+	_frame()
+	var outline: PackedVector2Array = bridge.shape_outline(ground_shape_id)
+	_check(outline.size() == 4 and outline[0].is_equal_approx(Vector2(10, 190)) and outline[2].is_equal_approx(Vector2(310, 210)),
+		"CollisionShape2D outline on the canvas")
+	_play(true)
+	for i in 40: _process(0.05)
+	var ball: Dictionary = bridge.node_state(ball_id)
+	_stop()
+	_check(not ball.is_empty() and absf(ball.position.y - 180.0) < 1.5, "a RigidBody2D falls and rests on a StaticBody2D")
+	_set_screen(Screen.VIEW_2D)
+	viewport.canvas_zoom = 2.0
+	viewport.canvas_origin = Vector2.ZERO
+	_render()
+	var outline_2d: PackedVector2Array = bridge.shape_outline(ground_shape_id)
+	_check(viewport.mode_2d and outline_2d.size() == 4 and outline_2d[0].is_equal_approx(Vector2(20, 380)),
+		"the 2D view shows the canvas at its own zoom")
+	_set_screen(Screen.VIEW_3D)
+	var shape_type := str(Document.find(_root_node(), ground_id).type)
+	_change_type(ground_id, "Area2D")
+	var retyped: Dictionary = Document.find(_root_node(), ground_id)
+	_check(str(retyped.type) == "Area2D" and retyped.has("monitoring") and not retyped.has("friction")
+		and retyped.position == [160.0, 200.0] and Document.children(retyped).size() == 1, "Change Type keeps name, children and shared properties")
+	_undo()
+	_check(str(Document.find(_root_node(), ground_id).type) == shape_type, "Change Type can be undone")
+	var lonely_2d := {"id": 903, "name": "Zone", "type": "Area2D", "children": []}
+	var warnings_2d := Document.configuration_warnings(test_root, lonely_2d)
+	_check(warnings_2d.size() == 1 and "CollisionShape2D" in warnings_2d[0]
+		and Document.configuration_warnings(_root_node(), Document.find(_root_node(), ball_id)).is_empty(),
+		"2D bodies want a CollisionShape2D")
+	_delete_node(ball_id)
+	_delete_node(ground_id)
+	# New scenes ask for their root, as Godot's Scene dock does
+	var tab_count := tabs.size()
+	_new_scene()
+	new_scene_dialog.hide()
+	new_scene_dialog.root_chosen.emit("Node2D")
+	_check(tabs.size() == tab_count + 1 and str(_root_node().type) == "Node2D" and screen == Screen.VIEW_2D, "a new 2D scene opens in the 2D view")
+	_close_tab(current, true)
+	_new_scene()
+	new_scene_dialog.hide()
+	new_scene_dialog.root_chosen.emit("Control")
+	_check(str(_root_node().type) == "Control" and _root_node().size == [viewport.W, viewport.H], "a User Interface scene fills the screen")
+	_close_tab(current, true)
+	_set_screen(Screen.VIEW_3D)
+	# Timer and signals
+	_add_node("Timer", int(_root_node().id))
+	var timer_id: int = _tab().selected
+	_property_edited("wait_time", 0.1, true)
+	_property_edited("autostart", true, true)
+	var timer_script := "res://scripts/smoke_timer.jet"
+	project.write(timer_script, "extends Timer\nsignal fired(count)\nvar count := 0\nfunc _ready():\n\ttimeout.connect(_on_timeout)\n"
+		+ "\tfired.connect(_on_fired)\nfunc _on_timeout():\n\tcount += 1\n\tfired.emit(count)\nfunc _on_fired(n):\n\tif n == 2:\n\t\tprint(\"smoke timeout \", wait_time)\n")
+	_attach_script(timer_id, timer_script)
+	var timer_info := _script_info(timer_script)
+	var timer_class: Array = bridge.class_db().filter(func(c): return c.name == "Timer")
+	_check(timer_info.get("ok", false) and timer_info.signals.size() == 1 and timer_info.signals[0].name == "fired"
+		and timer_class.size() == 1 and timer_class[0].signals[0].name == "timeout", "script and engine signals reach the completion")
+	_play(true)
+	for i in 6: _process(0.05)
+	var timed_out := "smoke timeout 0.1" in output.get_parsed_text()
+	_stop()
+	_check(timed_out, "a Timer emits timeout, a script signal passes it on")
+	_delete_node(timer_id)
+	# Signals connected in the Signals dock: the Connect dialog's name, the stub added to the script, Play, undo, deletion
+	_add_node("Timer", int(_root_node().id))
+	var ticker_id: int = _tab().selected
+	_rename_node(ticker_id, "Ticker")
+	_property_edited("wait_time", 0.1, true)
+	_property_edited("autostart", true, true)
+	_add_node("Node", int(_root_node().id))
+	var receiver_id: int = _tab().selected
+	_rename_node(receiver_id, "Receiver")
+	var receiver_script := "res://scripts/smoke_receiver.jet"
+	project.write(receiver_script, "extends Node\n")
+	_attach_script(receiver_id, receiver_script)
+	_select(ticker_id)
+	right_tabs.current_tab = 1
+	_connect_requested("timeout", [])
+	var receiver_item: TreeItem = connect_dialog._tree.get_root()
+	while receiver_item != null and int(receiver_item.get_metadata(0)) != receiver_id: receiver_item = receiver_item.get_next_in_tree()
+	if receiver_item != null: receiver_item.select(0)
+	var proposed: String = connect_dialog._method.text
+	connect_dialog.hide()
+	_check(proposed == "_on_ticker_timeout" and not connect_dialog.get_ok_button().disabled, "the Connect dialog proposes Godot's method name")
+	_add_connection("timeout", [], receiver_id, proposed, 0)
+	var stub = script_editor.source_of(receiver_script)
+	_check(Document.connections(_tab().doc).size() == 1 and stub != null and "func _on_ticker_timeout() -> void:" in stub
+		and screen == Screen.SCRIPT, "connecting adds the method to the receiver's script and opens it")
+	var dock_tree: Tree = signals_dock._tree
+	var timeout_item: TreeItem = dock_tree.get_root().get_child(0).get_child(0) if dock_tree.get_root() != null else null
+	_check(timeout_item != null and timeout_item.get_text(0) == "timeout()" and timeout_item.get_child_count() == 1
+		and "Receiver :: _on_ticker_timeout()" in timeout_item.get_child(0).get_text(0), "the Signals dock lists the signal and its connection")
+	script_editor._scripts[receiver_script].code.text = stub.replace("pass # Replace with function body.", "print(\"smoke connected\")")
+	script_editor.save(receiver_script)
+	_set_screen(Screen.VIEW_3D)
+	_play(true)
+	for i in 4: _process(0.05)
+	var connected := "smoke connected" in output.get_parsed_text()
+	_stop()
+	_check(connected, "a connection made in the editor works in Play")
+	var connections_pack := _root_dir().path_join(".cache/tests/connections.jetpack")
+	var connections_bytes := FileAccess.get_file_as_bytes(connections_pack) if _export_to(connections_pack) else PackedByteArray()
+	_check(connections_bytes.hex_encode().contains("_on_ticker_timeout".to_utf8_buffer().hex_encode()), "the package carries the connection")
+	_undo()
+	_check(Document.connections(_tab().doc).is_empty(), "undo removes the connection")
+	_redo()
+	_duplicate_node(ticker_id)
+	_check(Document.connections(_tab().doc).size() == 2, "a duplicated node keeps its connections")
+	_undo()
+	_delete_node(receiver_id)
+	_check(Document.connections(_tab().doc).is_empty(), "deleting the receiver drops its connections")
+	_delete_node(ticker_id)
+	right_tabs.current_tab = 0
 	# Particles
 	_add_node("CPUParticles3D", int(_root_node().id))
 	_property_edited("position", [0.0, 1.5, 0.0], true)
@@ -2668,6 +3062,27 @@ func _run_smoke() -> void:
 	_check(_frame() != before_sprite and _missing_assets(_tab().doc).is_empty()
 		and _mesh_bounds(Document.find(_root_node(), sprite_id)).size() == 2, "Sprite3D draws its texture and has selection bounds")
 	_undo()
+	# 2D nodes
+	var before_2d_sprite := _frame()
+	_add_node("Node2D", int(_root_node().id))
+	var holder_id: int = _tab().selected
+	_property_edited("position", [200.0, 150.0], true)
+	_add_node("Sprite2D", holder_id)
+	var ship_id: int = _tab().selected
+	_property_edited("texture", "res://models/decal.png", true)
+	_property_edited("position", [20.0, 20.0], true)
+	var ship_item := scene_dock.tree.get_selected()
+	_check(ship_item != null and ship_item.get_button_by_id(0, SceneDock.BUTTON_VISIBLE) >= 0, "2D nodes have the visibility toggle")
+	var drawn_frame := _frame()
+	var drawn: Rect2i = bridge.drawn_rect(ship_id)
+	_check(drawn_frame != before_2d_sprite and drawn.has_area() and drawn.get_center().distance_to(Vector2(220, 170)) < 2
+		and viewport._control_at(Vector2(220, 170)) == ship_id, "Sprite2D draws under its Node2D parent and is picked in the viewport")
+	viewport._begin_move_2d(ship_id, viewport._image_rect().position)
+	viewport._update_move_2d(viewport._image_rect().position + Vector2(10, 0) * viewport._image_rect().size.x / viewport.W, true)
+	viewport._nav = viewport.Nav.NONE # as when the button is released
+	viewport._drag = {}
+	_check(Document.find(_root_node(), ship_id).position[0] > 20.0, "dragging moves a Sprite2D")
+	_delete_node(holder_id)
 	# Hardware
 	_check(Hardware.boards.has("nano_esp32") and Hardware.displays.has("st7796_320x480"), "hardware profiles are loaded")
 	project.config.hardware = {"board": "esp32s3_devkitc_n8r8", "display": "st7796_320x480", "orientation": "landscape"}
@@ -2717,6 +3132,20 @@ func _run_smoke() -> void:
 	_check(Hardware.pin_label(f746, 45) == "B1 USER · PC13" and active_high == [45]
 		and not Hardware.software_spi(f746) and Hardware.problems(f746).is_empty(),
 		"Nucleo-144: the B1 USER button (pressed = high) and MOSI on D11 through the SPI peripheral")
+
+	# The RAM estimate logged before a board build: the F746's heap, the Nano's PSRAM.
+	var memory_text := func(hardware: Dictionary) -> String:
+		project.config["hardware"] = hardware
+		_apply_hardware()
+		if not _export_to(input_pack): return ""
+		var logged := output.get_parsed_text().length()
+		_report_memory()
+		return output.get_parsed_text().substr(logged)
+	var stm32_memory: String = memory_text.call({"board": "nucleo_f746zg", "pins": {"mosi": 7}})
+	var psram_memory: String = memory_text.call({"board": "nano_esp32"})
+	_check(stm32_memory.begins_with("RAM (estimate): about ") and stm32_memory.contains(" of 288 KB")
+		and psram_memory.contains(" in PSRAM (of 8 MB)") and int(_pack_memory.field) == 160 * 120 * 2,
+		"RAM estimate for boards without PSRAM (fits or not) and with it")
 	project.config.erase("hardware")
 	_apply_hardware()
 	_check(_frame().size() == 320 * 240 * 3, "default hardware is 320x240 again")
@@ -2779,5 +3208,5 @@ func _run_smoke() -> void:
 	if _smoke_failed:
 		get_tree().quit(1)
 		return
-	print("PASS: Godot UI -> GDExtension -> runtime -> Jet; nodes, undo, hierarchy, scripts, play/stop, errors, save, export, 2D, physics, particles, Input Map, scenes, autoloads, boot splash, OBJ import, serial monitor")
+	print("PASS: Godot UI -> GDExtension -> runtime -> Jet; nodes, undo, hierarchy, scripts, play/stop, errors, save, export, 2D, physics, 2D physics, 2D view, new scene roots, Change Type, Timer, signals, Signals dock connections, particles, Input Map, scenes, autoloads, boot splash, OBJ import, serial monitor")
 	get_tree().quit()

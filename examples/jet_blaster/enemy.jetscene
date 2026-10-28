@@ -1,0 +1,34 @@
+{
+	"format": "jetscene",
+	"version": 2,
+	"root": {
+		"id": 3,
+		"name": "Enemy",
+		"type": "Area2D",
+		"script": "res://scripts/enemy.jet",
+		"script_properties": {},
+		"collision_layer": 4,
+		"collision_mask": 2,
+		"monitoring": true,
+		"children": [
+			{
+				"id": 1,
+				"name": "Body",
+				"type": "AnimatedSprite2D",
+				"texture": "res://textures/enemies.png",
+				"hframes": 4,
+				"animations": "saucer 0-1 6, bug 2-3 8",
+				"autoplay": false,
+				"children": []
+			},
+			{
+				"id": 2,
+				"name": "Shape",
+				"type": "CollisionShape2D",
+				"shape": "Circle",
+				"radius": 7,
+				"children": []
+			}
+		]
+	}
+}
