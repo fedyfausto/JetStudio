@@ -25,6 +25,7 @@ public:
     void set_editor_camera(const godot::Vector3& position, const godot::Vector3& rotation, double fov);
     void use_editor_camera(bool enabled);
     void set_editor_canvas(bool enabled, double zoom, const godot::Vector2& origin);
+    bool preview_animation(int player, const godot::String& name, double time);
     void update(double delta);
     godot::Ref<godot::ImageTexture> render_frame();
     godot::Array play_start();

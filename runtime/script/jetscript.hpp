@@ -93,6 +93,7 @@ struct ClassInfo {
     std::vector<PropertyInfo> properties;
     std::vector<MethodInfo> methods;
     std::vector<SignalInfo> signals; // the ones the engine emits
+    std::vector<std::pair<std::string, Int>> constants; // Tween.TRANS_SINE...
 };
 
 enum class Status : uint8_t { Ok, NotFound, Error };
@@ -215,6 +216,8 @@ public:
     bool ready(ObjectId object);
     // Calls _process(delta) if defined. Returns false on runtime error.
     bool process(ObjectId object, Real delta);
+    // Errors are recorded; false if the value isn't a Callable.
+    bool call_callable(const Value& callable, const Value* args = nullptr, int count = 0, Value* result = nullptr);
     // Calls any script function. A missing function is not an error (returns true).
     bool call(ObjectId object, std::string_view function, const Value* args = nullptr,
               int count = 0, Value* result = nullptr);

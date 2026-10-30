@@ -626,7 +626,7 @@ void model_tests() {
     const auto bytes = encode_pack(packed, error);
     if (bytes.empty()) std::cerr << "pack: " << error << '\n';
     Description back;
-    check(decode_pack(bytes.data(), bytes.size(), back, error), "pack v16 round trips");
+    check(decode_pack(bytes.data(), bytes.size(), back, error), "pack v17 round trips");
     check(back.meshes.size() == 2 && back.meshes[0].vertices.size() == model.meshes[0].vertices.size()
           && back.meshes[0].indices == model.meshes[0].indices, "pack keeps imported meshes");
     const auto& c = back.nodes[back.nodes.size() - 2];
@@ -1735,6 +1735,153 @@ void signal_tests() {
     }
 }
 
+// Godot's Tween: steps, parallel tweeners, loops, transitions, callbacks and signals.
+void tween_tests() {
+    Description d;
+    d.nodes.push_back(node(1, -1, NodeType::Node2D, "Main"));
+    for (uint32_t i = 0; i < 4; ++i) d.nodes.push_back(node(2 + i, 0, NodeType::Node2D, std::array<const char*, 4>{"Box", "Fade", "Step", "Gone"}[i]));
+    d.nodes[0].script = 0;
+    d.scripts.push_back({"res://main.jet",
+        "extends Node2D\nvar value := 0.0\nvar ticks := 0\nvar steps := []\nvar tween\n"
+        "func _ready():\n"
+        "\ttween = create_tween()\n"
+        "\ttween.tween_property($Box, \"position\", Vector2(100, 0), 1.0)\n"
+        "\ttween.tween_property($Box, \"position:y\", 50.0, 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)\n"
+        "\ttween.tween_callback(_on_done)\n"
+        "\ttween.finished.connect(_on_finished)\n"
+        "\ttween.step_finished.connect(func_step)\n"
+        "\tvar fade = create_tween().set_parallel()\n"
+        "\tfade.tween_property($Fade, \"alpha\", 0.0, 0.5)\n"
+        "\tfade.tween_property($Fade, \"position:x\", 40.0, 0.5).set_delay(0.25)\n"
+        "\tfade.chain().tween_callback(_on_fade)\n"
+        "\tvar loop = create_tween().set_loops(3)\n"
+        "\tloop.tween_property($Step, \"position:x\", 10.0, 0.1).as_relative()\n"
+        "\tloop.tween_callback(_on_tick)\n"
+        "\tcreate_tween().tween_method(_set_value, 0.0, 10.0, 1.0)\n"
+        "\t$Gone.create_tween().tween_callback(_on_gone).set_delay(0.5)\n"
+        "\t$Gone.queue_free()\n"
+        "\tprint(\"trans \", Tween.TRANS_SINE, \" \", Tween.EASE_OUT, \" \", tween.is_valid(), \" \", tween.is_running())\n"
+        "func func_step(idx):\n\tsteps.append(idx)\n"
+        "func _on_done():\n\tprint(\"done \", $Box.position)\n"
+        "func _on_finished():\n\tprint(\"finished \", steps, \" \", tween.is_valid(), \" \", value)\n\ttween.kill()\n"
+        "func _on_fade():\n\tprint(\"fade \", $Fade.alpha, \" \", $Fade.position.x)\n"
+        "func _on_tick():\n\tticks += 1\n\tprint(\"tick \", ticks, \" \", $Step.position.x)\n"
+        "func _set_value(v):\n\tvalue = v\n"
+        "func _on_gone():\n\tprint(\"gone\")\n", {}});
+    Runtime r;
+    check(start_scene(r, d), "tween scene starts");
+    simulate(r, 0.5f);
+    check(std::abs(position_of(r, 2).x - 50) < 2, "tween_property moves along its step (linear)");
+    simulate(r, 1.3f);
+    const auto log = run_log(r);
+    auto has = [&](const std::string& text) { return std::find(log.begin(), log.end(), text) != log.end(); };
+    check(has("trans 1 1 true true"), "Tween.TRANS_* and EASE_* constants; a new tween is valid and running");
+    check(has("done (100.0, 50.0)") && std::abs(position_of(r, 2).y - 50) < 0.01f, "steps run one after the other; \"position:y\" tweens one component");
+    check(has("finished [0, 1, 2] false 10.0"), "step_finished for each step, then finished; a finished tween is no longer valid and kill() is fine; tween_method reached its end");
+    check(has("fade 0.0 40.0"), "set_parallel() runs tweeners together, set_delay() waits, chain() starts a new step");
+    check(has("tick 1 10.0") && has("tick 3 30.0") && !has("tick 4 40.0"), "set_loops(3) with as_relative() moves 10 more each loop");
+    check(!has("gone"), "a node's tween dies with it");
+    for (const auto& line : log) if (line.rfind("E ", 0) == 0) std::cerr << line << '\n';
+    check(std::none_of(log.begin(), log.end(), [](const std::string& line) { return line.rfind("E ", 0) == 0; }), "no tween errors");
+
+    // Godot's errors: appending to a started tween, a property the object doesn't have, a tween that is over.
+    for (const char* body : {"\tvar t = create_tween()\n\tt.tween_interval(0.1)\n\tawait_frame = t\n",
+                             "\tcreate_tween().tween_property(self, \"nope\", 1.0, 1.0)\n",
+                             "\tvar t = create_tween()\n\tt.kill()\n\tt.tween_interval(1.0)\n"}) {
+        Description e;
+        e.nodes.push_back(node(1, -1, NodeType::Node2D, "Main"));
+        e.nodes[0].script = 0;
+        e.scripts.push_back({"res://e.jet", std::string("extends Node2D\nvar await_frame\nvar frames := 0\nfunc _ready():\n") + body +
+            "func _process(delta):\n\tframes += 1\n\tif frames == 3 and await_frame:\n\t\tawait_frame.tween_interval(1.0)\n", {}});
+        Runtime x;
+        check(start_scene(x, e), "tween error scene starts");
+        simulate(x, 0.1f);
+        const auto errors = run_log(x);
+        const bool reported = std::any_of(errors.begin(), errors.end(), [](const std::string& line) {
+            return line.find("Can't append to a Tween that has started") != std::string::npos
+                || line.find("does not exist in Main") != std::string::npos || line.find("no longer valid") != std::string::npos;
+        });
+        check(reported, "tween misuse is reported as in Godot");
+    }
+}
+
+// Godot's AnimationPlayer: value tracks (linear, nearest, one component), method tracks, loops, signals.
+void animation_player_tests() {
+    using jetscript::Value;
+    std::string error;
+    auto key = [](float time, Value value, float transition = 1) {
+        AnimationKey k;
+        k.time = time; k.value = std::move(value); k.transition = transition;
+        return k;
+    };
+    auto call = [](float time, const char* method, std::vector<Value> args = {}) {
+        AnimationKey k;
+        k.time = time; k.method = method; k.args = std::move(args);
+        return k;
+    };
+    Description d;
+    d.nodes.push_back(node(1, -1, NodeType::Node2D, "Main"));
+    d.nodes.push_back(node(2, 0, NodeType::Node2D, "Box"));
+    auto player = node(3, 0, NodeType::AnimationPlayer, "Player");
+    Animation move;
+    move.name = "move"; move.length = 1;
+    AnimationTrack position; position.path = "Box"; position.property = "position";
+    position.keys = {key(0, Value(jetscript::Vector2{0, 0})), key(1, Value(jetscript::Vector2{100, 50}))};
+    AnimationTrack alpha; alpha.path = "Box"; alpha.property = "alpha"; alpha.interpolation = 0;
+    alpha.keys = {key(0, Value(1.0)), key(0.5, Value(0.0))};
+    AnimationTrack calls; calls.path = "."; calls.keys = {call(0.5, "_on_half", {Value(jetscript::Int(7))})};
+    move.tracks = {position, alpha, calls};
+    Animation spin;
+    spin.name = "spin"; spin.length = 0.5; spin.loop = 1;
+    AnimationTrack x; x.path = "Box"; x.property = "position:x"; x.keys = {key(0, Value(0.0)), key(0.5, Value(10.0))};
+    AnimationTrack ticks; ticks.path = "."; ticks.keys = {call(0, "_on_spin")};
+    spin.tracks = {x, ticks};
+    player.extras().player_animations = {move, spin};
+    player.extras().animation = "move";
+    d.nodes.push_back(player);
+    d.nodes[0].script = 0;
+    d.scripts.push_back({"res://main.jet",
+        "extends Node2D\nvar spins := 0\n"
+        "func _ready():\n\t$Player.animation_finished.connect(_on_finished)\n"
+        "\tprint(\"lists \", $Player.get_animation_list(), \" \", $Player.has_animation(\"spin\"), \" \", $Player.current_animation)\n"
+        "func _on_half(v):\n\tprint(\"half \", v, \" \", $Box.alpha)\n"
+        "func _on_finished(anim):\n\tprint(\"finished \", anim, \" \", $Box.position, \" \", $Player.is_playing())\n\t$Player.play(\"spin\")\n"
+        "func _on_spin():\n\tspins += 1\n\tif spins == 3:\n\t\t$Player.stop()\n\t\tprint(\"stopped \", $Box.position.x, \" \", $Player.current_animation)\n"
+        "\t\t$Player.play_backwards(\"move\")\n\t\t$Player.seek(0.25, true)\n"
+        "\t\tprint(\"seek \", $Player.current_animation_position, \" \", $Box.position)\n", {}});
+
+    const auto bytes = encode_pack(d, error);
+    Description back;
+    check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[2].more().player_animations.size() == 2
+          && back.nodes[2].more().player_animations[0].tracks[2].keys[0].method == "_on_half" && back.nodes[2].more().animation == "move",
+          "the package keeps an AnimationPlayer's animations (v17)");
+
+    Runtime r;
+    std::vector<ScriptDiagnostic> diagnostics;
+    check(r.load_pack(bytes.data(), bytes.size(), error) && r.start(diagnostics), "AnimationPlayer scene starts");
+    simulate(r, 0.5f);
+    check(std::abs(position_of(r, 2).x - 50) < 2 && std::abs(position_of(r, 2).y - 25) < 1, "a value track interpolates (autoplay)");
+    simulate(r, 0.6f);
+    simulate(r, 0.55f * 3);
+    simulate(r, 0.05f);
+    const auto log = run_log(r);
+    auto has = [&](const std::string& text) { return std::find(log.begin(), log.end(), text) != log.end(); };
+    check(has("lists [\"move\", \"spin\"] true move"), "get_animation_list(), has_animation(), current_animation");
+    check(has("half 7 0.0"), "a method key calls with its arguments; nearest keys jump");
+    check(has("finished move (100.0, 50.0) false"), "animation_finished at the end of a non-looping animation, values at its end");
+    check(has("stopped 0.0 "), "a looping animation calls its first key each loop; stop() goes back to its start");
+    check(has("seek 0.25 (25.0, 12.5)"), "play_backwards() and seek(time, true) update the pose");
+    for (const auto& line : log) if (line.rfind("E ", 0) == 0) std::cerr << line << '\n';
+
+    // The editor previews a pose without playing.
+    Runtime editor;
+    check(editor.load(d, error) && editor.preview_animation(3, "move", 0.5f) && std::abs(position_of(editor, 2).x - 50) < 0.01f,
+          "the editor previews an animation at a time");
+    Description bad = d;
+    bad.nodes[2].extras().player_animations[0].tracks[0].keys[1].time = 5;
+    check(!editor.load(bad, error), "keys past the animation's length are refused");
+}
+
 int main(int argc, char** argv) {
     std::string error;
     bytecode_tests();
@@ -1749,6 +1896,8 @@ int main(int argc, char** argv) {
     twod_tests();
     physics2d_tests();
     signal_tests();
+    tween_tests();
+    animation_player_tests();
     Runtime runtime;
     const Description base = scene();
     check(runtime.load(base, error), "valid scene loads");
@@ -2006,5 +2155,5 @@ int main(int argc, char** argv) {
     }
 
     if (failures) { std::cerr << failures << " runtime test(s) failed\n"; return 1; }
-    std::cout << "PASS: hierarchy, Godot transforms, validation, picking, scripts, input, queue_free, errors, bytecode, textures, materials, sky, OBJ import, quantization, Quad/Torus, reflections, 2D nodes, draw order, resolution, physics, particles, input map, scenes, autoloads, Sprite3D, plain Control, slim nodes, RAM estimate, instantiate, 2D nodes, 2D physics, signals, Timer, scene connections, pack v16\n";
+    std::cout << "PASS: hierarchy, Godot transforms, validation, picking, scripts, input, queue_free, errors, bytecode, textures, materials, sky, OBJ import, quantization, Quad/Torus, reflections, 2D nodes, draw order, resolution, physics, particles, input map, scenes, autoloads, Sprite3D, plain Control, slim nodes, RAM estimate, instantiate, 2D nodes, 2D physics, signals, Timer, scene connections, tweens, AnimationPlayer, pack v17\n";
 }

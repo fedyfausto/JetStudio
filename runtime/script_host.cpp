@@ -19,8 +19,9 @@ enum Property : int {
     CollisionLayer, CollisionMask, Friction, Bounce,
     Emitting, Amount, Lifetime, OneShot, Explosiveness, LifetimeRandomness, Direction, Spread, Gravity,
     InitialVelocityMin, InitialVelocityMax, DampingMin, DampingMax, CurrentScene,
-    Frame, Hframes, Vframes, FlipH, FlipV, PixelSize, Modulate, ZIndex, Centered, Offset, Animation, SpeedScale, Zoom, Enabled,
-    OneWayCollision, WaitTime, Autostart, Paused, TimeLeft, PropertyCount
+    Frame, Hframes, Vframes, FlipH, FlipV, PixelSize, Modulate, ZIndex, Centered, Offset, AnimationName, SpeedScale, Zoom, Enabled,
+    OneWayCollision, WaitTime, Autostart, Paused, TimeLeft, CurrentAnimation, CurrentAnimationPosition, CurrentAnimationLength,
+    Autoplay, PropertyCount
 };
 const char* const property_names[PropertyCount] = {
     "name", "position", "rotation", "rotation_degrees", "scale", "visible", "global_position",
@@ -31,7 +32,8 @@ const char* const property_names[PropertyCount] = {
     "emitting", "amount", "lifetime", "one_shot", "explosiveness", "lifetime_randomness", "direction", "spread", "gravity",
     "initial_velocity_min", "initial_velocity_max", "damping_min", "damping_max", "current_scene",
     "frame", "hframes", "vframes", "flip_h", "flip_v", "pixel_size", "modulate", "z_index", "centered", "offset", "animation",
-    "speed_scale", "zoom", "enabled", "one_way_collision", "wait_time", "autostart", "paused", "time_left"};
+    "speed_scale", "zoom", "enabled", "one_way_collision", "wait_time", "autostart", "paused", "time_left", "current_animation",
+    "current_animation_position", "current_animation_length", "autoplay"};
 
 enum Method : int {
     GetNode, GetNodeOrNull, GetParent, GetChildren, GetChild, GetChildCount, FindChild, QueueFree,
@@ -41,6 +43,9 @@ enum Method : int {
     GetOverlappingBodies, HasOverlappingBodies, OverlapsBody, Restart, GetTree, ChangeSceneToFile, ReloadCurrentScene,
     AddChild, RemoveChild, Instantiate, Rotate, Play, Stop, IsPlaying, GetOverlappingAreas, HasOverlappingAreas, OverlapsArea,
     Start, IsStopped,
+    CreateTween, TweenProperty, TweenInterval, TweenCallback, TweenMethod, SetLoops, SetParallel, Parallel, Chain, SetTrans,
+    SetEase, SetSpeedScale, Kill, Pause, IsRunning, IsValid, BindNode, GetTotalElapsedTime, From, FromCurrent, AsRelative,
+    SetDelay, PlayBackwards, Seek, HasAnimation, GetAnimationList,
     MethodCount
 };
 const char* const method_names[MethodCount] = {
@@ -50,14 +55,18 @@ const char* const method_names[MethodCount] = {
     "move_and_slide", "is_on_floor", "is_on_wall", "is_on_ceiling", "get_floor_normal", "apply_central_impulse", "apply_impulse",
     "apply_central_force", "get_overlapping_bodies", "has_overlapping_bodies", "overlaps_body", "restart", "get_tree",
     "change_scene_to_file", "reload_current_scene", "add_child", "remove_child", "instantiate", "rotate", "play", "stop", "is_playing",
-    "get_overlapping_areas", "has_overlapping_areas", "overlaps_area", "start", "is_stopped"};
+    "get_overlapping_areas", "has_overlapping_areas", "overlaps_area", "start", "is_stopped",
+    "create_tween", "tween_property", "tween_interval", "tween_callback", "tween_method", "set_loops", "set_parallel", "parallel",
+    "chain", "set_trans", "set_ease", "set_speed_scale", "kill", "pause", "is_running", "is_valid", "bind_node",
+    "get_total_elapsed_time", "from", "from_current", "as_relative", "set_delay", "play_backwards", "seek", "has_animation",
+    "get_animation_list"};
 
 const std::vector<ClassInfo>& class_list() {
     static const std::vector<ClassInfo> classes = [] {
         std::vector<ClassInfo> c;
         auto add = [&](const char* name, const char* base, std::vector<jetscript::PropertyInfo> properties,
                        std::vector<jetscript::MethodInfo> methods, std::vector<jetscript::SignalInfo> signals = {}) {
-            c.push_back({name, base, std::move(properties), std::move(methods), std::move(signals)});
+            c.push_back({name, base, std::move(properties), std::move(methods), std::move(signals), {}});
         };
         const std::vector<jetscript::SignalInfo> area_signals = {
             {"body_entered", {"body"}}, {"body_exited", {"body"}}, {"area_entered", {"area"}}, {"area_exited", {"area"}}};
@@ -65,7 +74,7 @@ const std::vector<ClassInfo>& class_list() {
             {{"get_node", 1, 1, Type::Object}, {"get_node_or_null", 1, 1, Type::Object}, {"get_parent", 0, 0, Type::Object},
              {"get_children", 0, 0, Type::Array}, {"get_child", 1, 1, Type::Object}, {"get_child_count", 0, 0, Type::Int},
              {"find_child", 1, 1, Type::Object}, {"queue_free", 0, 0, Type::Nil}, {"get_tree", 0, 0, Type::Object},
-             {"add_child", 1, 2, Type::Nil}, {"remove_child", 1, 1, Type::Nil},
+             {"add_child", 1, 2, Type::Nil}, {"remove_child", 1, 1, Type::Nil}, {"create_tween", 0, 0, Type::Object},
              // run by the VM, listed for the editor's completion
              {"connect", 2, 3, Type::Int}, {"disconnect", 2, 2, Type::Nil}, {"is_connected", 2, 2, Type::Bool},
              {"emit_signal", 1, -1, Type::Int}, {"has_signal", 1, 1, Type::Bool}});
@@ -149,8 +158,34 @@ const std::vector<ClassInfo>& class_list() {
             {{"wait_time", Type::Float}, {"one_shot", Type::Bool}, {"autostart", Type::Bool}, {"paused", Type::Bool},
              {"time_left", Type::Float, true}},
             {{"start", 0, 1}, {"stop", 0, 0}, {"is_stopped", 0, 0, Type::Bool}}, {{"timeout", {}}});
+        add("AnimationPlayer", "Node",
+            {{"current_animation", Type::String}, {"current_animation_position", Type::Float, true},
+             {"current_animation_length", Type::Float, true}, {"autoplay", Type::String}, {"speed_scale", Type::Float}},
+            {{"play", 0, 4}, {"play_backwards", 0, 2}, {"stop", 0, 1}, {"pause", 0, 0}, {"is_playing", 0, 0, Type::Bool},
+             {"seek", 1, 2}, {"has_animation", 1, 1, Type::Bool}, {"get_animation_list", 0, 0, Type::Array}},
+            {{"animation_started", {"anim_name"}}, {"animation_finished", {"anim_name"}}});
         add("SceneTree", "", {{"current_scene", Type::Object, true}},
-            {{"change_scene_to_file", 1, 1, Type::Int}, {"reload_current_scene", 0, 0, Type::Int}});
+            {{"change_scene_to_file", 1, 1, Type::Int}, {"reload_current_scene", 0, 0, Type::Int}, {"create_tween", 0, 0, Type::Object}});
+        add("Tween", "", {},
+            {{"tween_property", 4, 4, Type::Object}, {"tween_interval", 1, 1, Type::Object}, {"tween_callback", 1, 1, Type::Object},
+             {"tween_method", 4, 4, Type::Object}, {"set_loops", 0, 1, Type::Object}, {"set_parallel", 0, 1, Type::Object},
+             {"parallel", 0, 0, Type::Object}, {"chain", 0, 0, Type::Object}, {"set_trans", 1, 1, Type::Object},
+             {"set_ease", 1, 1, Type::Object}, {"set_speed_scale", 1, 1, Type::Object}, {"bind_node", 1, 1, Type::Object},
+             {"kill", 0, 0}, {"stop", 0, 0}, {"pause", 0, 0}, {"play", 0, 0}, {"is_running", 0, 0, Type::Bool},
+             {"is_valid", 0, 0, Type::Bool}, {"get_total_elapsed_time", 0, 0, Type::Float}},
+            {{"finished", {}}, {"step_finished", {"idx"}}, {"loop_finished", {"loop_count"}}});
+        c.back().constants = {{"TRANS_LINEAR", 0}, {"TRANS_SINE", 1}, {"TRANS_QUINT", 2}, {"TRANS_QUART", 3}, {"TRANS_QUAD", 4},
+                              {"TRANS_EXPO", 5}, {"TRANS_ELASTIC", 6}, {"TRANS_CUBIC", 7}, {"TRANS_CIRC", 8}, {"TRANS_BOUNCE", 9},
+                              {"TRANS_BACK", 10}, {"TRANS_SPRING", 11}, {"EASE_IN", 0}, {"EASE_OUT", 1}, {"EASE_IN_OUT", 2},
+                              {"EASE_OUT_IN", 3}};
+        add("Tweener", "", {}, {}, {{"finished", {}}});
+        add("PropertyTweener", "Tweener", {},
+            {{"from", 1, 1, Type::Object}, {"from_current", 0, 0, Type::Object}, {"as_relative", 0, 0, Type::Object},
+             {"set_trans", 1, 1, Type::Object}, {"set_ease", 1, 1, Type::Object}, {"set_delay", 1, 1, Type::Object}});
+        add("IntervalTweener", "Tweener", {}, {});
+        add("CallbackTweener", "Tweener", {}, {{"set_delay", 1, 1, Type::Object}});
+        add("MethodTweener", "Tweener", {},
+            {{"set_trans", 1, 1, Type::Object}, {"set_ease", 1, 1, Type::Object}, {"set_delay", 1, 1, Type::Object}});
         add("Input", "", {},
             {{"is_action_pressed", 1, 1, Type::Bool}, {"is_action_just_pressed", 1, 1, Type::Bool},
              {"is_action_just_released", 1, 1, Type::Bool}, {"get_axis", 2, 2, Type::Float}});
@@ -177,7 +212,10 @@ bool has_property(NodeType type, int p) {
     case ZIndex: return is_node2d(type);
     case Centered: return type == NodeType::Sprite2D || type == NodeType::AnimatedSprite2D;
     case Offset: return type == NodeType::Sprite2D || type == NodeType::AnimatedSprite2D || type == NodeType::Camera2D;
-    case Animation: case SpeedScale: return type == NodeType::AnimatedSprite2D;
+    case AnimationName: return type == NodeType::AnimatedSprite2D;
+    case SpeedScale: return type == NodeType::AnimatedSprite2D || type == NodeType::AnimationPlayer;
+    case CurrentAnimation: case CurrentAnimationPosition: case CurrentAnimationLength: case Autoplay:
+        return type == NodeType::AnimationPlayer;
     case Zoom: case Enabled: return type == NodeType::Camera2D;
     case UvOffset: case UvScale: case PerspectiveCorrect: case TextureFilter: return type == NodeType::MeshInstance3D;
     case Text: return type == NodeType::Label;
@@ -211,9 +249,11 @@ bool node_has_method(NodeType type, int m) {
     if (m == Translate || m == LookAt || m == IsVisibleInTree || m == Rotate) return is_node3d(type) ? m != Rotate : is_node2d(type);
     if (m <= IsVisibleInTree) return is_node3d(type);
     if (m == MakeCurrent) return type == NodeType::Camera3D || type == NodeType::Camera2D;
-    if (m == Play || m == IsPlaying) return type == NodeType::AnimatedSprite2D;
-    if (m == Stop) return type == NodeType::AnimatedSprite2D || type == NodeType::Timer;
+    if (m == Play || m == IsPlaying) return type == NodeType::AnimatedSprite2D || type == NodeType::AnimationPlayer;
+    if (m == Stop) return type == NodeType::AnimatedSprite2D || type == NodeType::Timer || type == NodeType::AnimationPlayer;
+    if (m == Pause || m == PlayBackwards || m == Seek || m == HasAnimation || m == GetAnimationList) return type == NodeType::AnimationPlayer;
     if (m == Start || m == IsStopped) return type == NodeType::Timer;
+    if (m == CreateTween) return true;
     if (m >= MoveAndSlide && m <= GetFloorNormal) return physics::is_character(type);
     if (m >= ApplyCentralImpulse && m <= ApplyCentralForce) return physics::is_rigid(type);
     if ((m >= GetOverlappingBodies && m <= OverlapsBody) || (m >= GetOverlappingAreas && m <= OverlapsArea)) return physics::is_area(type);
@@ -249,9 +289,25 @@ std::string_view ScriptHost::scene_path(ObjectId id) const {
     return i <= d.scenes.size() ? std::string_view(d.scenes[i - 1].path) : std::string_view();
 }
 
+// Tweens stay objects after they finish, as Godot's RefCounted ones: ids are never reused.
+bool ScriptHost::is_tween(ObjectId id) const {
+    return runtime_ && ((id >= TweenIdBase && id < runtime_->next_tween_id_) || (id >= TweenerIdBase && id < runtime_->next_tweener_id_));
+}
+
 std::string_view ScriptHost::class_of(ObjectId id) const {
     if (id == InputId) return "Input";
     if (id == TreeId) return "SceneTree";
+    if (is_tween(id)) {
+        if (id < TweenerIdBase) return "Tween";
+        const auto* tw = runtime_->tweener_of(id);
+        if (!tw) return "Tweener";
+        switch (tw->kind) {
+        case Runtime::Tweener::Kind::Property: return "PropertyTweener";
+        case Runtime::Tweener::Kind::Interval: return "IntervalTweener";
+        case Runtime::Tweener::Kind::Callback: return "CallbackTweener";
+        case Runtime::Tweener::Kind::Method: return "MethodTweener";
+        }
+    }
     if (!scene_path(id).empty()) return "PackedScene";
     if (!runtime_) return {};
     const int index = runtime_->index_of(id);
@@ -282,6 +338,7 @@ ObjectId ScriptHost::singleton(std::string_view name) const {
 // From the node types, so the device never builds the class list (it's for the compiler).
 bool ScriptHost::has_signal(ObjectId id, std::string_view name) const {
     if (!runtime_) return false;
+    if (is_tween(id)) return name == "finished" || (id < TweenerIdBase && (name == "step_finished" || name == "loop_finished"));
     const int index = runtime_->index_of(id);
     if (index < 0 || runtime_->nodes_[index].freed) return false;
     const NodeType type = runtime_->nodes_[index].d.type;
@@ -290,6 +347,7 @@ bool ScriptHost::has_signal(ObjectId id, std::string_view name) const {
     if (type == NodeType::Timer) return name == "timeout";
     if (type == NodeType::AnimatedSprite2D) return name == "animation_finished";
     if (type == NodeType::CPUParticles3D) return name == "finished";
+    if (type == NodeType::AnimationPlayer) return name == "animation_started" || name == "animation_finished";
     return false;
 }
 
@@ -297,7 +355,14 @@ bool ScriptHost::has_method(ObjectId id, std::string_view name) const {
     const int m = method_id(name);
     if (m < 0) return false;
     if (id == InputId) return m >= IsActionPressed && m <= GetAxis;
-    if (id == TreeId) return m == ChangeSceneToFile || m == ReloadCurrentScene;
+    if (id == TreeId) return m == ChangeSceneToFile || m == ReloadCurrentScene || m == CreateTween;
+    if (is_tween(id)) {
+        const ClassInfo* info = find_class(class_of(id));
+        if (info)
+            for (const auto& method : info->methods)
+                if (method.name == name) return true;
+        return false;
+    }
     if (!scene_path(id).empty()) return m == Instantiate;
     if (!runtime_) return false;
     const int index = runtime_->index_of(id);
@@ -307,6 +372,7 @@ bool ScriptHost::has_method(ObjectId id, std::string_view name) const {
 std::string ScriptHost::describe(ObjectId id) const {
     if (id == InputId) return "<Input>";
     if (id == TreeId) return "<SceneTree>";
+    if (is_tween(id)) return "<" + std::string(class_of(id)) + "#" + std::to_string(id) + ">";
     if (!scene_path(id).empty()) return "<PackedScene:" + std::string(scene_path(id)) + ">";
     if (runtime_) {
         const int index = runtime_->index_of(id);
@@ -377,7 +443,7 @@ Status ScriptHost::get_property(ObjectId id, int p, Value& out, std::string& err
         case ZIndex: out = Value(jetscript::Int(d.z_index)); return Status::Ok;
         case Centered: out = Value(d.centered); return Status::Ok;
         case Offset: out = Value(jetscript::Vector2{d.offset[0], d.offset[1]}); return Status::Ok;
-        case Animation: out = Value(d.more().animation); return Status::Ok;
+        case AnimationName: out = Value(d.more().animation); return Status::Ok;
         case SpeedScale: out = Value(d.more().speed_scale); return Status::Ok;
         case Zoom: out = Value(jetscript::Vector2{d.more().zoom[0], d.more().zoom[1]}); return Status::Ok;
         case Enabled: out = Value(d.more().current); return Status::Ok;
@@ -447,6 +513,18 @@ Status ScriptHost::get_property(ObjectId id, int p, Value& out, std::string& err
     case WaitTime: out = Value(d.more().lifetime); break;
     case Autostart: out = Value(d.more().autoplay); break;
     case Paused: out = Value(d.more().paused); break;
+    case SpeedScale: out = Value(d.more().speed_scale); break;
+    case Autoplay: out = Value(d.more().animation); break;
+    case CurrentAnimation: case CurrentAnimationPosition: case CurrentAnimationLength: {
+        // Godot: the animation playing (or paused partway), "" otherwise.
+        const auto& e = d.more();
+        const jetstudio::Animation* a = e.player_current >= 0 ? &e.player_animations[size_t(e.player_current)] : nullptr;
+        const bool current = a && (e.playing || (e.anim_time > 0 && e.anim_time < a->length));
+        if (p == CurrentAnimation) out = Value(current ? std::string_view(a->name) : std::string_view());
+        else if (p == CurrentAnimationPosition) out = Value(a ? e.anim_time : 0.0f);
+        else out = Value(a ? a->length : 0.0f);
+        break;
+    }
     case TimeLeft: out = Value(d.more().playing ? std::max(live.cycle, 0.0f) : 0.0f); break;
     }
     return Status::Ok;
@@ -546,7 +624,7 @@ Status ScriptHost::set_property(ObjectId id, int p, const Value& v, std::string&
             break;
         case Centered: ok = expect(Type::Bool); if (ok) d.centered = v.truthy(); break;
         case Offset: ok = vector2(100000); if (ok) { d.offset[0] = w.x; d.offset[1] = w.y; } break;
-        case Animation: {
+        case AnimationName: {
             ok = expect(Type::String);
             if (!ok) break;
             // Switching keeps it playing (from the new animation's start) or stopped, as in Godot.
@@ -620,6 +698,19 @@ Status ScriptHost::set_property(ObjectId id, int p, const Value& v, std::string&
     case WaitTime: ok = number(d.extras().lifetime, 0.001f, 100000); break;
     case Autostart: ok = expect(Type::Bool); if (ok) d.extras().autoplay = v.truthy(); break;
     case Paused: ok = expect(Type::Bool); if (ok) d.extras().paused = v.truthy(); break;
+    case SpeedScale: ok = number(d.extras().speed_scale, -100, 100); break;
+    case Autoplay: ok = expect(Type::String); if (ok) d.extras().animation = std::string(v.as_string()); break;
+    case CurrentAnimation:
+        ok = expect(Type::String);
+        if (ok && v.as_string().empty()) runtime_->stop_player(live, true);
+        else if (ok && !runtime_->play_player(live, v.as_string(), 1, false)) {
+            error = "Animation not found: '" + std::string(v.as_string()) + "'.";
+            ok = false;
+        }
+        break;
+    case CurrentAnimationPosition: case CurrentAnimationLength:
+        error = std::string("Property '") + property_names[p] + "' is read-only.";
+        return Status::Error;
     case TimeLeft: error = "Property 'time_left' is read-only."; return Status::Error;
     case Explosiveness: ok = number(d.extras().explosiveness, 0, 1); break;
     case LifetimeRandomness: ok = number(d.extras().lifetime_randomness, 0, 1); break;
@@ -722,7 +813,13 @@ Status ScriptHost::call_method(ObjectId id, int m, const Value* args, int count,
         out = args[i].as_string();
         return true;
     };
+    if (is_tween(id)) return tween_call(id, m, args, count, result, error);
     if (id == TreeId) {
+        if (m == CreateTween) {
+            result = Value::object(runtime_->create_tween(0));
+            if (result.is_nil()) { error = "Too many tweens at once (at most 256)."; return Status::Error; }
+            return Status::Ok;
+        }
         if (m == ChangeSceneToFile) { // returns OK (0) or ERR_CANT_OPEN (19), as in Godot
             std::string_view path;
             if (!arg_string(0, path)) return Status::Error;
@@ -889,6 +986,16 @@ Status ScriptHost::call_method(ObjectId id, int m, const Value* args, int count,
     case Play: {
         std::string_view name;
         if (count >= 1 && !arg_string(0, name)) return Status::Error;
+        if (node.d.type == NodeType::AnimationPlayer) {
+            // Godot's play(name, custom_blend, custom_speed, from_end); blending is not supported.
+            float speed = 1;
+            if (count >= 3 && !number(2, speed)) return Status::Error;
+            if (!runtime_->play_player(node, name, speed, count >= 4 && args[3].truthy())) {
+                error = name.empty() ? "AnimationPlayer has no animation to play." : "Animation not found: '" + std::string(name) + "'.";
+                return Status::Error;
+            }
+            return Status::Ok;
+        }
         if (!runtime_->play_animation(node, name)) {
             error = name.empty() ? "AnimatedSprite2D has no animations: set them in the Inspector." :
                                    "There is no animation with name '" + std::string(name) + "'.";
@@ -897,6 +1004,10 @@ Status ScriptHost::call_method(ObjectId id, int m, const Value* args, int count,
         return Status::Ok;
     }
     case Stop:
+        if (node.d.type == NodeType::AnimationPlayer) {
+            runtime_->stop_player(node, count >= 1 && args[0].truthy());
+            return Status::Ok;
+        }
         node.d.extras().playing = false;
         if (node.d.type == NodeType::Timer) {
             node.cycle = 0;
@@ -916,6 +1027,32 @@ Status ScriptHost::call_method(ObjectId id, int m, const Value* args, int count,
     }
     case IsStopped: result = Value(!node.d.more().playing); return Status::Ok;
     case IsPlaying: result = Value(node.d.more().playing); return Status::Ok;
+    case Pause: node.d.extras().playing = false; return Status::Ok;
+    case PlayBackwards: case Seek: case HasAnimation: case GetAnimationList: {
+        const auto& animations = node.d.more().player_animations;
+        std::string_view name;
+        if (m == GetAnimationList) {
+            result = Value::new_array();
+            for (const auto& a : animations) result.array_push(Value(a.name));
+            return Status::Ok;
+        }
+        if (m == Seek) {
+            float time = 0;
+            if (!number(0, time)) return Status::Error;
+            runtime_->seek_player(node, time, count >= 2 && args[1].truthy());
+            return Status::Ok;
+        }
+        if ((count >= 1 || m == HasAnimation) && !arg_string(0, name)) return Status::Error;
+        if (m == HasAnimation) {
+            result = Value(std::any_of(animations.begin(), animations.end(), [&](const jetstudio::Animation& a) { return a.name == name; }));
+            return Status::Ok;
+        }
+        if (!runtime_->play_player(node, name, -1, true)) {
+            error = name.empty() ? "AnimationPlayer has no animation to play." : "Animation not found: '" + std::string(name) + "'.";
+            return Status::Error;
+        }
+        return Status::Ok;
+    }
     case Rotate:
         if (count < 1 || !args[0].is_number()) { error = "Invalid argument for 'rotate': expected float (radians)."; return Status::Error; }
         node.d.rotation.z += args[0].as_real() * 180.0f / Pi;
@@ -1019,8 +1156,187 @@ Status ScriptHost::call_method(ObjectId id, int m, const Value* args, int count,
     }
     case Restart: runtime_->restart_particles(node); return Status::Ok;
     case GetTree: result = Value::object(TreeId); return Status::Ok;
+    case CreateTween:
+        result = Value::object(runtime_->create_tween(id));
+        if (result.is_nil()) { error = "Too many tweens at once (at most 256)."; return Status::Error; }
+        return Status::Ok;
     }
     return Status::NotFound;
+}
+
+// A finished or killed tween can still be queried, not extended.
+Status ScriptHost::tween_call(ObjectId id, int m, const Value* args, int count, Value& result, std::string& error) {
+    Runtime& r = *runtime_;
+    auto number = [&](int i, float& out, float low) {
+        if (i < count && args[i].is_number() && std::isfinite(args[i].as_real()) && args[i].as_real() >= low) {
+            out = args[i].as_real();
+            return true;
+        }
+        error = std::string("Invalid argument ") + std::to_string(i + 1) + " for '" + method_names[m] + "': expected a number"
+            + (low >= 0 ? " not below 0." : ".");
+        return false;
+    };
+    auto choice = [&](int high, uint8_t& out) {
+        if (count >= 1 && args[0].type() == Type::Int && args[0].as_int() >= 0 && args[0].as_int() <= high) {
+            out = uint8_t(args[0].as_int());
+            return true;
+        }
+        error = std::string("Invalid argument for '") + method_names[m] + "': expected a Tween." + (m == SetTrans ? "TRANS_*" : "EASE_*") + " constant.";
+        return false;
+    };
+    result = Value::object(id); // the setters chain
+
+    if (id >= TweenerIdBase) {
+        Runtime::Tweener* tw = r.tweener_of(id);
+        if (!tw) return m == SetTrans || m == SetEase || m == SetDelay || m == From || m == FromCurrent || m == AsRelative
+            ? Status::Ok : Status::NotFound; // its tween is over: nothing left to change
+        const bool property = tw->kind == Runtime::Tweener::Kind::Property, method = tw->kind == Runtime::Tweener::Kind::Method;
+        float delay = 0;
+        switch (m) {
+        case SetTrans: if (!(property || method)) return Status::NotFound; return choice(11, tw->trans) ? Status::Ok : Status::Error;
+        case SetEase: if (!(property || method)) return Status::NotFound; return choice(3, tw->ease) ? Status::Ok : Status::Error;
+        case SetDelay:
+            if (tw->kind == Runtime::Tweener::Kind::Interval) return Status::NotFound;
+            if (!number(0, delay, 0)) return Status::Error;
+            tw->delay = delay;
+            return Status::Ok;
+        case From:
+            if (!property) return Status::NotFound;
+            tw->from = args[0];
+            tw->has_from = true;
+            return Status::Ok;
+        case FromCurrent: {
+            if (!property) return Status::NotFound;
+            Value now;
+            if (get_property(tw->target, tw->property, now, error) != Status::Ok) return Status::Error;
+            if (tw->component >= 0) now = Value(now.type() == Type::Vector2 ? (tw->component == 0 ? now.as_vector2().x : now.as_vector2().y)
+                : tw->component == 0 ? now.as_vector3().x : tw->component == 1 ? now.as_vector3().y : now.as_vector3().z);
+            tw->from = now;
+            tw->has_from = true;
+            return Status::Ok;
+        }
+        case AsRelative: if (!property) return Status::NotFound; tw->relative = true; return Status::Ok;
+        default: return Status::NotFound;
+        }
+    }
+
+    Runtime::Tween* t = r.tween_of(id);
+    if (!t) {
+        switch (m) {
+        case IsValid: case IsRunning: result = Value(false); return Status::Ok;
+        case GetTotalElapsedTime: result = Value(0.0f); return Status::Ok;
+        case Kill: case Stop: case Pause: case Play: result = Value(); return Status::Ok;
+        default:
+            if (m < 0 || m >= MethodCount || !has_method(id, method_names[m])) return Status::NotFound;
+            error = "The Tween is no longer valid: it finished or was killed. Create a new one with create_tween().";
+            return Status::Error;
+        }
+    }
+    auto appending = [&]() {
+        if (!t->started) return true;
+        error = "Can't append to a Tween that has started. Use stop() first.";
+        return false;
+    };
+    switch (m) {
+    case TweenProperty: {
+        float duration = 0;
+        if (!appending()) return Status::Error;
+        if (args[0].type() != Type::Object || args[1].type() != Type::String) {
+            error = "tween_property() needs an object and the property's name.";
+            return Status::Error;
+        }
+        // "position:x" tweens one component.
+        std::string_view name = args[1].as_string();
+        int8_t component = -1;
+        const size_t colon = name.find(':');
+        if (colon != std::string_view::npos) {
+            const std::string_view part = name.substr(colon + 1);
+            component = part == "x" || part == "r" ? 0 : part == "y" || part == "g" ? 1 : part == "z" || part == "b" ? 2 : -2;
+            name = name.substr(0, colon);
+        }
+        const ObjectId target = args[0].as_object();
+        const int property = property_id(name);
+        Value now;
+        std::string ignored;
+        if (component == -2 || property < 0 || get_property(target, property, now, ignored) != Status::Ok
+            || (component >= 0 && now.type() != Type::Vector2 && now.type() != Type::Vector3 && now.type() != Type::Color)
+            || (component == 2 && now.type() == Type::Vector2)) {
+            error = "The tweened property \"" + std::string(args[1].as_string()) + "\" does not exist in " + describe(target) + ".";
+            return Status::Error;
+        }
+        if (!number(3, duration, 0)) return Status::Error;
+        auto& tw = r.add_tweener(*t, Runtime::Tweener::Kind::Property);
+        tw.target = target;
+        tw.property = property;
+        tw.component = component;
+        tw.to = args[2];
+        tw.duration = duration;
+        result = Value::object(tw.id);
+        return Status::Ok;
+    }
+    case TweenInterval: {
+        float time = 0;
+        if (!appending() || !number(0, time, 0)) return Status::Error;
+        auto& tw = r.add_tweener(*t, Runtime::Tweener::Kind::Interval);
+        tw.duration = time;
+        result = Value::object(tw.id);
+        return Status::Ok;
+    }
+    case TweenCallback:
+    case TweenMethod: {
+        float duration = 0;
+        if (!appending()) return Status::Error;
+        if (args[0].type() != Type::Callable) {
+            error = std::string("Invalid argument for '") + method_names[m] + "': expected a Callable.";
+            return Status::Error;
+        }
+        if (m == TweenMethod && !number(3, duration, 0)) return Status::Error;
+        auto& tw = r.add_tweener(*t, m == TweenMethod ? Runtime::Tweener::Kind::Method : Runtime::Tweener::Kind::Callback);
+        tw.callable = args[0];
+        if (m == TweenMethod) {
+            tw.from = args[1];
+            tw.to = args[2];
+            tw.duration = duration;
+        }
+        result = Value::object(tw.id);
+        return Status::Ok;
+    }
+    case SetLoops:
+        if (count >= 1 && (args[0].type() != Type::Int || args[0].as_int() < 0)) {
+            error = "Invalid argument for 'set_loops': expected an int, 0 for endless loops.";
+            return Status::Error;
+        }
+        t->loops = count >= 1 ? int(std::min<jetscript::Int>(args[0].as_int(), 1000000)) : 0;
+        return Status::Ok;
+    case SetParallel: t->parallel = count < 1 || args[0].truthy(); return Status::Ok;
+    case Parallel: t->join_next = true; return Status::Ok;
+    case Chain: t->new_step = true; return Status::Ok;
+    case SetTrans: return choice(11, t->trans) ? Status::Ok : Status::Error;
+    case SetEase: return choice(3, t->ease) ? Status::Ok : Status::Error;
+    case SetSpeedScale: return number(0, t->speed, 0) ? Status::Ok : Status::Error;
+    case BindNode:
+        if (count < 1 || args[0].type() != Type::Object || r.index_of(args[0].as_object()) < 0) {
+            error = "Invalid argument for 'bind_node': expected a node.";
+            return Status::Error;
+        }
+        t->bound = args[0].as_object();
+        return Status::Ok;
+    case Kill: t->done = true; result = Value(); return Status::Ok;
+    case Pause: t->running = false; result = Value(); return Status::Ok;
+    case Play: t->running = true; result = Value(); return Status::Ok;
+    case Stop:
+        // Back to the start; play() runs it again.
+        t->running = t->started = false;
+        t->step = t->loop = 0;
+        t->step_time = t->elapsed = 0;
+        for (auto& tw : t->tweeners) tw.started = tw.finished = false;
+        result = Value();
+        return Status::Ok;
+    case IsRunning: result = Value(t->running); return Status::Ok;
+    case IsValid: result = Value(true); return Status::Ok;
+    case GetTotalElapsedTime: result = Value(t->elapsed); return Status::Ok;
+    default: return Status::NotFound;
+    }
 }
 
 } // namespace jetstudio

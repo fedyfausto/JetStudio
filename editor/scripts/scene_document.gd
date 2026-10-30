@@ -4,7 +4,7 @@ extends RefCounted
 const VERSION := 2
 const TYPES := ["Node", "Node3D", "MeshInstance3D", "Sprite3D", "Camera3D", "DirectionalLight3D", "WorldEnvironment",
 	"Node2D", "Sprite2D", "AnimatedSprite2D", "Camera2D", "StaticBody2D", "CharacterBody2D", "RigidBody2D", "Area2D", "CollisionShape2D", "Control", "Label", "TextureRect", "ColorRect", "StaticBody3D", "CharacterBody3D", "RigidBody3D", "Area3D", "CollisionShape3D",
-	"CPUParticles3D", "Timer"]
+	"CPUParticles3D", "Timer", "AnimationPlayer"]
 const BASE := {"Node": "", "Node3D": "Node", "MeshInstance3D": "Node3D", "Camera3D": "Node3D",
 	"DirectionalLight3D": "Node3D", "WorldEnvironment": "Node", "Control": "Node", "Label": "Control",
 	"TextureRect": "Control", "ColorRect": "Control", "CollisionObject3D": "Node3D", "PhysicsBody3D": "CollisionObject3D",
@@ -13,7 +13,7 @@ const BASE := {"Node": "", "Node3D": "Node", "MeshInstance3D": "Node3D", "Camera
 	"Node2D": "Node", "Sprite2D": "Node2D", "AnimatedSprite2D": "Node2D", "Camera2D": "Node2D",
 	"CollisionObject2D": "Node2D", "PhysicsBody2D": "CollisionObject2D", "StaticBody2D": "PhysicsBody2D",
 	"CharacterBody2D": "PhysicsBody2D", "RigidBody2D": "PhysicsBody2D", "Area2D": "CollisionObject2D", "CollisionShape2D": "Node2D",
-	"Timer": "Node"}
+	"Timer": "Node", "AnimationPlayer": "Node"}
 ## Base classes shown in the class tree but not instantiable.
 const ABSTRACT := ["CollisionObject3D", "PhysicsBody3D", "CollisionObject2D", "PhysicsBody2D"]
 const BODIES := ["StaticBody3D", "CharacterBody3D", "RigidBody3D", "Area3D", "StaticBody2D", "CharacterBody2D", "RigidBody2D", "Area2D"]
@@ -48,6 +48,7 @@ const DESCRIPTIONS := {
 	"Area3D": "Region that detects bodies and areas: the body_entered and body_exited signals (or _on_body_entered(body) in its script), get_overlapping_bodies().",
 	"CollisionShape3D": "Collision shape (Box, Sphere, Capsule) of a body or an area: add it as a child.",
 	"CPUParticles3D": "Emits particles (sparks, splashes, fountains) drawn by Jet's particle system. Visible in Play.",
+	"AnimationPlayer": "Plays animations of the properties of the nodes around it, and calls their methods at given times. Edit them in the Animation panel at the bottom; the key icons in the Inspector add keys.",
 	"Timer": "Counts down Wait Time and emits timeout: connect it in the Signals dock, or in a script ($Timer.timeout.connect(_on_timeout)). One Shot stops after the first time.",
 }
 const MESHES := ["Box", "Sphere", "Plane", "Pyramid", "Cylinder", "Capsule", "Quad", "Torus", "File"]
@@ -259,6 +260,10 @@ const PROPERTIES := {
 		{"key": "one_way_collision", "label": "One Way Collision", "type": "bool", "default": false,
 			"tooltip": "Bodies only land on it from above (its -y side) and pass through from below: jump-through platforms."},
 		{"key": "disabled", "type": "bool", "default": false},
+	],
+	"AnimationPlayer": [
+		{"key": "speed_scale", "label": "Speed Scale", "type": "float", "default": 1.0, "min": -100.0, "max": 100.0, "step": 0.01,
+			"tooltip": "Multiplies the speed of every animation (negative: backwards)."},
 	],
 	"Timer": [
 		{"key": "wait_time", "type": "float", "default": 1.0, "min": 0.001, "max": 100000.0, "step": 0.001, "suffix": "s",
@@ -728,6 +733,7 @@ static func validate(doc: Variant) -> String:
 
 ## Integer ids and colours come back from JSON as floats.
 static func normalize(doc: Dictionary) -> void:
+	if not doc.get("connections") is Array: doc.connections = []
 	walk(doc.root, func(n, _p, _d):
 		for key in ["id", "color", "segments", "light_color", "background_color", "ambient_color", "shininess", "text_scale",
 				"collision_layer", "collision_mask", "amount", "color_end", "z_index", "hframes", "vframes", "frame", "modulate",

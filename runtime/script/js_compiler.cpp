@@ -99,6 +99,7 @@ private:
     const PropertyInfo* find_prop(const std::string& name) const;
     const MethodInfo* find_method(const std::string& name) const;
     bool find_signal(const std::string& name) const;
+    bool class_constant(const std::string& cls, const std::string& name, Value& out) const;
     void emit_bound(const std::string& name, bool signal);
     bool class_exists(const std::string& name) const;
     void build_metadata();
@@ -262,6 +263,20 @@ const MethodInfo* Compiler::find_method(const std::string& name) const {
         for (const MethodInfo& m : c->methods)
             if (m.name == name) return &m;
     return nullptr;
+}
+
+// Tween.TRANS_SINE: the class's constants or its bases'.
+bool Compiler::class_constant(const std::string& cls, const std::string& name, Value& out) const {
+    const ClassInfo* ci = host_.find_class(cls);
+    for (int guard = 0; ci && guard < 64; ++guard) {
+        for (const auto& c : ci->constants)
+            if (c.first == name) {
+                out = Value(c.second);
+                return true;
+            }
+        ci = ci->base.empty() ? nullptr : host_.find_class(ci->base);
+    }
+    return false;
 }
 
 bool Compiler::find_signal(const std::string& name) const {
@@ -707,7 +722,7 @@ int Compiler::const_static_member(Node* n, Value& out) {
     Type t;
     bool is_class = false;
     if (it == syms_.end() && names_type(b->name, t, is_class)) {
-        if (is_class) return 0;
+        if (is_class) return class_constant(nm(b->name), nm(n->name), out) ? 1 : 0;
         return builtin_type_constant(t, nm(n->name), out) ? 1 : 0;
     }
     return -1;
@@ -1804,7 +1819,7 @@ bool Compiler::member_static(Node* n, SType& type) {
     if (it == syms_.end() && names_type(b->name, t, is_class)) {
         Value cv;
         type = kUnknown;
-        if (!is_class && builtin_type_constant(t, mname, cv)) {
+        if ((!is_class && builtin_type_constant(t, mname, cv)) || (is_class && class_constant(nm(b->name), mname, cv))) {
             emit_const(cv);
             type = stype_of(cv);
             return true;

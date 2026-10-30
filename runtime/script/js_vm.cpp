@@ -1646,6 +1646,23 @@ void VM::forget(ObjectId object) {
                list.end());
 }
 
+bool VM::call_callable(const Value& callable, const Value* args, int count, Value* result) {
+    VMState& s = *state_;
+    if (result) *result = Value();
+    if (callable.type() != Type::Callable) return false;
+    if (count < 0 || (count > 0 && !args)) count = 0;
+    Value out;
+    std::string err;
+    const std::string_view method = Heap::bound_name(callable);
+    if (!s.call_bound(Heap::bound_object(callable), method, args, count, out, err)) {
+        s.record("Error calling '" + s.bound_text(Heap::bound_object(callable), method) + "': " + err,
+                 s.find(Heap::bound_object(callable)), Heap::str(callable)->chars());
+        return false;
+    }
+    if (result) *result = std::move(out);
+    return true;
+}
+
 std::vector<RuntimeError> VM::take_errors() {
     std::vector<RuntimeError> out;
     out.swap(state_->errors);

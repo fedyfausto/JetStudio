@@ -1,4 +1,4 @@
-# Jet Studio - prototype 0.5.0
+# Jet Studio - prototype 0.6.0
 
 A **Godot**-style 3D desktop editor, built with Godot's UI, with an **independent C++17** game
 runtime, the **Jet** renderer and the **JetScript** scripting language (GDScript syntax). The
@@ -57,8 +57,8 @@ otherwise make the Wayland driver terminate. The interface scale is changed from
   groups, draggable numeric fields (Shift for precision, Ctrl for snapping, click to type a
   value or an expression), a button that reverts to the default value, a property filter and the
   `@export` variables of the attached script. A drag produces a single undo step.
-- **Output / Debugger / Serial** (bottom): messages, `print()` output from scripts, errors with
-  links to the line, and the board's serial monitor (see below).
+- **Output / Debugger / Serial / Animation** (bottom): messages, `print()` output from scripts, errors with
+  links to the line, the board's serial monitor (see below) and the animation editor (see Animation).
 
 ## Nodes
 
@@ -89,6 +89,7 @@ otherwise make the Wayland driver terminate. The interface scale is changed from
 | `CollisionShape3D` | Box, Sphere or Capsule collision shape, child of a body or an area |
 | `CPUParticles3D` | particle emitter (sparks, splashes, fountains) using Jet's particle system |
 | `Timer` | counts down `wait_time` and emits `timeout`; `one_shot`, `autostart`, `start()`, `stop()`, `time_left` |
+| `AnimationPlayer` | Godot's animations: keyed values and method calls on the nodes under its parent, loops, autoplay |
 
 2D nodes (`Control`) use 320×240 screen pixels; the position is relative to the parent Control.
 They have opacity and visibility, are selected by clicking them in the viewport and are moved by
@@ -127,10 +128,15 @@ Godot's signals, from scripts: `signal health_changed(old, new)`, `health_change
 `disconnect()`, `is_connected()`, `emit_signal()`. A method or a signal named without calling it is a
 `Callable` or a `Signal` value (`$Timer.timeout.connect($Door.hide)`). The engine's nodes emit
 `body_entered`/`body_exited`/`area_entered`/`area_exited` (areas), `timeout` (Timer),
-`animation_finished` (AnimatedSprite2D) and `finished` (a one-shot CPUParticles3D).
+`animation_finished` (AnimatedSprite2D, AnimationPlayer), `animation_started` (AnimationPlayer) and
+`finished` (a one-shot CPUParticles3D).
 The connections are kept by the VM, outside the nodes: a node costs no memory for its signals,
 and a signal nobody is connected to costs one check when it is emitted. Freeing a node drops its
 connections.
+
+**Tweens** work as in Godot 4: `create_tween().tween_property($Ship, "position", Vector2(160, 120), 0.5)`, with
+intervals, callbacks, methods, parallel steps, loops, `as_relative()`, `from()`, delays and Godot's twelve
+transitions and four eases (see `docs/jetscript.md`). They cost nothing when there are none.
 
 In the editor, the **Signals** tab next to the Inspector is Godot's Node dock (Signals): the selected node's
 signals (its script's first, then its classes'), each with its connections. *Connect...* (or a
@@ -153,6 +159,23 @@ limited by drawing.
 As in Godot, a body or an area without a `CollisionShape3D` does not collide (it falls through
 the floor): the Scene dock flags it with the warning icon and Play reports it in the Output.
 Bounce and friction combine as in Godot (bounces are added, up to 1; the lower friction wins).
+
+### Animation
+
+The **Animation** tab of the bottom panel is Godot's animation editor for the selected `AnimationPlayer`
+(selecting one opens it). *Animation* creates, renames, duplicates and removes animations; next to it are
+Autoplay on load, the time, the length and No Loop / Loop / Ping-Pong. *Add Track* adds a property track
+(any property the runtime can set: position, rotation, scale, visible, colours, alpha, text...) or a Call
+Method track on a node under the player's parent. While an animation is open the Inspector shows Godot's
+key icons: a click keys the property's current value at the current time. In the timeline, double-click
+inserts a key, drag moves it, Delete removes it, the right-click menu does both; the ruler scrubs and the
+track's icons switch linear/nearest and remove it. The selected key's value, easing (Godot's `ease()`
+curve to the next key) or method and arguments are edited under the timeline. Moving the time previews
+the pose in the viewport without changing the scene. Ctrl+wheel zooms, Shift+wheel scrolls.
+
+Scripts use Godot's API: `$AnimationPlayer.play("open")`, `play_backwards()`, `stop()`, `seek()`,
+`animation_finished` (see `docs/jetscript.md`). Method keys call the node's script functions or engine
+methods (`queue_free`, `hide`, `start`...) with their arguments.
 
 ### Particles
 
@@ -242,8 +265,13 @@ space. At most 256 nodes and 128 meshes per scene.
 The **2D** screen is Godot's 2D editor: the canvas alone (no 3D world), with a grid, the axes,
 the game's screen as a purple rectangle at the origin and each Camera2D's view. **Middle** or
 **right button** (or Alt+left) pans, the **wheel** zooms where the cursor is, **F** centres the
-selection; clicking picks the 2D node or Control under the cursor and dragging moves it (Y
-snaps to 8 px). Controls sit on the screen rectangle, as Godot shows a CanvasLayer. It is drawn
+selection; clicking picks the 2D node or Control under the cursor and dragging moves it.
+Godot's 2D gizmos: **Q** select, **W** move (X/Y arrows lock an axis, so does Shift), **E** rotate
+(drag the ring or the node around its origin), **S** scale (X/Y handles, the centre square or the node
+for both; Shift keeps the ratio). ColorRect and TextureRect have resize handles, CollisionShape2D
+handles for its size, radius and height; sprites show their rotated frame. **Y** (or holding Ctrl)
+snaps to 8 px, 15° and 10%; arrow keys nudge by 1 px (Shift: 8). Moves follow rotated and scaled
+parents. Controls sit on the screen rectangle, as Godot shows a CanvasLayer. It is drawn
 by the runtime at the display's resolution, so it looks like the board. A 2D or UI scene opens
 in the 2D screen, a 3D one in the 3D screen; Ctrl+F1/F2 switch.
 
@@ -473,7 +501,7 @@ package and the project have the same actions.
   (save them to update the file).
 - `.jet`: JetScript script.
 - `*.import`: import settings of a PNG or OBJ (JSON, next to the file).
-- `.jetpack`: binary package version 16 (resolution, Input Map, every scene of the project with its 3D and 2D nodes and signal connections, autoloads, materials, converted textures, imported meshes, script bytecode, exported values)
+- `.jetpack`: binary package version 17 (resolution, Input Map, every scene of the project with its 3D and 2D nodes, animations and signal connections, autoloads, materials, converted textures, imported meshes, script bytecode, exported values)
   read by the runtime. The bytecode has a version, an instruction-set fingerprint and a CRC; on
   load every operand and jump is verified. A package must be re-exported when the JetScript version changes.
 

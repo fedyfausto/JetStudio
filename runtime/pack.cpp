@@ -6,7 +6,7 @@
 // Scripts travel as bytecode so devices only need the VM. Everything is validated again after decoding.
 namespace jetstudio {
 namespace {
-constexpr uint32_t Magic = 0x5054454a, Version = 16;
+constexpr uint32_t Magic = 0x5054454a, Version = 17;
 
 struct Writer {
     std::vector<uint8_t> out;
@@ -172,6 +172,21 @@ std::vector<uint8_t> encode_pack(const Description& d, std::string& error) {
             w.u16(uint16_t(n.z_index)); w.u8(n.centered ? 1 : 0); w.f32(n.offset[0]); w.f32(n.offset[1]);
             w.str(n.more().animations); w.str(n.more().animation); w.f32(n.more().speed_scale); w.u8(n.more().autoplay ? 1 : 0);
             w.f32(n.more().zoom[0]); w.f32(n.more().zoom[1]);
+            // AnimationPlayer
+            w.u16(uint16_t(n.more().player_animations.size()));
+            for (const auto& a : n.more().player_animations) {
+                w.str(a.name); w.f32(a.length); w.u8(a.loop); w.u16(uint16_t(a.tracks.size()));
+                for (const auto& t : a.tracks) {
+                    w.str(t.path); w.str(t.property); w.u8(t.interpolation); w.u32(uint32_t(t.keys.size()));
+                    for (const auto& k : t.keys) {
+                        w.f32(k.time); w.f32(k.transition);
+                        if (!w.value(k.value)) { error = "Animation value not exportable in " + n.name + "."; return false; }
+                        w.str(k.method); w.u8(uint8_t(k.args.size()));
+                        for (const auto& arg : k.args)
+                            if (!w.value(arg)) { error = "Animation call argument not exportable in " + n.name + "."; return false; }
+                    }
+                }
+            }
             w.u32(uint32_t(n.script));
             w.u32(uint32_t(n.overrides.size()));
             for (const auto& o : n.overrides) {
@@ -264,9 +279,34 @@ static bool read_nodes(Reader& r, std::vector<NodeDesc>& nodes, std::vector<Scen
         e.autoplay = autoplay == 1;
         e.zoom[0] = r.f32(); e.zoom[1] = r.f32();
         if (centered > 1 || autoplay > 1) r.ok = false;
+        const uint16_t animations = r.u16();
+        if (animations > MaxAnimations) r.ok = false;
+        for (uint16_t i = 0; i < animations && r.ok; ++i) {
+            Animation a;
+            a.name = r.str(80); a.length = r.f32(); a.loop = r.u8();
+            const uint16_t tracks = r.u16();
+            if (tracks > MaxTracks) r.ok = false;
+            for (uint16_t t = 0; t < tracks && r.ok; ++t) {
+                AnimationTrack track;
+                track.path = r.str(256); track.property = r.str(80); track.interpolation = r.u8();
+                const uint32_t keys = r.u32();
+                if (keys > MaxKeys) r.ok = false;
+                for (uint32_t k = 0; k < keys && r.ok; ++k) {
+                    AnimationKey key;
+                    key.time = r.f32(); key.transition = r.f32(); key.value = r.value();
+                    key.method = r.str(80);
+                    const uint8_t args = r.u8();
+                    if (args > 8) r.ok = false;
+                    for (uint8_t i = 0; i < args && r.ok; ++i) key.args.push_back(r.value());
+                    track.keys.push_back(std::move(key));
+                }
+                a.tracks.push_back(std::move(track));
+            }
+            e.player_animations.push_back(std::move(a));
+        }
         n.script = int32_t(r.u32());
         const uint32_t overrides = r.u32();
-        if (type > uint8_t(NodeType::Timer) || shape > uint8_t(Shape::Mesh) || shading > uint8_t(Shading::Water)
+        if (type > uint8_t(NodeType::AnimationPlayer) || shape > uint8_t(Shape::Mesh) || shading > uint8_t(Shading::Water)
             || cull > uint8_t(CullMode::Disabled) || draw_order > uint8_t(DrawOrder::OnTop)
             || background > uint8_t(Background::Panorama) || flags > 31
             || visible > 1 || current > 1 || overrides > 256) { error = "Invalid node in the package."; return false; }
@@ -300,7 +340,7 @@ bool decode_pack(const uint8_t* data, size_t size, Description& out, std::string
     error.clear();
     if (!data || size < 12) { error = "Truncated package."; return false; }
     Reader r{data, size};
-    if (r.u32() != Magic || r.u32() != Version) { error = "Unsupported JETP format (expected version 16): export the project again."; return false; }
+    if (r.u32() != Magic || r.u32() != Version) { error = "Unsupported JETP format (expected version 17): export the project again."; return false; }
     Description d;
     d.name = r.str(256);
     d.width = r.u16();

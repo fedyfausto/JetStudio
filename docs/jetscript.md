@@ -355,6 +355,38 @@ The engine classes form this hierarchy. Properties use Godot names.
   (read only), `start(time_sec = -1)` (a positive time becomes the new `wait_time`), `stop()`,
   `is_stopped()`. Emits `timeout` when the time is up, at most once per frame; a repeating Timer
   starts again with what was left over. Autostart starts it when it enters the scene.
+- **Tween** (from `create_tween()` on any node, which it dies with, or `get_tree().create_tween()`), as in
+  Godot 4. Each `tween_*` call is a step that starts when the previous one ends:
+
+  ```gdscript
+  var tween = create_tween()
+  tween.tween_property($Ship, "position", Vector2(160, 120), 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+  tween.tween_property($Ship, "modulate", Color.RED, 0.2)
+  tween.tween_interval(1.0)
+  tween.tween_callback($Ship.queue_free)
+  ```
+
+  Tween: `tween_property(object, property, final_value, duration)` (`"position:x"` tweens one component),
+  `tween_interval(time)`, `tween_callback(callable)`, `tween_method(callable, from, to, duration)` (calls it with
+  the value each frame), `set_parallel(parallel = true)`, `parallel()` (the next tweener joins the previous one),
+  `chain()`, `set_loops(loops = 0)` (0: forever), `set_trans()`, `set_ease()` (defaults for the next tweeners),
+  `set_speed_scale()`, `bind_node()`, `pause()`, `play()`, `stop()` (back to the start), `kill()`, `is_running()`,
+  `is_valid()`, `get_total_elapsed_time()`; signals `finished`, `step_finished(idx)`, `loop_finished(loop_count)`.
+  PropertyTweener: `from(value)`, `from_current()`, `as_relative()`, `set_trans()`, `set_ease()`, `set_delay()`;
+  MethodTweener: `set_trans()`, `set_ease()`, `set_delay()`; CallbackTweener: `set_delay()`.
+  Transitions `Tween.TRANS_LINEAR SINE QUINT QUART QUAD EXPO ELASTIC CUBIC CIRC BOUNCE BACK SPRING`, eases
+  `Tween.EASE_IN EASE_OUT EASE_IN_OUT EASE_OUT_IN`. Numbers, Vector2, Vector3 and Color are interpolated, ints stay
+  ints. Tweens run after the scripts' `_process()`; once finished or killed they are no longer valid, and adding to
+  a tween that has started is an error (`stop()` it first), as in Godot.
+- **AnimationPlayer** (extends Node), as in Godot 4: `play(name = "", custom_blend = -1, custom_speed = 1.0,
+  from_end = false)` (no name: the current one, or the autoplay one; the same animation resumes where it was),
+  `play_backwards(name = "")`, `stop(keep_state = false)` (back to the start), `pause()`, `is_playing()`,
+  `seek(seconds, update = false)`, `has_animation(name)`, `get_animation_list()`, `current_animation`,
+  `current_animation_position` and `current_animation_length` (read only), `autoplay`, `speed_scale`. Signals
+  `animation_started(anim_name)` and `animation_finished(anim_name)` (not for looping animations). Track paths
+  start from the player's parent (Godot's default root node); a property track sets an engine property
+  (`"position:x"` animates one component) or a script variable; method keys run after the frame's animations,
+  with the other deferred calls. Blending and the RESET animation are not supported.
 - **Control** (extends Node; 2D nodes drawn over the 3D scene, in screen pixels
   of the display, 320×240 unless the project hardware sets another resolution): `position` and `size` (Vector2, a Vector3
   is accepted too; position is relative to a parent Control), `visible`, `alpha`, `show()`, `hide()`. A plain Control draws

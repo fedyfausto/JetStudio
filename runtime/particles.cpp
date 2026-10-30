@@ -147,7 +147,7 @@ void Runtime::update_particles(float dt) {
                 if (n.cycle < lifetime) break;
                 if (n.d.more().one_shot) {
                     n.d.extras().emitting = false;
-                    if (vm_->has_connections(n.d.id)) signals_.push_back({n.d.id, "finished"});
+                    defer_signal(n.d.id, "finished");
                     break;
                 }
                 n.cycle -= lifetime;
@@ -160,7 +160,7 @@ void Runtime::update_particles(float dt) {
             ++n.emitted;
         }
     }
-    emit_signals();
+    run_deferred();
 }
 
 // Projects like Jet (camera space x right, y up, z forward). The matrix is built as in Scene::renderObject().

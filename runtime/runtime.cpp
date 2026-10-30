@@ -165,6 +165,7 @@ const char* node_type_name(NodeType type) {
     case NodeType::Area2D: return "Area2D";
     case NodeType::CollisionShape2D: return "CollisionShape2D";
     case NodeType::Timer: return "Timer";
+    case NodeType::AnimationPlayer: return "AnimationPlayer";
     }
     return "Node";
 }
@@ -184,8 +185,8 @@ bool is_node2d(NodeType type) {
         || physics::is_flat(type);
 }
 bool is_node3d(NodeType type) {
-    return type != NodeType::Node && type != NodeType::WorldEnvironment && type != NodeType::Timer && !is_control(type)
-        && !is_node2d(type);
+    return type != NodeType::Node && type != NodeType::WorldEnvironment && type != NodeType::Timer
+        && type != NodeType::AnimationPlayer && !is_control(type) && !is_node2d(type);
 }
 uint16_t rgb565(uint32_t c) { return uint16_t(((c >> 19) & 31) << 11 | ((c >> 10) & 63) << 5 | ((c >> 3) & 31)); }
 
@@ -264,7 +265,23 @@ bool validate(const Description& d, std::string& error) {
             if (!n.id || n.id >= InstanceIdBase || !ids.insert(n.id).second) return fail("Duplicate or null node identifier.");
             if (!valid_name(n.name)) return fail("Invalid node name: \"" + n.name + "\" (1..80 characters, without . : @ / \" %).");
             if (!siblings.insert(std::to_string(n.parent) + "/" + n.name).second) return fail("Two sibling nodes have the same name: " + n.name);
-            if (uint8_t(n.type) > uint8_t(NodeType::Timer)) return fail("Unsupported node type.");
+            if (uint8_t(n.type) > uint8_t(NodeType::AnimationPlayer)) return fail("Unsupported node type.");
+            if (n.type == NodeType::AnimationPlayer) {
+                const auto& animations = n.more().player_animations;
+                if (animations.size() > MaxAnimations) return fail("At most 64 animations in " + n.name + ".");
+                for (const auto& a : animations) {
+                    bool ok = !a.name.empty() && a.name.size() <= 80 && std::isfinite(a.length) && a.length > 0 && a.length <= 10000
+                        && a.loop <= 2 && a.tracks.size() <= MaxTracks;
+                    for (const auto& t : a.tracks) {
+                        ok = ok && t.path.size() <= 256 && t.property.size() <= 80 && t.interpolation <= 1 && t.keys.size() <= MaxKeys;
+                        for (size_t k = 0; ok && k < t.keys.size(); ++k)
+                            ok = std::isfinite(t.keys[k].time) && t.keys[k].time >= 0 && t.keys[k].time <= a.length
+                                && std::isfinite(t.keys[k].transition) && (k == 0 || t.keys[k].time >= t.keys[k - 1].time)
+                                && t.keys[k].method.size() <= 80 && t.keys[k].args.size() <= 8;
+                    }
+                    if (!ok) return fail("Invalid animation \"" + a.name + "\" in " + n.name + ".");
+                }
+            }
             if (n.type == NodeType::Timer && (!std::isfinite(n.more().lifetime) || n.more().lifetime < 0.001f || n.more().lifetime > 100000))
                 return fail("Invalid wait time in " + n.name + " (0.001 to 100000 seconds).");
             if (n.type == NodeType::CPUParticles3D) {
@@ -1003,6 +1020,7 @@ bool Runtime::start(std::vector<ScriptDiagnostic>& errors) {
     playing_ = false;
     vm_->clear();
     vm_->take_errors();
+    kill_tweens(false);
     scene_nodes_ = nodes_of(description_.path, &scene_connections_);
     current_scene_ = description_.path;
     pending_scene_.clear();
@@ -1239,6 +1257,8 @@ void Runtime::enter_tree(int32_t root) {
             if (playing_ && n.d.type == NodeType::CPUParticles3D && n.particles < 0) start_particle(n);
             if (playing_ && n.d.type == NodeType::AnimatedSprite2D && n.d.more().autoplay && !n.d.more().playing) play_animation(n, {});
             if (playing_ && n.d.type == NodeType::Timer && n.d.more().autoplay && !n.d.more().playing) start_timer(n);
+            if (playing_ && n.d.type == NodeType::AnimationPlayer && !n.d.more().animation.empty() && !n.d.more().playing)
+                play_player(n, n.d.more().animation, 1, false);
         }
         if (child < n.children.size()) {
             const int32_t next = n.children[child++];
@@ -1322,8 +1342,13 @@ bool Runtime::play_animation(Live& n, std::string_view name) {
 // Advances the playing AnimatedSprite2Ds and Timers. A "once" animation stops on its last frame.
 void Runtime::update_animations(float dt) {
     for (auto& n : nodes_) {
-        if ((n.d.type != NodeType::AnimatedSprite2D && n.d.type != NodeType::Timer) || n.freed || !n.in_tree || !n.d.more().playing)
+        if ((n.d.type != NodeType::AnimatedSprite2D && n.d.type != NodeType::Timer && n.d.type != NodeType::AnimationPlayer)
+            || n.freed || !n.in_tree || !n.d.more().playing)
             continue;
+        if (n.d.type == NodeType::AnimationPlayer) {
+            advance_player(n, dt);
+            continue;
+        }
         auto& e = n.d.extras();
 
         // Godot's Timer: at most one timeout per frame, a repeating one keeps the time it overran by.
@@ -1337,7 +1362,7 @@ void Runtime::update_animations(float dt) {
             } else {
                 n.cycle += e.lifetime;
             }
-            if (vm_->has_connections(n.d.id)) signals_.push_back({n.d.id, "timeout"});
+            defer_signal(n.d.id, "timeout");
             continue;
         }
 
@@ -1350,11 +1375,11 @@ void Runtime::update_animations(float dt) {
         } else if (step >= count || step < 0) {
             step = step < 0 ? 0 : count - 1;
             e.playing = false;
-            if (vm_->has_connections(n.d.id)) signals_.push_back({n.d.id, "animation_finished"});
+            defer_signal(n.d.id, "animation_finished");
         }
         n.d.frame = uint16_t(e.anim_first + step);
     }
-    emit_signals();
+    run_deferred();
 }
 
 void Runtime::start_timer(Live& n, float wait_time) {
@@ -1364,12 +1389,20 @@ void Runtime::start_timer(Live& n, float wait_time) {
     n.cycle = e.lifetime;
 }
 
-// The callees may add and free nodes, so they run after the walk over nodes_ that found the signals.
-void Runtime::emit_signals() {
-    if (signals_.empty()) return;
-    std::vector<std::pair<uint32_t, const char*>> pending;
-    pending.swap(signals_);
-    for (const auto& [id, signal] : pending) vm_->emit_signal(id, signal);
+// a signal nobody listens to isn't even queued
+void Runtime::defer_signal(uint32_t source, const char* signal, std::vector<jetscript::Value> args) {
+    if (vm_->has_connections(source)) deferred_.push_back({source, signal, {}, std::move(args)});
+}
+
+void Runtime::run_deferred() {
+    if (deferred_.empty()) return;
+    std::vector<Deferred> pending;
+    pending.swap(deferred_);
+    for (const auto& d : pending) {
+        const jetscript::Value* args = d.args.empty() ? nullptr : d.args.data();
+        if (d.signal) vm_->emit_signal(d.source, d.signal, args, int(d.args.size()));
+        else vm_->call_callable(d.callable, args, int(d.args.size()));
+    }
     flush_script_errors();
 }
 
@@ -1392,6 +1425,7 @@ void Runtime::switch_scene() {
         if (vm_->has_instance(n.d.id)) vm_->detach(n.d.id);
         vm_->forget(n.d.id); // the next scene's nodes may get the same ids
     }
+    kill_tweens(true);
     flush_script_errors();
     scene_nodes_ = target;
     scene_connections_ = std::move(connections);
@@ -1405,6 +1439,7 @@ void Runtime::stop() {
     if (!playing_) return;
     playing_ = false;
     vm_->clear();
+    kill_tweens(false);
     flush_script_errors();
     scene_nodes_ = nodes_of(description_.path);
     current_scene_ = description_.path;
@@ -1525,6 +1560,7 @@ void Runtime::update(float delta) {
             if (vm_->has_instance(id)) vm_->process(id, dt);
         }
         flush_script_errors();
+        update_tweens(dt);
         free_pending();
         update_animations(dt);
         previous_input_ = input_;

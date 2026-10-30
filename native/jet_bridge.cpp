@@ -73,6 +73,66 @@ jetscript::Value to_value(const Variant& v, int depth = 0) {
     default: return {};
     }
 }
+// [x, y] vectors and 0xRRGGBB colours, as the scene stores them.
+jetscript::Value key_value(const Variant& v, const String& type) {
+    const Array a = v.get_type() == Variant::ARRAY ? Array(v) : Array();
+    auto real = [&](int i) { return i < a.size() ? float(double(a[i])) : 0.0f; };
+    if (type == "vector2") return jetscript::Value(jetscript::Vector2{real(0), real(1)});
+    if (type == "vector3") return jetscript::Value(jetscript::Vector3{real(0), real(1), real(2)});
+    if (type == "color" && (v.get_type() == Variant::INT || v.get_type() == Variant::FLOAT)) {
+        const uint32_t c = uint32_t(int64_t(v));
+        return jetscript::Value(jetscript::Color{((c >> 16) & 255) / 255.0f, ((c >> 8) & 255) / 255.0f, (c & 255) / 255.0f});
+    }
+    if (type == "float" && (v.get_type() == Variant::INT || v.get_type() == Variant::FLOAT)) return jetscript::Value(double(v));
+    if (type == "int" && (v.get_type() == Variant::INT || v.get_type() == Variant::FLOAT)) return jetscript::Value(jetscript::Int(int64_t(v)));
+    return to_value(v);
+}
+
+bool read_animations(const Array& list, std::vector<jetstudio::Animation>& out) {
+    for (int i = 0; i < list.size(); ++i) {
+        if (list[i].get_type() != Variant::DICTIONARY) return false;
+        const Dictionary entry = list[i];
+        jetstudio::Animation a;
+        a.name = utf8(entry.get("name", ""));
+        a.length = float(double(entry.get("length", 1.0)));
+        const String loop = entry.get("loop", "none");
+        a.loop = loop == "linear" ? 1 : loop == "pingpong" ? 2 : 0;
+        const Array tracks = entry.get("tracks", Array());
+        for (int t = 0; t < tracks.size(); ++t) {
+            if (tracks[t].get_type() != Variant::DICTIONARY) return false;
+            const Dictionary source = tracks[t];
+            jetstudio::AnimationTrack track;
+            track.path = utf8(source.get("path", "."));
+            const bool method = bool(source.get("method", false));
+            if (!method) track.property = utf8(source.get("property", ""));
+            if (!method && track.property.empty()) continue;
+            track.interpolation = String(source.get("interpolation", "linear")) == "nearest" ? 0 : 1;
+            const String type = source.get("type", "");
+            const Array keys = source.get("keys", Array());
+            for (int k = 0; k < keys.size(); ++k) {
+                if (keys[k].get_type() != Variant::DICTIONARY) return false;
+                const Dictionary key = keys[k];
+                jetstudio::AnimationKey out_key;
+                out_key.time = float(double(key.get("time", 0.0)));
+                if (out_key.time > a.length) continue; // left behind by a shorter length, as in Godot
+                out_key.transition = float(double(key.get("transition", 1.0)));
+                if (method) {
+                    out_key.method = utf8(key.get("method", ""));
+                    const Array args = key.get("args", Array());
+                    for (int j = 0; j < args.size(); ++j) out_key.args.push_back(to_value(args[j]));
+                } else {
+                    out_key.value = key_value(key.get("value", Variant()), type);
+                }
+                track.keys.push_back(std::move(out_key));
+            }
+            std::stable_sort(track.keys.begin(), track.keys.end(), [](const auto& x, const auto& y) { return x.time < y.time; });
+            a.tracks.push_back(std::move(track));
+        }
+        out.push_back(std::move(a));
+    }
+    return true;
+}
+
 Variant to_variant(const jetscript::Value& v, int depth = 0) {
     using jetscript::Type;
     switch (v.type()) {
@@ -198,7 +258,7 @@ struct Flattener {
                                                "Label", "TextureRect", "ColorRect", "StaticBody3D", "CharacterBody3D",
                                                "RigidBody3D", "Area3D", "CollisionShape3D", "CPUParticles3D", "Sprite3D", "Control",
                                                "Node2D", "Sprite2D", "AnimatedSprite2D", "Camera2D", "StaticBody2D", "CharacterBody2D",
-                                               "RigidBody2D", "Area2D", "CollisionShape2D", "Timer"})) {
+                                               "RigidBody2D", "Area2D", "CollisionShape2D", "Timer", "AnimationPlayer"})) {
                 error = "Unsupported node type: " + String(node["type"]); return false;
             }
             jetstudio::Vec3 uv_scale{n.uv_scale[0], n.uv_scale[1], 1}, uv_offset{};
@@ -254,6 +314,11 @@ struct Flattener {
                 && choice(node, "emission_shape", n.extras().emission_shape, {"Point", "Sphere", "Box"})
                 && real(node, "emission_sphere_radius", n.extras().emission_radius) && vec(node, "emission_box_extents", n.extras().emission_box);
             n.extras().amount = uint16_t(amount);
+            if (n.type == NodeType::AnimationPlayer) {
+                if (node.has("autoplay")) n.extras().animation = utf8(node["autoplay"]);
+                ok = ok && real(node, "speed_scale", n.extras().speed_scale)
+                    && read_animations(node.get("animations", Array()), n.extras().player_animations);
+            }
             // Timer: wait_time and autostart are kept in lifetime and autoplay; Godot doesn't autostart by default.
             if (n.type == NodeType::Timer) {
                 n.extras().autoplay = false;
@@ -356,6 +421,7 @@ void JetBridge::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_editor_camera", "position", "rotation", "fov"), &JetBridge::set_editor_camera);
     ClassDB::bind_method(D_METHOD("use_editor_camera", "enabled"), &JetBridge::use_editor_camera);
     ClassDB::bind_method(D_METHOD("set_editor_canvas", "enabled", "zoom", "origin"), &JetBridge::set_editor_canvas);
+    ClassDB::bind_method(D_METHOD("preview_animation", "player", "name", "time"), &JetBridge::preview_animation);
     ClassDB::bind_method(D_METHOD("update", "delta"), &JetBridge::update);
     ClassDB::bind_method(D_METHOD("render_frame"), &JetBridge::render_frame);
     ClassDB::bind_method(D_METHOD("play_start"), &JetBridge::play_start);
@@ -529,6 +595,10 @@ void JetBridge::set_editor_camera(const godot::Vector3& p, const godot::Vector3&
     runtime_.set_editor_camera({float(p.x), float(p.y), float(p.z)}, {float(r.x), float(r.y), float(r.z)}, float(fov));
 }
 void JetBridge::use_editor_camera(bool enabled) { runtime_.use_editor_camera(enabled); }
+bool JetBridge::preview_animation(int player, const String& name, double time) {
+    return runtime_.preview_animation(uint32_t(player), utf8(name), float(time));
+}
+
 void JetBridge::set_editor_canvas(bool enabled, double zoom, const godot::Vector2& origin) {
     runtime_.set_editor_canvas(enabled, float(zoom), {float(origin.x), float(origin.y), 0});
 }

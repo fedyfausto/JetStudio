@@ -9,6 +9,7 @@ signal duplicate_requested
 signal file_dropped(id: int, path: String)
 signal model_dropped(path: String, position: Vector3)
 signal control_moved(id: int, position: Vector2, final: bool)
+signal canvas_edited(id: int, values: Dictionary, final: bool) # 2D view gizmos: position, rotation_degrees, scale, size...
 
 const Document := preload("res://scripts/scene_document.gd")
 const Style := preload("res://scripts/theme.gd")
@@ -19,15 +20,19 @@ var H := 240.0
 const NEAR := 0.05
 const ORBIT_SPEED := 0.0044 # radians per pixel (Godot: 0.25 degrees)
 const GIZMO_PIXELS := 80.0
+const GIZMO_2D := 60.0
+const RING_2D := 54.0
 
 enum Tool { SELECT, MOVE, ROTATE, SCALE }
-enum Nav { NONE, ORBIT, PAN, ZOOM, FREELOOK, GIZMO, MOVE_2D }
+enum Nav { NONE, ORBIT, PAN, ZOOM, FREELOOK, GIZMO, MOVE_2D, EDIT_2D }
 
 var bridge: Object
 ## Callable(node) -> [min, max] local bounds of an imported mesh part (empty if unknown).
 var mesh_bounds: Callable
 ## Callable(node) -> Rect2 of a 2D Control in Jet screen pixels.
 var control_rect: Callable
+## Callable(res_path) -> Vector2i: a texture's size after import.
+var texture_size: Callable
 var root: Dictionary = {}
 var selected := 0
 var playing := false
@@ -71,6 +76,7 @@ var _left_down := false
 var _hover_axis := -1
 var _drag := {}
 var _gizmo_icons := [] # [{id, position}]
+var _hover_2d := {}
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 2)
@@ -89,7 +95,6 @@ func _ready() -> void:
 		bar.add_child(button)
 		_tool_buttons.append(button)
 	bar.add_child(VSeparator.new())
-	_tools_3d = [_tool_buttons[Tool.ROTATE], _tool_buttons[Tool.SCALE]]
 	_local_button = _bar_button("Object", "Use Local Space (T)", true)
 	_local_button.toggled.connect(func(on): local_space = on; overlay.queue_redraw())
 	bar.add_child(_local_button)
@@ -131,6 +136,7 @@ func _ready() -> void:
 	area.resized.connect(_layout)
 	area.mouse_exited.connect(func():
 		_hover_axis = -1
+		_hover_2d = {}
 		overlay.queue_redraw())
 	frame.add_child(area)
 	var background := ColorRect.new()
@@ -182,10 +188,12 @@ func set_mode_2d(on: bool) -> void:
 	_nav = Nav.NONE
 	_drag = {}
 	_hover_axis = -1
+	_hover_2d = {}
+	area.mouse_default_cursor_shape = Control.CURSOR_ARROW
 	for button in _tools_3d: button.visible = not on
-	if on:
-		if tool == Tool.ROTATE or tool == Tool.SCALE: _set_tool(Tool.MOVE)
-		if preview_camera: _preview_button.button_pressed = false
+	_tool_buttons[Tool.SCALE].tooltip_text = "Scale Mode (S)" if on else "Scale Mode (R)"
+	_snap_button.tooltip_text = "Snap: 8 px · 15° · 10% (Y, or hold Ctrl)" if on else "Snap: 0.5 m · 15° · 10% (Y)"
+	if on and preview_camera: _preview_button.button_pressed = false
 	_fill_view_menu()
 	set_scene(root, selected, playing)
 	camera_changed.emit()
@@ -518,11 +526,12 @@ func _bounds_of(node: Dictionary) -> Array:
 	return Document.MESH_BOUNDS.get(mesh, Document.MESH_BOUNDS.Box)
 
 ## Selection frame of a 2D node (Jet pixels mapped onto the displayed image).
-func _draw_control(box: Rect2, image_rect: Rect2) -> void:
+func _draw_control(box: Rect2, image_rect: Rect2, corners: bool = true) -> void:
 	var k := image_rect.size.x / W
 	var frame := Rect2(image_rect.position + box.position * k, box.size * k)
 	var color := Color("ffb35c")
 	overlay.draw_rect(frame, color, false, 1.5)
+	if not corners: return
 	for corner in [frame.position, Vector2(frame.end.x, frame.position.y), frame.end, Vector2(frame.position.x, frame.end.y)]:
 		overlay.draw_rect(Rect2(corner - Vector2(3, 3), Vector2(6, 6)), color)
 
@@ -861,34 +870,42 @@ func _input_2d(event: InputEvent) -> void:
 			if event.pressed:
 				_left_down = true
 				_press = event.position
-				if not playing and _image_rect().has_point(event.position) and tool != Tool.SELECT:
-					var hit := _pick_2d(event.position)
-					if hit > 0:
-						if hit != selected: node_picked.emit(hit)
-						_begin_move_2d(hit, event.position)
+				if not playing: _press_2d(event.position)
 			else:
 				_left_down = false
-				if _nav == Nav.MOVE_2D:
+				if _nav == Nav.EDIT_2D:
 					_nav = Nav.NONE
-					_update_move_2d(event.position, true)
+					_update_edit_2d(event.position, true, event.shift_pressed, event.ctrl_pressed)
 					_drag = {}
+					overlay.queue_redraw()
 				elif _press.distance_to(event.position) < 4.0:
 					_click(event.position)
 		elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 			_zoom_2d(1.1 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1 / 1.1, event.position)
 	elif event is InputEventMouseMotion:
 		if _nav == Nav.PAN: _pan_2d(event.relative)
-		elif _nav == Nav.MOVE_2D: _update_move_2d(event.position, false)
+		elif _nav == Nav.EDIT_2D: _update_edit_2d(event.position, false, event.shift_pressed, event.ctrl_pressed)
+		elif not _left_down and not playing:
+			var hover := _handle_at_2d(event.position)
+			if not _same_handle(hover, _hover_2d):
+				_hover_2d = hover
+				area.mouse_default_cursor_shape = _cursor_for(hover)
+				overlay.queue_redraw()
 	elif event is InputEventPanGesture:
 		_pan_2d(-event.delta * 12.0)
 	elif event is InputEventMagnifyGesture:
 		_zoom_2d(event.factor, area.get_local_mouse_position())
-	elif event is InputEventKey and event.pressed and not event.echo:
-		if event.ctrl_pressed and event.keycode == KEY_D: duplicate_requested.emit()
+	elif event is InputEventKey and event.pressed:
+		if event.keycode in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN] and not event.ctrl_pressed and not event.alt_pressed:
+			if not _nudge_2d(event.keycode, event.shift_pressed): return
+		elif event.echo: return
+		elif event.ctrl_pressed and event.keycode == KEY_D: duplicate_requested.emit()
 		elif event.keycode == KEY_DELETE: delete_requested.emit()
 		elif event.ctrl_pressed or event.alt_pressed: return
 		elif event.keycode == KEY_Q: _set_tool(Tool.SELECT)
 		elif event.keycode == KEY_W: _set_tool(Tool.MOVE)
+		elif event.keycode == KEY_E: _set_tool(Tool.ROTATE)
+		elif event.keycode == KEY_S: _set_tool(Tool.SCALE)
 		elif event.keycode == KEY_Y: _snap_button.button_pressed = not _snap_button.button_pressed
 		elif event.keycode == KEY_F: focus_selection()
 		else: return
@@ -925,16 +942,286 @@ func _draw_overlay_2d(rect: Rect2) -> void:
 	var type := str(node.type)
 	if Document.is_control(type) and control_rect.is_valid():
 		var box: Rect2 = control_rect.call(node)
-		_draw_control(Rect2((box.position - canvas_origin) * canvas_zoom, box.size * canvas_zoom), rect)
+		var resizable := not playing and tool in [Tool.SELECT, Tool.MOVE] and node.has("size")
+		_draw_control(Rect2((box.position - canvas_origin) * canvas_zoom, box.size * canvas_zoom), rect, not resizable)
 	elif Document.is_2d(type):
+		var outline := _sprite_outline(node)
 		var drawn: Rect2i = bridge.drawn_rect(selected) if bridge != null else Rect2i()
-		if drawn.has_area():
-			_draw_control(Rect2(drawn), rect)
-		else:
-			# Nodes that draw nothing: their origin.
-			var at := canvas_to_area(Document.canvas_transform(root, selected).origin)
+		var at := canvas_to_area(Document.canvas_transform(root, selected).origin)
+		if outline.size() > 0:
+			overlay.draw_polyline(outline, Color("ffb35c"), 1.5)
+		elif drawn.has_area():
+			_draw_control(Rect2(drawn), rect, false)
+		if (outline.is_empty() and not drawn.has_area()) or tool == Tool.SELECT:
 			overlay.draw_line(at - Vector2(8, 0), at + Vector2(8, 0), Color("ffb35c"), 2.0)
 			overlay.draw_line(at - Vector2(0, 8), at + Vector2(0, 8), Color("ffb35c"), 2.0)
+	_draw_gizmo_2d()
+
+	if _nav == Nav.EDIT_2D and not str(_drag.get("message", "")).is_empty():
+		var font := get_theme_default_font()
+		var at := Vector2(12, area.size.y - 12)
+		overlay.draw_string(font, at + Vector2(1, 1), _drag.message, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0, 0, 0, 0.8))
+		overlay.draw_string(font, at, _drag.message, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
+
+## Godot's 2D gizmos for the selected node, in view coordinates. Shape and resize handles come first, so they win.
+func _handles_2d() -> Array:
+	var out := []
+	var node := Document.find(root, selected) if selected > 0 and not playing and mode_2d else {}
+	if node.is_empty(): return out
+	var type := str(node.type)
+
+	if type == "CollisionShape2D":
+		var t := Document.canvas_transform(root, selected)
+		var shape := str(node.get("shape", "Rectangle"))
+		if shape == "Rectangle":
+			var s: Array = node.get("size", [20.0, 20.0])
+			var half := Vector2(float(s[0]), float(s[1])) * 0.5
+			var sides := [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
+			# small on screen, eight handles would cover the shape
+			if canvas_to_area(t * half).distance_to(canvas_to_area(t * -half)) > 56.0:
+				sides += [Vector2i(-1, 0), Vector2i(0, -1), Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1)]
+			for side in sides:
+				out.append({"kind": "shape", "side": side, "at": canvas_to_area(t * (half * Vector2(side)))})
+		else:
+			out.append({"kind": "shape", "param": "radius", "at": canvas_to_area(t * Vector2(float(node.get("radius", 10.0)), 0))})
+			if shape == "Capsule":
+				out.append({"kind": "shape", "param": "height", "at": canvas_to_area(t * Vector2(0, float(node.get("height", 30.0)) * 0.5))})
+
+	if Document.is_control(type):
+		if tool in [Tool.SELECT, Tool.MOVE] and node.has("size") and control_rect.is_valid():
+			var box: Rect2 = control_rect.call(node)
+			var a := canvas_to_area(box.position)
+			var b := canvas_to_area(box.end)
+			for y in [-1, 0, 1]:
+				for x in [-1, 0, 1]:
+					if x != 0 or y != 0:
+						out.append({"kind": "resize", "side": Vector2i(x, y), "at": Vector2(lerpf(a.x, b.x, (x + 1) * 0.5), lerpf(a.y, b.y, (y + 1) * 0.5))})
+		return out
+	if not Document.is_2d(type): return out
+
+	var g := Document.canvas_transform(root, selected)
+	var o := canvas_to_area(g.origin)
+	var ux := g.x.normalized() if g.x.length() > 0.0001 else Vector2.RIGHT
+	var uy := g.y.normalized() if g.y.length() > 0.0001 else Vector2.DOWN
+	match tool:
+		Tool.MOVE:
+			out.append({"kind": "move", "axis": 0, "dir": ux, "from": o + ux * 14.0, "at": o + ux * GIZMO_2D})
+			out.append({"kind": "move", "axis": 1, "dir": uy, "from": o + uy * 14.0, "at": o + uy * GIZMO_2D})
+		Tool.SCALE:
+			out.append({"kind": "scale", "axis": -1, "at": o})
+			out.append({"kind": "scale", "axis": 0, "dir": ux, "from": o + ux * 10.0, "at": o + ux * GIZMO_2D})
+			out.append({"kind": "scale", "axis": 1, "dir": uy, "from": o + uy * 10.0, "at": o + uy * GIZMO_2D})
+		Tool.ROTATE:
+			out.append({"kind": "rotate", "at": o})
+	return out
+
+func _handle_at_2d(at: Vector2) -> Dictionary:
+	for h in _handles_2d():
+		match str(h.kind):
+			"rotate":
+				if absf(at.distance_to(h.at) - RING_2D) < 6.0: return h
+			"move", "scale":
+				if at.distance_to(h.at) < 8.0 or (h.has("from") and _distance_to_segment(at, h.from, h.at) < 5.0): return h
+			_:
+				if at.distance_to(h.at) < 7.0: return h
+	return {}
+
+static func _same_handle(a: Dictionary, b: Dictionary) -> bool:
+	return a.get("kind", "") == b.get("kind", "") and a.get("axis", -2) == b.get("axis", -2) \
+		and a.get("side", Vector2i.ZERO) == b.get("side", Vector2i.ZERO) and a.get("param", "") == b.get("param", "")
+
+func _cursor_for(handle: Dictionary) -> Control.CursorShape:
+	var side: Vector2i = handle.get("side", Vector2i.ZERO)
+	if handle.get("param", "") == "radius": side = Vector2i(1, 0)
+	elif handle.get("param", "") == "height": side = Vector2i(0, 1)
+	if side.x != 0 and side.y != 0: return Control.CURSOR_FDIAGSIZE if side.x == side.y else Control.CURSOR_BDIAGSIZE
+	if side.x != 0: return Control.CURSOR_HSIZE
+	if side.y != 0: return Control.CURSOR_VSIZE
+	return Control.CURSOR_ARROW if handle.is_empty() else Control.CURSOR_MOVE
+
+func _draw_gizmo_2d() -> void:
+	var active: Dictionary = _drag.get("handle", {}) if _nav == Nav.EDIT_2D else _hover_2d
+	for h in _handles_2d():
+		var hot := _same_handle(h, active)
+		match str(h.kind):
+			"move", "scale":
+				if not h.has("dir"):
+					overlay.draw_rect(Rect2(h.at - Vector2(5, 5), Vector2(10, 10)), Color(1, 1, 1, 1.0 if hot else 0.75), false, 2.0)
+					continue
+				var color: Color = Style.AXIS[int(h.axis)]
+				if hot: color = color.lightened(0.45)
+				overlay.draw_line(h.from, h.at, color, 2.0, true)
+				if h.kind == "move":
+					var d: Vector2 = h.dir
+					var n := Vector2(-d.y, d.x)
+					overlay.draw_colored_polygon(PackedVector2Array([h.at + d * 10.0, h.at + n * 5.0, h.at - n * 5.0]), color)
+				else:
+					overlay.draw_rect(Rect2(h.at - Vector2(4.5, 4.5), Vector2(9, 9)), color)
+			"rotate":
+				overlay.draw_arc(h.at, RING_2D, 0.0, TAU, 72, Color(0.85, 0.9, 1.0, 0.95 if hot else 0.5), 2.0 if hot else 1.5, true)
+				overlay.draw_circle(h.at, 3.0, Color(0.85, 0.9, 1.0))
+				if _nav == Nav.EDIT_2D: overlay.draw_line(h.at, area.get_local_mouse_position(), Color(0.85, 0.9, 1.0, 0.6), 1.0, true)
+			"resize":
+				var box := Rect2(h.at - Vector2(4, 4), Vector2(8, 8))
+				overlay.draw_rect(box, Color("ffb35c").lightened(0.4) if hot else Color("ffb35c"))
+				overlay.draw_rect(box, Color(0, 0, 0, 0.6), false, 1.0)
+			"shape":
+				overlay.draw_circle(h.at, 5.0 if hot else 4.0, Color(1.0, 0.45, 0.3))
+				overlay.draw_arc(h.at, 5.0 if hot else 4.0, 0.0, TAU, 16, Color(1, 1, 1, 0.9), 1.0, true)
+
+## A sprite's frame on the canvas, rotated and scaled with the node, as Godot outlines it.
+func _sprite_outline(node: Dictionary) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	if not str(node.type) in ["Sprite2D", "AnimatedSprite2D"] or not texture_size.is_valid(): return out
+	var size := Vector2(texture_size.call(str(node.get("texture", ""))))
+	if size == Vector2.ZERO: return out
+	size /= Vector2(maxi(1, int(node.get("hframes", 1))), maxi(1, int(node.get("vframes", 1))))
+	var offset: Array = node.get("offset", [0.0, 0.0])
+	var low := Vector2(float(offset[0]), float(offset[1])) - (size * 0.5 if bool(node.get("centered", true)) else Vector2.ZERO)
+	var t := Document.canvas_transform(root, int(node.id))
+	for corner in [low, low + Vector2(size.x, 0), low + size, low + Vector2(0, size.y), low]:
+		out.append(canvas_to_area(t * corner))
+	return out
+
+func _canvas_scale() -> float:
+	return canvas_zoom * _image_rect().size.x / W
+
+## A press in the 2D view: a gizmo handle, or the node under the cursor, which the tool then moves, turns or scales.
+func _press_2d(at: Vector2) -> void:
+	var handle := _handle_at_2d(at)
+	if not handle.is_empty():
+		_begin_edit_2d(selected, handle, at)
+		return
+	if not _image_rect().has_point(at): return
+	var hit := _pick_2d(at)
+	if hit <= 0: return
+	if hit != selected: node_picked.emit(hit)
+	var kind := "rotate" if tool == Tool.ROTATE else "scale" if tool == Tool.SCALE else "move"
+	if kind != "move" and not Document.is_2d(str(Document.find(root, hit).get("type", ""))): return
+	_begin_edit_2d(hit, {"kind": kind, "axis": -1}, at)
+
+func _begin_edit_2d(id: int, handle: Dictionary, at: Vector2) -> void:
+	var node := Document.find(root, id)
+	if node.is_empty(): return
+	var parent := Document.parent_of(root, id)
+	var p: Array = node.get("position", [0.0, 0.0])
+	var s: Array = node.get("scale", [1.0, 1.0])
+	_drag = {"id": id, "handle": handle, "press": at, "last": at, "turn": 0.0,
+		"position": Vector2(float(p[0]), float(p[1])), "rotation": float(node.get("rotation_degrees", 0.0)),
+		"scale": Vector2(float(s[0]), float(s[1])), "global": Document.canvas_transform(root, id),
+		"parent": Document.canvas_transform(root, int(parent.id)) if not parent.is_empty() else Transform2D.IDENTITY}
+	if Document.is_control(str(node.type)) and control_rect.is_valid(): _drag.rect = control_rect.call(node)
+	_nav = Nav.EDIT_2D
+
+## Shift keeps a move on one axis or a scale uniform; Ctrl snaps like the Snap button.
+func _update_edit_2d(at: Vector2, final: bool, shift: bool, ctrl: bool) -> void:
+	if _drag.is_empty(): return
+	var id: int = _drag.id
+	var node := Document.find(root, id)
+	if node.is_empty(): return
+	var handle: Dictionary = _drag.handle
+	var g: Transform2D = _drag.global
+	var o := canvas_to_area(g.origin)
+	var snapping := snap or ctrl
+	var step := 8.0 if snapping else 1.0
+	var press: Vector2 = _drag.press
+	var delta := (at - press) / _canvas_scale()
+	var values := {}
+	var message := ""
+
+	match str(handle.kind):
+		"move":
+			if handle.has("dir"): delta = handle.dir * delta.dot(handle.dir)
+			elif shift: delta = Vector2(delta.x, 0) if absf(delta.x) >= absf(delta.y) else Vector2(0, delta.y)
+			var target: Vector2
+			if Document.is_control(str(node.type)):
+				target = (_drag.position + delta).round()
+				if snapping: target = target.snapped(Vector2(8, 8))
+			else:
+				var origin: Vector2 = g.origin + delta
+				if snapping: origin = origin.snapped(Vector2(8, 8))
+				target = ((_drag.parent as Transform2D).affine_inverse() * origin).round()
+			values.position = [target.x, target.y]
+			message = "Position: (%d, %d)" % [target.x, target.y]
+		"rotate":
+			var v0: Vector2 = _drag.last - o
+			var v1 := at - o
+			if v0.length() > 2.0 and v1.length() > 2.0:
+				_drag.turn += v0.angle_to(v1)
+				_drag.last = at
+			var degrees := snappedf(float(_drag.rotation) + rad_to_deg(_drag.turn), 15.0 if snapping else 0.1)
+			degrees = wrapf(degrees, -180.0, 180.0)
+			values.rotation_degrees = degrees
+			message = "Rotation: %.1f°" % degrees
+		"scale":
+			var ratio := Vector2.ONE
+			if int(handle.get("axis", -1)) < 0:
+				var r := (at - o).length() / maxf((press - o).length(), 8.0)
+				ratio = Vector2(r, r)
+			else:
+				var d: Vector2 = handle.dir
+				var p0 := (press - o).dot(d)
+				if absf(p0) < 4.0: return
+				var r := (at - o).dot(d) / p0
+				ratio = Vector2(r, r) if shift else (Vector2(r, 1.0) if int(handle.axis) == 0 else Vector2(1.0, r))
+			var scale: Vector2 = _drag.scale * ratio
+			for i in 2:
+				scale[i] = snappedf(scale[i], 0.1 if snapping else 0.01)
+				if absf(scale[i]) < 0.01: scale[i] = -0.01 if scale[i] < 0 else 0.01
+			values.scale = [scale.x, scale.y]
+			message = "Scale: (%.2f, %.2f)" % [scale.x, scale.y]
+		"resize":
+			var box: Rect2 = _drag.rect
+			var side: Vector2i = handle.side
+			var low := box.position
+			var high := box.end
+			if side.x < 0: low.x = minf(snappedf(low.x + delta.x, step), high.x - 1)
+			if side.x > 0: high.x = maxf(snappedf(high.x + delta.x, step), low.x + 1)
+			if side.y < 0: low.y = minf(snappedf(low.y + delta.y, step), high.y - 1)
+			if side.y > 0: high.y = maxf(snappedf(high.y + delta.y, step), low.y + 1)
+			var position: Vector2 = _drag.position + (low - box.position)
+			values.position = [position.x, position.y]
+			values.size = [high.x - low.x, high.y - low.y]
+			message = "Size: (%d, %d)" % [high.x - low.x, high.y - low.y]
+		"shape":
+			if absf(g.determinant()) < 0.000001: return
+			var local := g.affine_inverse() * area_to_canvas(at)
+			if handle.has("side"):
+				var s: Array = node.get("size", [20.0, 20.0])
+				var size := Vector2(float(s[0]), float(s[1]))
+				if handle.side.x != 0: size.x = maxf(snappedf(absf(local.x) * 2.0, step), 1.0)
+				if handle.side.y != 0: size.y = maxf(snappedf(absf(local.y) * 2.0, step), 1.0)
+				values.size = [size.x, size.y]
+				message = "Size: (%d, %d)" % [size.x, size.y]
+			elif handle.param == "radius":
+				values.radius = maxf(snappedf(absf(local.x), step), 1.0)
+				message = "Radius: %d" % values.radius
+			else:
+				values.height = maxf(snappedf(absf(local.y) * 2.0, step), float(node.get("radius", 10.0)) * 2.0)
+				message = "Height: %d" % values.height
+
+	if at.distance_to(press) > 2.0: _drag.moved = true
+	_drag.message = message
+	# A plain click selects without leaving an empty undo step.
+	if _drag.get("moved", false): canvas_edited.emit(id, values, final)
+	overlay.queue_redraw()
+
+## Arrow keys move the selection by a pixel, Shift by 8, as in Godot.
+func _nudge_2d(key: int, far: bool) -> bool:
+	var node := Document.find(root, selected) if selected > 0 and not playing else {}
+	if node.is_empty() or not (Document.is_2d(str(node.type)) or Document.is_control(str(node.type))): return false
+	var directions := {KEY_LEFT: Vector2.LEFT, KEY_RIGHT: Vector2.RIGHT, KEY_UP: Vector2.UP, KEY_DOWN: Vector2.DOWN}
+	var step: Vector2 = directions[key] * (8.0 if far else 1.0)
+	var p: Array = node.get("position", [0.0, 0.0])
+	var position := Vector2(float(p[0]), float(p[1]))
+	if Document.is_2d(str(node.type)):
+		var parent := Document.parent_of(root, selected)
+		var t := Document.canvas_transform(root, int(parent.id)) if not parent.is_empty() else Transform2D.IDENTITY
+		position = t.affine_inverse() * (t * position + step)
+	else:
+		position += step
+	canvas_edited.emit(selected, {"position": [position.x, position.y]}, true)
+	return true
 
 func _draw_canvas_rect(box: Rect2, color: Color, width: float) -> void:
 	var a := canvas_to_area(box.position)

@@ -31,7 +31,7 @@ enum class NodeType : uint8_t { Node, Node3D, MeshInstance3D, Camera3D, Directio
                                 Label, TextureRect, ColorRect,
                                 StaticBody3D, CharacterBody3D, RigidBody3D, Area3D, CollisionShape3D, CPUParticles3D, Sprite3D, Control,
                                 Node2D, Sprite2D, AnimatedSprite2D, Camera2D,
-                                StaticBody2D, CharacterBody2D, RigidBody2D, Area2D, CollisionShape2D, Timer };
+                                StaticBody2D, CharacterBody2D, RigidBody2D, Area2D, CollisionShape2D, Timer, AnimationPlayer };
 // Godot's BoxShape3D, SphereShape3D, CapsuleShape3D; in 2D RectangleShape2D, CircleShape2D, CapsuleShape2D.
 enum class CollisionKind : uint8_t { Box, Sphere, Capsule };
 // Primitives use Godot's default mesh sizes (BoxMesh 1 m, SphereMesh r 0.5...). Mesh is an imported model part.
@@ -228,6 +228,30 @@ private:
     size_t size_ = 0;
 };
 
+struct AnimationKey {
+    float time = 0;
+    float transition = 1;          // Godot's ease() curve to the next key: 1 linear, above 1 in, below 1 out, negative in-out
+    jetscript::Value value;        // value tracks
+    std::string method;            // method tracks: method(args) on the track's node
+    std::vector<jetscript::Value> args;
+};
+struct AnimationTrack {
+    std::string path;              // the node, from the player's parent: "." (the parent), "Ship", "Ship/Gun"
+    std::string property;          // "position", "position:x", or a script variable; empty for a method track
+    uint8_t interpolation = 1;     // Godot's INTERPOLATION_NEAREST (0) or LINEAR (1)
+    std::vector<AnimationKey> keys; // sorted by time
+    // Looked up the first time the track plays.
+    mutable int property_id = -2;
+    mutable int8_t component = -1;
+};
+struct Animation {
+    std::string name;
+    float length = 1;
+    uint8_t loop = 0;              // Godot's LOOP_NONE, LOOP_LINEAR, LOOP_PINGPONG
+    std::vector<AnimationTrack> tracks;
+};
+constexpr size_t MaxAnimations = 64, MaxTracks = 128, MaxKeys = 4096;
+
 // Fields of the less common node types (2D, camera, light, environment, physics, particles).
 struct NodeExtras {
     // Label / TextureRect / ColorRect (color and alpha are shared with materials)
@@ -288,7 +312,19 @@ struct NodeExtras {
     float zoom[2] = {1, 1};
     // Timer: wait_time is lifetime, autostart is autoplay, and it runs while playing (time left in Live::cycle).
     bool paused = false;
+    // AnimationPlayer: `animation` is the autoplay name, anim_time the position in player_current.
+    std::vector<Animation> player_animations;
+    int16_t player_current = -1;
+    bool player_fresh = false; // just started: keys at its first instant fire too
+    float player_speed = 1;
 };
+
+// ints stay ints; vectors and colours go per component
+jetscript::Value interpolate(const jetscript::Value& a, const jetscript::Value& b, float weight);
+float component_of(const jetscript::Value& v, int component);
+jetscript::Value with_component(const jetscript::Value& v, int component, float x);
+// Godot's ease()
+float ease_curve(float x, float curve);
 
 // Godot conventions: metres, Y up, -Z forward, rotation in degrees applied in YXZ order.
 struct NodeDesc {
@@ -369,6 +405,7 @@ struct Autoload {
 constexpr size_t MaxAutoloads = 16;
 constexpr uint32_t AutoloadIdBase = 0x7fff0000u; // node ids of the autoloads; scene ids stay below
 constexpr uint32_t InstanceIdBase = 0x40000000u; // node ids made by instantiate(), below the autoloads'
+constexpr uint32_t TweenIdBase = 0x60000000u, TweenerIdBase = 0x68000000u; // Tweens and their Tweeners, never reused
 struct Description {
     std::string name = "Scene";
     std::string path;            // the starting scene, held in `nodes`
@@ -489,6 +526,8 @@ public:
     size_t node_bytes() const;
     // Live state of a node during play (for the editor); false if missing/freed.
     bool node_state(uint32_t id, NodeDesc& out) const;
+    // Editor preview: the values at `time`, without method keys.
+    bool preview_animation(uint32_t player, std::string_view name, float time);
 
     // Material and UV values last pushed to a node's Jet object.
     struct Applied {
@@ -590,7 +629,48 @@ private:
     void update_particles(float dt);
     void update_animations(float dt);
     void start_timer(Live& n, float wait_time = -1);
-    void emit_signals(); // the engine's signals gathered in signals_
+    // Tween steps run in sequence, the tweeners of a step together.
+    struct Tweener {
+        enum class Kind : uint8_t { Property, Interval, Callback, Method };
+        Kind kind = Kind::Property;
+        uint32_t id = 0;
+        int step = 0;
+        uint32_t target = 0;   // Property: the object and its property; "position:x" tweens one component
+        int property = -1;
+        int8_t component = -1;
+        jetscript::Value from, to, start, end, callable;
+        bool has_from = false, relative = false, started = false, finished = false;
+        float duration = 0, delay = 0;
+        uint8_t trans = 0, ease = 2; // Godot's Tween.TRANS_LINEAR, Tween.EASE_IN_OUT
+    };
+    struct Tween {
+        uint32_t id = 0, bound = 0; // bound: the node it dies with (0: the SceneTree's)
+        std::vector<Tweener> tweeners;
+        int steps = 0, step = 0, loops = 1, loop = 0; // loops 0: forever
+        bool parallel = false, join_next = false, new_step = false, running = true, started = false, done = false;
+        float speed = 1, step_time = 0, elapsed = 0;
+        uint8_t trans = 0, ease = 2;
+    };
+    uint32_t create_tween(uint32_t bound);
+    Tween* tween_of(uint32_t id);
+    Tweener* tweener_of(uint32_t id);
+    Tweener& add_tweener(Tween& t, Tweener::Kind kind);
+    void update_tweens(float dt);
+    bool advance_tween(Tween& t, float time);
+    void start_tweener(Tweener& tw);
+    void apply_tweener(Tweener& tw, float progress);
+    void kill_tweens(bool keep_autoloads);
+    bool play_player(Live& n, std::string_view name, float speed, bool from_end);
+    void stop_player(Live& n, bool keep_state);
+    void seek_player(Live& n, float time, bool update);
+    void advance_player(Live& n, float dt);
+    void apply_player(const Live& n, const Animation& a, float time);
+    void fire_method_keys(const Live& n, const Animation& a, float from, float to);
+    int animation_target(const Live& player, const std::string& path) const;
+    // Queued while walking nodes_ and run after it: scripts may add and free nodes.
+    struct Deferred { uint32_t source = 0; const char* signal = nullptr; jetscript::Value callable; std::vector<jetscript::Value> args; };
+    void defer_signal(uint32_t source, const char* signal, std::vector<jetscript::Value> args = {});
+    void run_deferred();
     bool play_animation(Live& n, std::string_view name);
     void render_particles();
     struct ParticleView;
@@ -687,8 +767,9 @@ private:
     bool reorder_needed_ = false; // a node was added under one that comes later in nodes_
     uint32_t next_instance_id_ = InstanceIdBase;
     std::vector<LogLine> log_;
-    // Signals (timeout, animation_finished...) found while walking nodes_, emitted after the walk.
-    std::vector<std::pair<uint32_t, const char*>> signals_;
+    std::vector<Deferred> deferred_;
+    std::vector<Tween> tweens_;
+    uint32_t next_tween_id_ = TweenIdBase, next_tweener_id_ = TweenerIdBase;
     std::unique_ptr<ScriptHost> host_;
     std::unique_ptr<jetscript::VM> vm_;
 };

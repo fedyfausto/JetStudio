@@ -14,12 +14,13 @@ const AttachScriptDialog := preload("res://scripts/attach_script_dialog.gd")
 const SignalsDock := preload("res://scripts/signals_dock.gd")
 const ConnectDialog := preload("res://scripts/connect_dialog.gd")
 const NewSceneDialog := preload("res://scripts/new_scene_dialog.gd")
+const AnimationPanel := preload("res://scripts/animation_panel.gd")
 const ProjectManager := preload("res://scripts/project_manager.gd")
 const SerialMonitor := preload("res://scripts/serial_monitor.gd")
 const ProjectSettingsDialog := preload("res://scripts/project_settings_dialog.gd")
 const Hardware := preload("res://scripts/hardware.gd")
 const Actions := preload("res://scripts/input_map.gd")
-const VERSION := "0.5.0"
+const VERSION := "0.6.0"
 const SETTINGS := "user://editor.cfg"
 
 enum Screen { VIEW_3D, SCRIPT, GAME, VIEW_2D }
@@ -59,6 +60,8 @@ var scene_dock: SceneDock
 var filesystem: FileSystemDock
 var inspector: Inspector
 var signals_dock: SignalsDock
+var animation_panel: AnimationPanel
+var _repose := false # the next upload shows the animation pose being edited again
 var right_tabs: TabBar # Inspector | Node, as in Godot
 var viewport: Viewport3D
 var script_editor: ScriptEditor
@@ -439,6 +442,7 @@ func _build_ui() -> void:
 	bottom_tabs.add_tab("Output")
 	bottom_tabs.add_tab("Debugger")
 	bottom_tabs.add_tab("Serial")
+	bottom_tabs.add_tab("Animation")
 	bottom_tabs.clip_tabs = false # show every tab, the stats take the rest of the bar
 	bottom_bar.add_child(bottom_tabs)
 	# Board stats (Debug firmware only), visible from every tab.
@@ -475,10 +479,16 @@ func _build_ui() -> void:
 	serial_monitor.visible = false
 	serial_monitor.stats_changed.connect(func(text): device_stats.text = text)
 	bottom_stack.add_child(serial_monitor)
+	animation_panel = AnimationPanel.new()
+	animation_panel.visible = false
+	bottom_stack.add_child(animation_panel)
 	bottom_tabs.tab_changed.connect(func(i):
 		output_box.visible = i == 0
 		debugger.visible = i == 1
 		serial_monitor.visible = i == 2
+		animation_panel.visible = i == 3
+		if i == 3 and bottom_card.size.y < 300: center_split.split_offset -= int(300 - bottom_card.size.y)
+		_refresh_inspector() # key icons only show with the Animation tab
 		if i == 2 and not serial_monitor.is_connected_to_board(): serial_monitor.refresh_ports())
 	var debug_title := Label.new()
 	debug_title.text = "Script compile and runtime errors (double-click: go to line)"
@@ -576,6 +586,21 @@ func _build_ui() -> void:
 	scene_dock.signals_requested.connect(func(id):
 		_select(id)
 		right_tabs.current_tab = 1)
+	animation_panel.apply = func(merge, final, mutate):
+		var id := animation_panel.player_id
+		_repose = true
+		_change(merge, final, func():
+			var player := Document.find(_root_node(), id)
+			if not player.is_empty(): mutate.call(player))
+	animation_panel.scene_root = func(): return _root_node() if current >= 0 else {}
+	animation_panel.animatable = _animatable_properties
+	animation_panel.preview_requested.connect(func(id, name, at):
+		if bridge != null and not playing:
+			bridge.preview_animation(id, name, at)
+			needs_render = true)
+	inspector.keyable = func(node, key):
+		return animation_panel.visible and not animation_panel.animation.is_empty() and not _animatable(node, key).is_empty()
+	inspector.key_requested.connect(_key_property)
 	inspector.property_edited.connect(_property_edited)
 	inspector.script_property_edited.connect(_script_property_edited)
 	inspector.script_action.connect(func(action): _script_action_for(_tab().selected if current >= 0 else 0, action))
@@ -597,6 +622,8 @@ func _build_ui() -> void:
 		if not _smoke and _export_path.is_empty(): settings.save(SETTINGS))
 	viewport.model_dropped.connect(func(path, at): if current >= 0: _instantiate_model(int(_root_node().id), path, at))
 	viewport.control_moved.connect(_control_moved)
+	viewport.canvas_edited.connect(_canvas_edited)
+	viewport.texture_size = _texture_size
 	viewport.mesh_bounds = _mesh_bounds
 	viewport.control_rect = func(node): return Document.control_rect(_root_node(), node, _texture_size(str(node.get("texture", ""))))
 	viewport.camera_changed.connect(func(): needs_render = true)
@@ -999,6 +1026,7 @@ func _switch_tab(index: int) -> void:
 	_switching = true
 	scene_tabs.current_tab = index
 	_switching = false
+	animation_panel.edit(0)
 	if tabs[index].view.is_empty(): viewport.reset_view()
 	else: viewport.load_state(tabs[index].view)
 	_view_for_scene()
@@ -1048,6 +1076,45 @@ func _change_type(id: int, new_type: String) -> void:
 	var base := str(_script_info(path).get("base", "")) if not path.is_empty() else ""
 	if not base.is_empty() and not Document.inherits(new_type, base):
 		_log("%s's script extends %s, which a %s isn't: change the script's extends or detach it." % [node.name, base, new_type], Style.WARNING)
+
+func _animatable(node: Dictionary, key: String) -> Dictionary:
+	if node.is_empty(): return {}
+	var prop := Document.property_def(str(node.type), key)
+	if prop.is_empty(): return {}
+	# 3D rotation is stored in degrees
+	var property := "rotation_degrees" if key == "rotation" and Document.is_3d(str(node.type)) else key
+	var cls := str(node.type)
+	while not cls.is_empty():
+		var found := {}
+		for c in script_editor.class_db:
+			if c.name == cls: found = c
+		if found.is_empty(): return {}
+		for p in found.properties:
+			if str(p.name) == property and not bool(p.get("read_only", false)):
+				var type := str(prop.type)
+				if not type in ["float", "int", "bool", "vector2", "vector3", "color"]: type = "string"
+				return {"key": key, "label": Document.label_for(prop), "property": property, "type": type}
+		cls = str(found.base)
+	return {}
+
+func _animatable_properties(node: Dictionary) -> Array:
+	var out := []
+	for cls in Document.class_chain(str(node.get("type", ""))):
+		for prop in Document.PROPERTIES.get(cls, []):
+			var info := _animatable(node, str(prop.key))
+			if not info.is_empty(): out.append(info)
+	return out
+
+func _key_property(key: String) -> void:
+	var node := Document.find(_root_node(), _tab().selected)
+	var info := _animatable(node, key)
+	var player := Document.find(_root_node(), animation_panel.player_id)
+	if info.is_empty() or player.is_empty(): return
+	var parent := Document.parent_of(_root_node(), int(player.id))
+	var path := Document.relative_path(_root_node(), int(parent.id), int(node.id)) if not parent.is_empty() else "."
+	var value = node.get(key)
+	animation_panel.insert_key(path, str(info.property), key, str(info.type), value.duplicate() if value is Array else value)
+	_status("Key: %s:%s at %.2f s." % [node.name, info.property, animation_panel.time])
 
 ## The signals a node has: its script's and its classes'.
 func _signal_names(node: Dictionary) -> Array:
@@ -1610,6 +1677,10 @@ func _upload() -> void:
 	sources.merge(_autoload_sources())
 	var error: String = bridge.load_scene(_tab().doc, sources, _scene_assets(_tab().doc))
 	if not error.is_empty(): _log("Invalid scene: " + error, Style.ERROR)
+	# as in Godot, an Inspector or gizmo edit shows the edited value until the time moves again
+	if _repose and animation_panel.visible and animation_panel.player_id > 0 and not animation_panel.animation.is_empty():
+		bridge.preview_animation(animation_panel.player_id, animation_panel.animation, animation_panel.time)
+	_repose = false
 	needs_render = true
 
 func _refresh_all() -> void:
@@ -1618,6 +1689,8 @@ func _refresh_all() -> void:
 	if Document.find(tab.doc.root, tab.selected).is_empty(): tab.selected = int(tab.doc.root.id)
 	scene_dock.connections = Document.connections(tab.doc)
 	scene_dock.rebuild(tab.doc.root, tab.selected, playing)
+	animation_panel.read_only = playing
+	animation_panel.refresh()
 	_refresh_inspector()
 	viewport.set_scene(tab.doc.root, tab.selected, playing)
 	var names := []
@@ -1657,6 +1730,9 @@ func _script_info(path: String) -> Dictionary:
 func _select(id: int) -> void:
 	if current < 0: return
 	_tab().selected = id
+	if str(Document.find(_root_node(), id).get("type", "")) == "AnimationPlayer":
+		animation_panel.edit(id)
+		bottom_tabs.current_tab = 3
 	scene_dock.select(id)
 	_refresh_inspector()
 	viewport.set_scene(_root_node(), id, playing)
@@ -1712,6 +1788,7 @@ func _undo() -> void:
 	tab.redo.append(tab.doc.duplicate(true))
 	tab.doc = tab.undo.pop_back()
 	_merge_key = ""
+	_repose = true
 	_upload()
 	_refresh_all()
 	_status("Undo.")
@@ -1722,6 +1799,7 @@ func _redo() -> void:
 	tab.undo.append(tab.doc.duplicate(true))
 	tab.doc = tab.redo.pop_back()
 	_merge_key = ""
+	_repose = true
 	_upload()
 	_refresh_all()
 	_status("Redo.")
@@ -1752,6 +1830,12 @@ func _control_moved(id: int, position: Vector2, final: bool) -> void:
 	_change("move2d:%d" % id, final, func():
 		var node := Document.find(_root_node(), id)
 		if not node.is_empty(): node.position = [position.x, position.y])
+
+func _canvas_edited(id: int, values: Dictionary, final: bool) -> void:
+	_change("canvas:%d" % id, final, func():
+		var node := Document.find(_root_node(), id)
+		if node.is_empty(): return
+		for key in values: node[key] = values[key])
 
 func _transform_edited(id: int, local: Transform3D, final: bool) -> void:
 	_change("gizmo:%d" % id, final, func():
@@ -2639,6 +2723,7 @@ func _capture_and_quit(path: String) -> void:
 					"Backtrace: 0x4038085A:0x3FC9ED40 0x40381DAD:0x3FC9ED60 0x4037DE71:0x3FCB93E0 0x4037FF32:0x3FCB96A0 0x4203671B:0x3FCB96E0 0x42037278:0x3FCB9840 0x42005F05:0x3FCB9860 0x42001B71:0x3FCB9880"]:
 				serial_monitor.feed((line + "\r\n").to_utf8_buffer())
 		elif arg.begins_with("--screen="): _set_screen(int(arg.trim_prefix("--screen=")))
+		elif arg.begins_with("--tool="): viewport._set_tool(int(arg.trim_prefix("--tool=")))
 		elif arg == "--play": _play(false)
 		elif arg == "--dialog=create": _open_create("add", _tab().selected)
 		elif arg == "--dialog=new-scene": _new_scene()
@@ -2800,7 +2885,7 @@ func _run_smoke() -> void:
 	var pack_path := _root_dir().path_join(".cache/tests/smoke.jetpack")
 	_check(_export_to(pack_path), "export .jetpack")
 	var bytes := FileAccess.get_file_as_bytes(pack_path)
-	_check(bytes.size() > 100 and bytes.slice(0, 5) == PackedByteArray([74, 69, 84, 80, 16]), "package header JETP v16")
+	_check(bytes.size() > 100 and bytes.slice(0, 5) == PackedByteArray([74, 69, 84, 80, 17]), "package header JETP v17")
 	# 2D nodes
 	_add_node("ColorRect", int(_root_node().id))
 	var rect_id: int = _tab().selected
@@ -2886,6 +2971,49 @@ func _run_smoke() -> void:
 	var outline_2d: PackedVector2Array = bridge.shape_outline(ground_shape_id)
 	_check(viewport.mode_2d and outline_2d.size() == 4 and outline_2d[0].is_equal_approx(Vector2(20, 380)),
 		"the 2D view shows the canvas at its own zoom")
+
+	# 2D gizmos, driven as a drag from one view point to another
+	var drag_2d := func(id: int, handle: Dictionary, from: Vector2, to: Vector2):
+		viewport._begin_edit_2d(id, handle, from)
+		viewport._update_edit_2d(to, true, false, false)
+		viewport._nav = viewport.Nav.NONE
+		viewport._drag = {}
+	var handle_2d := func(kind: String, key: String, value: Variant) -> Dictionary:
+		for h in viewport._handles_2d():
+			if h.kind == kind and h.get(key) == value: return h
+		return {}
+	var ground_at := viewport.canvas_to_area(Vector2(160, 200))
+	_select(ground_id)
+	viewport._set_tool(viewport.Tool.ROTATE)
+	drag_2d.call(ground_id, handle_2d.call("rotate", "kind", "rotate"), ground_at + Vector2(60, 0), ground_at + Vector2(0, 60))
+	_check(is_equal_approx(float(Document.find(_root_node(), ground_id).rotation_degrees), 90.0), "the rotate gizmo turns a Node2D clockwise")
+	_select(ground_shape_id)
+	viewport._set_tool(viewport.Tool.MOVE)
+	drag_2d.call(ground_shape_id, {"kind": "move", "axis": -1}, ground_at, viewport.canvas_to_area(Vector2(170, 200)))
+	_check(Document.find(_root_node(), ground_shape_id).position == [0.0, -10.0], "moving a child of a rotated Node2D follows the cursor")
+	_undo()
+	_undo()
+	_select(ground_id)
+	viewport._set_tool(viewport.Tool.SCALE)
+	var scale_x: Dictionary = handle_2d.call("scale", "axis", 0)
+	drag_2d.call(ground_id, scale_x, scale_x.get("at", Vector2.ZERO), ground_at + scale_x.get("dir", Vector2.ZERO) * 120.0)
+	_check(Document.find(_root_node(), ground_id).scale == [2.0, 1.0], "the scale gizmo's X handle scales one axis")
+	_undo()
+	_select(ground_shape_id)
+	var right_edge: Dictionary = handle_2d.call("shape", "side", Vector2i(1, 0))
+	drag_2d.call(ground_shape_id, right_edge, right_edge.get("at", Vector2.ZERO), viewport.canvas_to_area(Vector2(330, 200)))
+	_check(Document.find(_root_node(), ground_shape_id).size == [340.0, 20.0], "CollisionShape2D handles resize the shape")
+	_undo()
+	_add_node("ColorRect", int(_root_node().id))
+	var panel_id: int = _tab().selected
+	viewport._set_tool(viewport.Tool.SELECT)
+	var corner: Dictionary = handle_2d.call("resize", "side", Vector2i(1, 1))
+	drag_2d.call(panel_id, corner, corner.get("at", Vector2.ZERO), viewport.canvas_to_area(Vector2(80, 72)))
+	viewport._nudge_2d(KEY_RIGHT, false)
+	var panel: Dictionary = Document.find(_root_node(), panel_id)
+	_check(panel.size == [80.0, 72.0] and panel.position == [1.0, 0.0], "Control resize handles and arrow-key nudging")
+	_delete_node(panel_id)
+	viewport._set_tool(viewport.Tool.MOVE)
 	_set_screen(Screen.VIEW_3D)
 	var shape_type := str(Document.find(_root_node(), ground_id).type)
 	_change_type(ground_id, "Area2D")
@@ -2983,6 +3111,80 @@ func _run_smoke() -> void:
 	_check(Document.connections(_tab().doc).is_empty(), "deleting the receiver drops its connections")
 	_delete_node(ticker_id)
 	right_tabs.current_tab = 0
+
+	# AnimationPlayer: the Animation panel, the Inspector's key icons, the preview and Play
+	_add_node("MeshInstance3D", int(_root_node().id))
+	var mover_id: int = _tab().selected
+	_rename_node(mover_id, "Mover")
+	_add_node("AnimationPlayer", int(_root_node().id))
+	var anim_player_id: int = _tab().selected
+	_select(anim_player_id)
+	_check(bottom_tabs.current_tab == 3 and animation_panel.player_id == anim_player_id, "selecting an AnimationPlayer opens the Animation panel")
+	animation_panel._on_edit_menu(0)
+	_check(Document.find(_root_node(), anim_player_id).get("animations", []).size() == 1 and animation_panel.animation == "new_animation",
+		"Animation > New adds an animation")
+
+	_select(mover_id)
+	_check(inspector.keyable.call(Document.find(_root_node(), mover_id), "position"), "the Inspector shows key icons while an animation is edited")
+	_key_property("position")
+	animation_panel._set_time(1.0)
+	_property_edited("position", [2.0, 0.0, 0.0], true)
+	_key_property("position")
+	var position_track: Dictionary = Document.find(_root_node(), anim_player_id).animations[0].tracks[0]
+	_check(position_track.path == "Mover" and position_track.property == "position" and position_track.keys.size() == 2
+		and position_track.keys[1].value == [2.0, 0.0, 0.0], "key icons add a track and its keys")
+	animation_panel._set_time(0.5)
+	var posed: Dictionary = bridge.node_state(mover_id)
+	_check(not posed.is_empty() and absf(posed.position.x - 1.0) < 0.01 and Document.find(_root_node(), mover_id).position == [2.0, 0.0, 0.0],
+		"moving the time previews the pose without changing the scene")
+
+	animation_panel._menu_target = {"method": false}
+	animation_panel._show_node_menu()
+	var mover_index := -1
+	for i in animation_panel._node_menu.item_count:
+		if int(animation_panel._node_menu.get_item_metadata(i)) == mover_id: mover_index = i
+	animation_panel._node_menu.hide()
+	animation_panel._on_node_chosen(mover_index)
+	animation_panel._property_menu.hide()
+	var choices: Array = animation_panel._menu_target.get("choices", [])
+	_check(choices.any(func(c): return c.property == "rotation_degrees") and not choices.any(func(c): return c.property == "mesh"),
+		"Add Track offers the properties the runtime can animate")
+	animation_panel._menu_target = {"method": true}
+	animation_panel._on_node_chosen(mover_index)
+	animation_panel._insert_at(1, 0.5)
+	animation_panel._selected = Vector2i(1, 0)
+	animation_panel.refresh()
+	animation_panel._set_key_field(1, 0, "method", "hit")
+	animation_panel._set_key_field(1, 0, "args", [7])
+	var call_key: Dictionary = Document.find(_root_node(), anim_player_id).animations[0].tracks[1].keys[0]
+	_check(call_key.method == "hit" and call_key.args == [7] and animation_panel._key_box.get_child_count() > 0, "a Call Method track with a key and its arguments")
+
+	animation_panel._autoplay.button_pressed = true
+	animation_panel._toggle_autoplay()
+	var mover_script := "res://scripts/smoke_mover.jet"
+	project.write(mover_script, "extends MeshInstance3D\nfunc hit(n):\n\tprint(\"smoke hit \", n)\n")
+	_attach_script(mover_id, mover_script)
+	_play(true)
+	for i in 5: _process(0.1)
+	var halfway: Dictionary = bridge.node_state(mover_id)
+	for i in 5: _process(0.1)
+	var hit := "smoke hit 7" in output.get_parsed_text()
+	_stop()
+	_check(hit and not halfway.is_empty() and absf(halfway.position.x - 1.0) < 0.25, "an autoplay animation moves the node and calls its method in Play")
+	var anim_pack := _root_dir().path_join(".cache/tests/animation.jetpack")
+	_check(_export_to(anim_pack), "export with an AnimationPlayer")
+
+	_select(anim_player_id)
+	var invalid_before := output.get_parsed_text().count("Invalid scene")
+	animation_panel._length.value = 0.25
+	_check(Document.find(_root_node(), anim_player_id).animations[0].length == 0.25 and output.get_parsed_text().count("Invalid scene") == invalid_before,
+		"a shorter length keeps the scene valid (later keys are left out)")
+	_undo()
+	_delete_node(anim_player_id)
+	_delete_node(mover_id)
+	bottom_tabs.current_tab = 0
+	_check(animation_panel.player_id == 0, "deleting the AnimationPlayer clears the panel")
+
 	# Particles
 	_add_node("CPUParticles3D", int(_root_node().id))
 	_property_edited("position", [0.0, 1.5, 0.0], true)
@@ -3198,6 +3400,7 @@ func _run_smoke() -> void:
 	_apply_hardware()
 	# Example project
 	_open_project(_example_folder())
+	_check(current >= 0 and not _dirty(_tab()), "an opened scene has no unsaved changes")
 	_play(false)
 	_check(playing, "example project plays")
 	for i in 5: _process(0.05)
@@ -3208,5 +3411,5 @@ func _run_smoke() -> void:
 	if _smoke_failed:
 		get_tree().quit(1)
 		return
-	print("PASS: Godot UI -> GDExtension -> runtime -> Jet; nodes, undo, hierarchy, scripts, play/stop, errors, save, export, 2D, physics, 2D physics, 2D view, new scene roots, Change Type, Timer, signals, Signals dock connections, particles, Input Map, scenes, autoloads, boot splash, OBJ import, serial monitor")
+	print("PASS: Godot UI -> GDExtension -> runtime -> Jet; nodes, undo, hierarchy, scripts, play/stop, errors, save, export, 2D, physics, 2D physics, 2D view, 2D gizmos, new scene roots, Change Type, Timer, signals, Signals dock connections, Animation panel, particles, Input Map, scenes, autoloads, boot splash, OBJ import, serial monitor")
 	get_tree().quit()

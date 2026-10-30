@@ -7,6 +7,7 @@ signal script_action(action: String)
 signal texture_requested(key: String)
 signal model_requested(key: String)
 signal import_applied(path: String, settings: Dictionary)
+signal key_requested(key: String)
 
 const Document := preload("res://scripts/scene_document.gd")
 const Style := preload("res://scripts/theme.gd")
@@ -22,6 +23,8 @@ var resolve_path: Callable
 var model_parts: Callable
 ## Size of a texture after its import settings: Callable(res_path) -> Vector2i.
 var imported_size: Callable
+## Callable(node, key) -> bool: whether the property gets a key icon.
+var keyable: Callable
 
 var node: Dictionary = {}
 var script_info: Dictionary = {}
@@ -262,6 +265,14 @@ func _row(parent: VBoxContainer, text: String, tooltip: String, editor: Control,
 	revert.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	label_box.add_child(revert)
 	_revert[key] = revert
+	if keyable.is_valid() and not read_only and keyable.call(node, key):
+		var key_button := Button.new()
+		key_button.theme_type_variation = "FlatButton"
+		key_button.icon = Icons.get_icon("Key")
+		key_button.tooltip_text = "Insert a key for this property in the animation, at the current time"
+		key_button.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		key_button.pressed.connect(func(): key_requested.emit(key))
+		label_box.add_child(key_button)
 	editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(editor)
 	_rows.append({"text": text.to_lower() + " " + key.to_lower(), "row": row})

@@ -32,6 +32,9 @@ public:
 
 private:
     std::string_view scene_path(jetscript::ObjectId id) const;
+    bool is_tween(jetscript::ObjectId id) const;
+    jetscript::Status tween_call(jetscript::ObjectId, int method, const jetscript::Value* args, int count,
+                                 jetscript::Value& result, std::string& error);
     Runtime* runtime_;
     std::vector<std::string> autoload_names_;
 };
