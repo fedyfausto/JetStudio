@@ -8,67 +8,75 @@
 #include <iostream>
 #include <limits>
 
-namespace {
-int failures = 0;
-void check(bool condition, const char* message) {
-    if (!condition) { std::cerr << "FAIL: " << message << '\n'; ++failures; }
-}
-
-using namespace jetstudio;
-constexpr int Width = DefaultWidth, Height = DefaultHeight;
-
-NodeDesc node(uint32_t id, int32_t parent, NodeType type, const char* name) {
-    NodeDesc n;
-    n.id = id; n.parent = parent; n.type = type; n.name = name;
-    return n;
-}
-// Root, light, camera and an orange cube at the origin.
-Description scene() {
-    Description d;
-    d.nodes.push_back(node(1, -1, NodeType::Node3D, "World"));
-    auto sun = node(2, 0, NodeType::DirectionalLight3D, "Sun");
-    sun.rotation = {-50, -35, 0};
-    d.nodes.push_back(sun);
-    auto camera = node(3, 0, NodeType::Camera3D, "Camera3D");
-    camera.position = {0, 2, 5}; camera.rotation = {-20, 0, 0}; camera.extras().current = true;
-    d.nodes.push_back(camera);
-    auto cube = node(4, 0, NodeType::MeshInstance3D, "Cube");
-    cube.position = {0, 0.5f, 0}; cube.color = 0xf0a45b;
-    d.nodes.push_back(cube);
-    return d;
-}
-std::vector<uint16_t> frame(Runtime& runtime) { runtime.render(); return runtime.pixels(); }
-size_t lit(const std::vector<uint16_t>& pixels, uint32_t background = 0x161c28) {
-    return size_t(std::count_if(pixels.begin(), pixels.end(), [&](uint16_t c) { return c != rgb565(background); }));
-}
-bool has_log(Runtime& runtime, const std::string& text, bool error) {
-    for (const auto& line : runtime.take_log()) if (line.error == error && line.text.find(text) != std::string::npos) return true;
-    return false;
-}
-std::vector<uint16_t> render_scene(const Description& d) {
-    Runtime runtime;
-    std::string error;
-    if (!runtime.load(d, error)) { std::cerr << error << '\n'; return {}; }
-    return frame(runtime);
-}
-std::vector<uint16_t> play_scene(const Description& d, float seconds = 0, uint32_t input = 0) {
-    Runtime runtime;
-    std::string error;
-    std::vector<ScriptDiagnostic> diagnostics;
-    if (!runtime.load(d, error) || !runtime.start(diagnostics)) {
-        std::cerr << error;
-        for (const auto& e : diagnostics) std::cerr << e.path << ':' << e.line << ' ' << e.message << '\n';
-        return {};
+namespace{
+    int failures = 0;
+    void check(bool condition, const char* message){
+        if(!condition){ std::cerr << "FAIL: " << message << '\n'; ++failures; }
     }
-    runtime.set_input(input);
-    for (float t = 0; t < seconds; t += 0.05f) runtime.update(0.05f);
-    runtime.update(0);
-    return frame(runtime);
+
+    using namespace jetstudio;
+    constexpr int Width = DefaultWidth, Height = DefaultHeight;
+
+    NodeDesc node(uint32_t id, int32_t parent, NodeType type, const char* name){
+        NodeDesc n;
+        n.id = id; n.parent = parent; n.type = type; n.name = name;
+        return n;
+    }
+    // Root, light, camera and an orange cube at the origin.
+    Description scene(){
+        Description d;
+        d.nodes.push_back(node(1, -1, NodeType::Node3D, "World"));
+        auto sun = node(2, 0, NodeType::DirectionalLight3D, "Sun");
+        sun.rotation = {-50, -35, 0};
+        d.nodes.push_back(sun);
+        auto camera = node(3, 0, NodeType::Camera3D, "Camera3D");
+        camera.position = {0, 2, 5}; camera.rotation = {-20, 0, 0}; camera.extras().current = true;
+        d.nodes.push_back(camera);
+        auto cube = node(4, 0, NodeType::MeshInstance3D, "Cube");
+        cube.position = {0, 0.5f, 0}; cube.color = 0xf0a45b;
+        d.nodes.push_back(cube);
+        return d;
+    }
+    std::vector<uint16_t> frame(Runtime& runtime){ runtime.render(); return runtime.pixels(); }
+    size_t lit(const std::vector<uint16_t>& pixels, uint32_t background = 0x161c28){
+        return size_t(std::count_if(pixels.begin(), pixels.end(), [&](uint16_t c){ return c != rgb565(background); }));
+    }
+    bool hasLog(Runtime& runtime, const std::string& text, bool error){
+        for(const auto& line : runtime.take_log()) if(line.error == error && line.text.find(text) != std::string::npos) return true;
+
+        return false;
+    }
+    std::vector<uint16_t> renderScene(const Description& d){
+        Runtime runtime;
+        std::string error;
+
+        if(!runtime.load(d, error)){ std::cerr << error << '\n'; return {}; }
+        return frame(runtime);
+    }
+    std::vector<uint16_t> playScene(const Description& d, float seconds = 0, uint32_t input = 0){
+        Runtime runtime;
+        std::string error;
+        std::vector<ScriptDiagnostic> diagnostics;
+
+        if(!runtime.load(d, error) || !runtime.start(diagnostics)){
+            std::cerr << error;
+
+            for(const auto& e : diagnostics) std::cerr << e.path << ':' << e.line << ' ' << e.message << '\n';
+
+            return {};
+        }
+
+        runtime.set_input(input);
+
+        for(float t = 0; t < seconds; t += 0.05f) runtime.update(0.05f);
+
+        runtime.update(0);
+        return frame(runtime);
+    }
 }
-} // namespace
 
 // Touches most of the language: loops, match, containers, formatting, enums, typed vars, calls, $ paths, builtins.
-const char* const coverage_script = R"(extends Node3D
+const char* const coverageScript = R"(extends Node3D
 const LIMIT := 4
 enum Mode { IDLE, RUN = 5, JUMP }
 @export var speed := 2.5
@@ -120,110 +128,129 @@ func _ready():
 	print(text, " ", mixed.size(), " ", table["y"], " ", Mode.JUMP, " ", str(total is int), " ", sqrt(16.0))
 )";
 
-std::vector<std::string> run_log(Runtime& runtime) {
+std::vector<std::string> runLog(Runtime& runtime){
     std::vector<std::string> lines;
-    for (const auto& line : runtime.take_log()) lines.push_back((line.error ? "E " : "") + line.text);
+
+    for(const auto& line : runtime.take_log()) lines.push_back((line.error ? "E " : "") + line.text);
+
     return lines;
 }
 
-uint32_t crc32(const uint8_t* data, size_t size) {
+uint32_t crc32(const uint8_t* data, size_t size){
     uint32_t crc = 0xFFFFFFFFu;
-    for (size_t i = 0; i < size; ++i) {
+
+    for(size_t i = 0; i < size; ++i){
         crc ^= data[i];
-        for (int k = 0; k < 8; ++k) crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
+
+        for(int k = 0; k < 8; ++k) crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
     }
+
     return ~crc;
 }
 
-void bytecode_tests() {
+void bytecodeTests(){
     ScriptHost host;
     const char* const sources[] = {
-        coverage_script,
+        coverageScript,
         "extends Node3D\n@export var speed := 90.0\nfunc _process(delta):\n\trotation_degrees.y += speed * delta\n",
         "extends Node\nvar data := {}\nfunc _ready():\n\tfor i in 3:\n\t\tdata[i] = [i, str(i)]\n\tprint(data)\n",
-        // Vector2 constants and exports, and a PackedScene from preload().
+        //Vector2 constants and exports, and a PackedScene from preload().
         "extends Sprite2D\n@export var velocity := Vector2(260, 0)\nconst HOME := Vector2(16, 8) * 2\n"
         "var bullet = preload(\"res://b.jetscene\")\nfunc _process(delta):\n\tposition += velocity * delta + HOME * 0.0\n",
     };
-    for (const char* source : sources) {
+
+    for(const char* source : sources){
         auto compiled = jetscript::compile(source, "res://t.jet", host);
         check(compiled.errors.empty(), "coverage script compiles");
-        if (!compiled.script) { for (auto& e : compiled.errors) std::cerr << e.line << ": " << e.message << '\n'; continue; }
-        const auto bytes = jetscript::save_bytecode(*compiled.script);
-        auto loaded = jetscript::load_bytecode(bytes.data(), bytes.size(), host);
+
+        if(!compiled.script){ for(auto& e : compiled.errors) std::cerr << e.line << ": " << e.message << '\n'; continue; }
+        const auto bytes = jetscript::saveBytecode(*compiled.script);
+        auto loaded = jetscript::loadBytecode(bytes.data(), bytes.size(), host);
         check(loaded.script != nullptr, "bytecode loads");
-        if (!loaded.script) { for (auto& e : loaded.errors) std::cerr << e.message << '\n'; continue; }
-        check(jetscript::save_bytecode(*loaded.script) == bytes, "bytecode round trip is stable");
+
+        if(!loaded.script){ for(auto& e : loaded.errors) std::cerr << e.message << '\n'; continue; }
+        check(jetscript::saveBytecode(*loaded.script) == bytes, "bytecode round trip is stable");
         check(loaded.script->exports().size() == compiled.script->exports().size()
-              && loaded.script->base_class() == compiled.script->base_class(), "bytecode keeps metadata");
-        // Every truncation and every single-byte corruption is rejected without crashing.
-        for (size_t n = 0; n < bytes.size(); n += 7)
-            check(jetscript::load_bytecode(bytes.data(), n, host).script == nullptr, "reject truncated bytecode");
-        for (size_t i = 0; i < bytes.size(); i += 3) {
+              && loaded.script->baseClass() == compiled.script->baseClass(), "bytecode keeps metadata");
+        //every truncation and every single-byte corruption is rejected without crashing.
+        for(size_t n = 0; n < bytes.size(); n += 7)
+            check(jetscript::loadBytecode(bytes.data(), n, host).script == nullptr, "reject truncated bytecode");
+
+        for(size_t i = 0; i < bytes.size(); i += 3){
             auto bad = bytes;
             bad[i] ^= 0x5a;
-            check(jetscript::load_bytecode(bad.data(), bad.size(), host).script == nullptr, "reject corrupted bytecode");
+            check(jetscript::loadBytecode(bad.data(), bad.size(), host).script == nullptr, "reject corrupted bytecode");
         }
     }
-    // Corruption with a valid checksum must be caught by the verifier (or be harmless).
-    auto compiled = jetscript::compile(coverage_script, "res://t.jet", host);
-    if (compiled.script) {
-        const auto bytes = jetscript::save_bytecode(*compiled.script);
+
+    //corruption with a valid checksum must be caught by the verifier (or be harmless).
+    auto compiled = jetscript::compile(coverageScript, "res://t.jet", host);
+
+    if(compiled.script){
+        const auto bytes = jetscript::saveBytecode(*compiled.script);
         int rejected = 0;
-        for (size_t i = 20; i < bytes.size(); ++i) {
+
+        for(size_t i = 20; i < bytes.size(); ++i){
             auto bad = bytes;
             bad[i] = uint8_t(bad[i] + 0x40);
             const uint32_t crc = crc32(bad.data() + 20, bad.size() - 20);
-            for (int k = 0; k < 4; ++k) bad[16 + k] = uint8_t(crc >> (8 * k));
-            rejected += jetscript::load_bytecode(bad.data(), bad.size(), host).script == nullptr;
+
+            for(int k = 0; k < 4; ++k) bad[16 + k] = uint8_t(crc >> (8 * k));
+
+            rejected += jetscript::loadBytecode(bad.data(), bad.size(), host).script == nullptr;
         }
+
         check(rejected > int(bytes.size()) / 4, "verifier rejects most re-checksummed corruptions");
     }
 }
 
 // RGBA checkerboard: `colors` distinct values, optional transparent pixels.
-std::vector<uint8_t> checker(int w, int h, int colors, bool holes) {
+std::vector<uint8_t> checker(int w, int h, int colors, bool holes){
     std::vector<uint8_t> rgba(size_t(w) * h * 4);
-    for (int y = 0; y < h; ++y)
-        for (int x = 0; x < w; ++x) {
+
+    for(int y = 0; y < h; ++y)
+        for(int x = 0; x < w; ++x){
             uint8_t* p = &rgba[(size_t(y) * w + x) * 4];
             const int c = (x / 4 + y / 4) % 2;
-            if (colors == 2) { p[0] = c ? 240 : 20; p[1] = c ? 200 : 40; p[2] = c ? 40 : 200; }
-            else { p[0] = uint8_t(x * 2); p[1] = uint8_t(y * 2); p[2] = uint8_t((x + y) & 255); } // every pixel different
+
+            if(colors == 2){ p[0] = c ? 240 : 20; p[1] = c ? 200 : 40; p[2] = c ? 40 : 200; }
+            //every pixel different
+            else { p[0] = uint8_t(x * 2); p[1] = uint8_t(y * 2); p[2] = uint8_t((x + y) & 255); }
             p[3] = holes && (x + y) % 9 == 0 ? 0 : 255;
         }
+
     return rgba;
 }
 
-void material_tests() {
+void materialTests(){
     std::string error;
-    // Conversion: palette when <= 256 colours, RGB565 otherwise, colour key for alpha.
+    //conversion: palette when <= 256 colours, RGB565 otherwise, colour key for alpha.
     TextureAsset small, large, holes;
     auto a = checker(16, 16, 2, false), b = checker(128, 128, 300, false), c = checker(16, 16, 2, true);
-    check(make_texture("res://a.png", 16, 16, a.data(), small, error) && small.palette.size() == 2 && small.indices.size() == 256,
+    check(makeTexture("res://a.png", 16, 16, a.data(), small, error) && small.palette.size() == 2 && small.indices.size() == 256,
           "two-colour image becomes a 2-entry palette texture");
-    check(make_texture("res://b.png", 128, 128, b.data(), large, error) && large.palette.empty() && large.pixels.size() == 128 * 128,
+    check(makeTexture("res://b.png", 128, 128, b.data(), large, error) && large.palette.empty() && large.pixels.size() == 128 * 128,
           "image with more than 256 colours stays RGB565");
-    check(make_texture("res://c.png", 16, 16, c.data(), holes, error) && holes.has_alpha
-          && std::find(holes.palette.begin(), holes.palette.end(), holes.alpha_color) != holes.palette.end(), "transparent pixels use a colour key");
+    check(makeTexture("res://c.png", 16, 16, c.data(), holes, error) && holes.has_alpha
+          && std::find(holes.palette.begin(), holes.palette.end(), holes.alphaColor) != holes.palette.end(), "transparent pixels use a colour key");
     TextureAsset bad;
-    check(!make_texture("res://x.png", 2048, 4, b.data(), bad, error), "reject oversized textures");
+    check(!makeTexture("res://x.png", 2048, 4, b.data(), bad, error), "reject oversized textures");
 
-    // Back-face culling must not drop visible faces of closed primitives.
-    // Covered pixels must match; colours may differ where back faces tied in depth.
-    for (int shape : {0, 1, 3, 4, 5}) {
+    //back-face culling must not drop visible faces of closed primitives.
+    //covered pixels must match; colours may differ where back faces tied in depth.
+    for(int shape : {0, 1, 3, 4, 5}){
         Description d = scene();
         d.nodes[3].shape = Shape(shape);
         d.nodes[3].rotation = {20, 35, 0};
         Description open = d, front = d;
         open.nodes[3].cull = CullMode::Disabled;
         front.nodes[3].cull = CullMode::Front;
-        const long all = long(lit(render_scene(open))), inside = long(lit(render_scene(front)));
-        check(render_scene(d) == render_scene(open), "back-face culling keeps closed primitives intact");
-        check(std::abs(inside - all) <= all / 50 + 2 && render_scene(front) != render_scene(open), "front-face culling shows the inside faces");
+        const long all = long(lit(renderScene(open))), inside = long(lit(renderScene(front)));
+        check(renderScene(d) == renderScene(open), "back-face culling keeps closed primitives intact");
+        check(std::abs(inside - all) <= all / 50 + 2 && renderScene(front) != renderScene(open), "front-face culling shows the inside faces");
     }
 
-    // Textures, filtering, perspective and albedo tint change the image.
+    //textures, filtering, perspective and albedo tint change the image.
     Description plain = scene();
     plain.nodes[3].position = {0, 0.4f, 3.6f};
     plain.nodes[3].rotation = {0, 55, 0};
@@ -232,8 +259,8 @@ void material_tests() {
     Description textured = plain;
     textured.textures.push_back(small);
     textured.nodes[3].texture = 0;
-    const auto untextured_frame = render_scene(plain), textured_frame = render_scene(textured);
-    check(textured_frame != untextured_frame, "textured box differs from a plain box");
+    const auto untexturedFrame = renderScene(plain), texturedFrame = renderScene(textured);
+    check(texturedFrame != untexturedFrame, "textured box differs from a plain box");
     Description linear = textured;
     linear.nodes[3].bilinear = true;
     Description affine = textured;
@@ -242,25 +269,29 @@ void material_tests() {
     tiled.nodes[3].uv_scale[0] = tiled.nodes[3].uv_scale[1] = 3;
     Description tinted = textured;
     tinted.nodes[3].color = 0xff0000;
-    check(render_scene(linear) != textured_frame, "bilinear filtering changes the magnified texture");
-    check(render_scene(affine) != textured_frame, "affine mapping differs from perspective-correct mapping");
-    check(render_scene(tiled) != textured_frame, "UV scale repeats the texture");
-    const auto red = render_scene(tinted);
+    check(renderScene(linear) != texturedFrame, "bilinear filtering changes the magnified texture");
+    check(renderScene(affine) != texturedFrame, "affine mapping differs from perspective-correct mapping");
+    check(renderScene(tiled) != texturedFrame, "UV scale repeats the texture");
+    const auto red = renderScene(tinted);
     size_t blue = 0;
-    for (uint16_t px : red) blue += px & 31;
-    size_t blue_plain = 0;
-    for (uint16_t px : textured_frame) blue_plain += px & 31;
-    check(blue < blue_plain, "albedo colour multiplies the texture");
+
+    for(uint16_t px : red) blue += px & 31;
+
+    size_t bluePlain = 0;
+
+    for(uint16_t px : texturedFrame) bluePlain += px & 31;
+
+    check(blue < bluePlain, "albedo colour multiplies the texture");
     Description glow = plain;
     glow.nodes[3].shading = Shading::Additive;
     glow.nodes[3].alpha = 0.6f;
-    check(render_scene(glow) != untextured_frame, "additive translucent material renders differently");
+    check(renderScene(glow) != untexturedFrame, "additive translucent material renders differently");
 
-    // Sky: gradient follows the camera pitch, panorama fills the background.
+    //sky: gradient follows the camera pitch, panorama fills the background.
     Description sky = scene();
     sky.nodes.push_back(node(5, 0, NodeType::WorldEnvironment, "Env"));
     sky.nodes[4].extras().background_mode = Background::Gradient;
-    sky.nodes[4].extras().sky_top = 0x0000ff; sky.nodes[4].extras().sky_horizon = 0xffffff; sky.nodes[4].extras().ground_horizon = 0x404040; sky.nodes[4].extras().ground_bottom = 0x000000;
+    sky.nodes[4].extras().skyTop = 0x0000ff; sky.nodes[4].extras().skyHorizon = 0xffffff; sky.nodes[4].extras().groundHorizon = 0x404040; sky.nodes[4].extras().groundBottom = 0x000000;
     Runtime r;
     check(r.load(sky, error), "scene with gradient sky loads");
     r.set_editor_camera({0, 1, 6}, {0, 0, 0}, 70);
@@ -280,13 +311,13 @@ void material_tests() {
     r.set_editor_camera({0, 1, 6}, {0, 0.8f, 0}, 70);
     check(frame(r) != first, "panorama turns with the camera");
 
-    // Script access to material properties.
+    //script access to material properties.
     Description scripted = textured;
     scripted.scripts.push_back({"res://uv.jet", "extends MeshInstance3D\nfunc _process(delta):\n\tuv_offset.x += 0.25\n\talpha = 0.5\n", {}});
     scripted.nodes[3].script = 0;
-    check(play_scene(scripted, 0.1f) != play_scene(textured, 0.1f), "scripts can scroll UVs and change alpha");
+    check(playScene(scripted, 0.1f) != playScene(textured, 0.1f), "scripts can scroll UVs and change alpha");
 
-    // Package v4 keeps textures and material fields.
+    //package v4 keeps textures and material fields.
     Description packed = textured;
     packed.textures.push_back(large);
     packed.textures.push_back(holes);
@@ -300,19 +331,19 @@ void material_tests() {
     Description back;
     check(decode_pack(bytes.data(), bytes.size(), back, error), "pack with textures round trips");
     check(back.textures.size() == 3 && back.textures[0].palette == small.palette && back.textures[0].indices == small.indices
-          && back.textures[1].pixels == large.pixels && back.textures[2].has_alpha && back.textures[2].alpha_color == holes.alpha_color,
+          && back.textures[1].pixels == large.pixels && back.textures[2].has_alpha && back.textures[2].alphaColor == holes.alphaColor,
           "pack keeps palette, RGB565 and colour-key textures");
     check(back.nodes[3].shading == Shading::Phong && back.nodes[3].uv_offset[0] == 0.5f && back.nodes[3].cull == CullMode::Front
           && back.nodes.back().more().background_mode == Background::Panorama && back.nodes.back().more().sky_texture == 1, "pack keeps material and sky fields");
-    check(render_scene(packed) == render_scene(back), "decoded pack renders identically");
+    check(renderScene(packed) == renderScene(back), "decoded pack renders identically");
     Description in_place;
-    check(decode_pack(bytes.data(), bytes.size(), in_place, error, true) && in_place.textures[0].packed_indices
-          && in_place.textures[0].indices.empty() && render_scene(in_place) == render_scene(back)
+    check(decode_pack(bytes.data(), bytes.size(), in_place, error, true) && in_place.textures[0].packedIndices
+          && in_place.textures[0].indices.empty() && renderScene(in_place) == renderScene(back)
           && encode_pack(in_place, error) == bytes, "palette textures read in place from the package render and save identically");
 }
 
 // Unit cube OBJ: two objects and materials, quads, shared per-face normals, negative indices, plus an MTL.
-const char* const cube_obj = R"(# test cube
+const char* const cubeObj = R"(# test cube
 mtllib cube.mtl
 v -0.5 -0.5 0.5
 v 0.5 -0.5 0.5
@@ -343,7 +374,7 @@ usemtl Glass
 f 4/1/5 3/2/5 7/3/5 8/4/5
 f -7/1/6 -8/2/6 -4/3/6 -3/4/6
 )";
-const char* const cube_mtl = R"(newmtl Paint
+const char* const cubeMtl = R"(newmtl Paint
 Kd 1.0 0.5 0.0
 Ns 32
 newmtl Glass
@@ -352,34 +383,38 @@ d 0.5
 map_Kd -s 1 1 1 glass.png
 )";
 
-void model_tests() {
+void modelTests(){
     std::string error;
-    // Quantization: a many-colour image becomes a 256-entry palette close to the source.
+    //quantization: a many-colour image becomes a 256-entry palette close to the source.
     auto many = checker(128, 128, 300, false), holes = checker(64, 64, 300, true);
     TextureAsset quantized, direct, keyed;
-    check(make_texture("res://q.png", 128, 128, many.data(), quantized, error, PaletteMode::Quantize) && quantized.palette.size() <= 256
+    check(makeTexture("res://q.png", 128, 128, many.data(), quantized, error, PaletteMode::Quantize) && quantized.palette.size() <= 256
           && quantized.palette.size() > 200 && quantized.indices.size() == 128 * 128, "Quantize reduces to a 256-colour palette");
     long worst = 0;
-    for (size_t i = 0; i < quantized.indices.size(); ++i) {
+
+    for(size_t i = 0; i < quantized.indices.size(); ++i){
         const uint16_t c = quantized.palette[quantized.indices[i]];
         const long r = long((c >> 11) << 3), g = long(((c >> 5) & 63) << 2), b = long((c & 31) << 3);
         worst = std::max({worst, std::abs(r - many[i * 4]), std::abs(g - many[i * 4 + 1]), std::abs(b - many[i * 4 + 2])});
     }
+
     check(worst < 48, "quantized colours stay close to the source");
     auto two = checker(16, 16, 2, false);
-    check(make_texture("res://d.png", 16, 16, two.data(), direct, error, PaletteMode::Rgb565) && direct.palette.empty()
+    check(makeTexture("res://d.png", 16, 16, two.data(), direct, error, PaletteMode::Rgb565) && direct.palette.empty()
           && direct.pixels.size() == 256, "RGB565 mode never builds a palette");
-    check(make_texture("res://k.png", 64, 64, holes.data(), keyed, error, PaletteMode::Quantize) && keyed.has_alpha
+    check(makeTexture("res://k.png", 64, 64, holes.data(), keyed, error, PaletteMode::Quantize) && keyed.has_alpha
           && keyed.palette.size() <= 256, "Quantize keeps the colour key");
-    bool key_only_on_holes = true;
-    for (size_t i = 0; i < keyed.indices.size(); ++i)
-        if ((keyed.palette[keyed.indices[i]] == keyed.alpha_color) != (holes[i * 4 + 3] < 128)) key_only_on_holes = false;
-    check(key_only_on_holes, "quantized opaque pixels never take the key colour");
+    bool keyOnlyOnHoles = true;
 
-    // OBJ import: parts per object and material, triangulation, MTL fields, UV flip.
+    for(size_t i = 0; i < keyed.indices.size(); ++i)
+        if((keyed.palette[keyed.indices[i]] == keyed.alphaColor) != (holes[i * 4 + 3] < 128)) keyOnlyOnHoles = false;
+
+    check(keyOnlyOnHoles, "quantized opaque pixels never take the key colour");
+
+    //OBJ import: parts per object and material, triangulation, MTL fields, UV flip.
     std::vector<ObjPart> parts;
     std::vector<ObjMaterial> materials;
-    check(import_obj(cube_obj, cube_mtl, {}, parts, materials, error), "OBJ cube imports");
+    check(importObj(cubeObj, cubeMtl, {}, parts, materials, error), "OBJ cube imports");
     check(parts.size() == 2 && parts[0].name == "Sides" && parts[0].material == "Paint" && parts[1].name == "Caps",
           "one part per object/material");
     check(parts.size() == 2 && parts[0].mesh.indices.size() == 24 && parts[1].mesh.indices.size() == 12, "quads become two triangles");
@@ -391,14 +426,14 @@ void model_tests() {
     ObjImportOptions options;
     options.mirror_x = true;
     options.scale = 2;
-    check(import_obj(cube_obj, cube_mtl, options, mirrored, materials, error) && mirrored[0].mesh.vertices[0].position.x == 1.0f
+    check(importObj(cubeObj, cubeMtl, options, mirrored, materials, error) && mirrored[0].mesh.vertices[0].position.x == 1.0f
           && mirrored[0].mesh.vertices[0].normal.z == 1.0f, "mirror X and scale");
-    check(!import_obj("v 0 0 0\nf 1 2 3\n", "", {}, parts, materials, error) && error.find("line 2") != std::string::npos,
+    check(!importObj("v 0 0 0\nf 1 2 3\n", "", {}, parts, materials, error) && error.find("line 2") != std::string::npos,
           "bad face index reports the line");
-    check(!import_obj("v 0 0 0\n", "", {}, parts, materials, error), "OBJ without faces is rejected");
-    check(import_obj(cube_obj, cube_mtl, {}, parts, materials, error), "re-import");
+    check(!importObj("v 0 0 0\n", "", {}, parts, materials, error), "OBJ without faces is rejected");
+    check(importObj(cubeObj, cubeMtl, {}, parts, materials, error), "re-import");
 
-    // Imported meshes render like the primitive they model and cull correctly.
+    //imported meshes render like the primitive they model and cull correctly.
     Description box = scene();
     box.nodes[3].shading = Shading::Unlit;
     box.nodes[3].rotation = {20, 35, 0};
@@ -409,22 +444,22 @@ void model_tests() {
     auto caps = model.nodes[3];
     caps.id = 5; caps.name = "Caps"; caps.mesh = 1;
     model.nodes.push_back(caps);
-    const auto primitive = render_scene(box), imported = render_scene(model);
+    const auto primitive = renderScene(box), imported = renderScene(model);
     check(!imported.empty() && std::labs(long(lit(imported)) - long(lit(primitive))) <= long(lit(primitive)) / 50,
           "imported cube covers the same pixels as the Box primitive");
     Description open = model;
     open.nodes[3].cull = open.nodes[4].cull = CullMode::Disabled;
-    check(render_scene(open) == imported, "imported winding faces outwards (culling keeps it intact)");
+    check(renderScene(open) == imported, "imported winding faces outwards (culling keeps it intact)");
     options = {};
     options.flip_faces = true;
     std::vector<ObjPart> inside;
-    check(import_obj(cube_obj, cube_mtl, options, inside, materials, error), "flip faces imports");
-    // Lit shading shows the inverted normals (unlit, both silhouettes are equal).
-    Description lit_model = model, flipped = model;
-    lit_model.nodes[3].shading = lit_model.nodes[4].shading = Shading::Gouraud;
+    check(importObj(cubeObj, cubeMtl, options, inside, materials, error), "flip faces imports");
+    //lit shading shows the inverted normals (unlit, both silhouettes are equal).
+    Description litModel = model, flipped = model;
+    litModel.nodes[3].shading = litModel.nodes[4].shading = Shading::Gouraud;
     flipped.nodes[3].shading = flipped.nodes[4].shading = Shading::Gouraud;
     flipped.meshes = {inside[0].mesh, inside[1].mesh};
-    check(render_scene(flipped) != render_scene(lit_model), "flip faces turns the model inside out");
+    check(renderScene(flipped) != renderScene(litModel), "flip faces turns the model inside out");
     Description empty = model;
     empty.nodes[3].mesh = empty.nodes[4].mesh = -1;
     Runtime runtime;
@@ -434,58 +469,61 @@ void model_tests() {
     empty.nodes[3].mesh = 7;
     check(!runtime.load(empty, error), "reject a mesh index out of range");
 
-    // Quad and Torus primitives.
+    //quad and Torus primitives.
     Description torus = scene();
     torus.nodes[3].shape = Shape::Torus;
     torus.nodes[3].rotation = {50, 20, 0};
-    Description torus_open = torus;
-    torus_open.nodes[3].cull = CullMode::Disabled;
-    check(lit(render_scene(torus)) > 500 && render_scene(torus) == render_scene(torus_open), "torus renders closed and outward");
+    Description torusOpen = torus;
+    torusOpen.nodes[3].cull = CullMode::Disabled;
+    check(lit(renderScene(torus)) > 500 && renderScene(torus) == renderScene(torusOpen), "torus renders closed and outward");
     Description quad = scene();
     quad.nodes[3].shape = Shape::Quad;
     quad.nodes[3].shading = Shading::Unlit;
-    const size_t quad_front = lit(render_scene(quad));
+    const size_t quadFront = lit(renderScene(quad));
     quad.nodes[3].rotation = {0, 180, 0};
-    const size_t quad_back = lit(render_scene(quad));
-    check(quad_front > 100 && quad_back == 0, "quad faces +Z and its back is culled");
+    const size_t quadBack = lit(renderScene(quad));
+    check(quadFront > 100 && quadBack == 0, "quad faces +Z and its back is culled");
     quad.nodes[3].cull = CullMode::Disabled;
-    check(lit(render_scene(quad)) == quad_front, "quad without culling is two-sided");
+    check(lit(renderScene(quad)) == quadFront, "quad without culling is two-sided");
 
-    // Diffuse coefficient darkens lit materials; environment reflection moves with the camera.
+    //diffuse coefficient darkens lit materials; environment reflection moves with the camera.
     Description shiny = scene();
     shiny.nodes[3].shading = Shading::Phong;
     shiny.nodes[3].color = 0xffffff;
     Description dull = shiny;
     dull.nodes[3].diffuse = 0.3f;
-    auto brightness = [](const std::vector<uint16_t>& px) {
+    auto brightness = [](const std::vector<uint16_t>& px){
         size_t sum = 0;
-        for (uint16_t c : px) sum += (c >> 11) + ((c >> 5) & 63) / 2 + (c & 31);
+
+        for(uint16_t c : px) sum += (c >> 11) + ((c >> 5) & 63) / 2 + (c & 31);
+
         return sum;
     };
-    check(brightness(render_scene(dull)) < brightness(render_scene(shiny)), "lower diffuse is darker");
+
+    check(brightness(renderScene(dull)) < brightness(renderScene(shiny)), "lower diffuse is darker");
     Description mirror = scene();
     TextureAsset environment;
-    check(make_texture("res://env.png", 128, 128, many.data(), environment, error), "environment texture");
+    check(makeTexture("res://env.png", 128, 128, many.data(), environment, error), "environment texture");
     mirror.textures.push_back(environment);
     mirror.nodes[3].texture = 0;
     mirror.nodes[3].color = 0xffffff;
     mirror.nodes[3].shading = Shading::Unlit;
     Description chrome = mirror;
     chrome.nodes[3].reflection = true;
-    check(render_scene(chrome) != render_scene(mirror), "reflection replaces the authored UVs");
+    check(renderScene(chrome) != renderScene(mirror), "reflection replaces the authored UVs");
     Runtime reflective;
     check(reflective.load(chrome, error), "reflective scene loads");
     reflective.set_editor_camera({0.3f, 1.6f, 4}, {-15, 4, 0}, 70);
-    const auto view_a = frame(reflective);
+    const auto viewA = frame(reflective);
     reflective.set_editor_camera({-0.3f, 1.6f, 4}, {-15, -4, 0}, 70);
-    const auto view_b = frame(reflective);
+    const auto viewB = frame(reflective);
     Runtime fixed;
     check(fixed.load(mirror, error), "plain textured scene loads");
     fixed.set_editor_camera({0.3f, 1.6f, 4}, {-15, 4, 0}, 70);
-    const auto plain_a = frame(fixed);
-    check(view_a != plain_a && view_b != view_a, "reflection follows the camera");
+    const auto plainA = frame(fixed);
+    check(viewA != plainA && viewB != viewA, "reflection follows the camera");
 
-    // 2D nodes over the 3D scene: fill, alpha, nesting, text, texture, picking.
+    //2D nodes over the 3D scene: fill, alpha, nesting, text, texture, picking.
     Description hud = scene();
     auto panel = node(10, 0, NodeType::ColorRect, "Panel");
     panel.position = {10, 10, 0}; panel.extras().size = {40, 30, 0}; panel.color = 0xff0000; panel.alpha = 1;
@@ -499,19 +537,23 @@ void model_tests() {
     auto icon = node(13, 0, NodeType::TextureRect, "Icon");
     icon.position = {250, 20, 0}; icon.texture = 0; icon.extras().text_scale = 2; icon.color = 0xffffff; icon.alpha = 1; icon.extras().size = {0, 0, 0};
     hud.nodes.push_back(icon);
-    TextureAsset two_colour;
-    check(make_texture("res://icon.png", 16, 16, two.data(), two_colour, error), "icon texture");
-    hud.textures.push_back(two_colour);
+    TextureAsset twoColour;
+    check(makeTexture("res://icon.png", 16, 16, two.data(), twoColour, error), "icon texture");
+    hud.textures.push_back(twoColour);
     Runtime overlay;
     check(overlay.load(hud, error), "scene with 2D nodes loads");
-    if (!error.empty()) std::cerr << error << '\n';
+
+    if(!error.empty()) std::cerr << error << '\n';
+
     auto px = frame(overlay);
-    auto at = [&](int x, int y) { return px[size_t(y) * Width + size_t(x)]; };
+    auto at = [&](int x, int y){ return px[size_t(y) * Width + size_t(x)]; };
     check(at(12, 12) == rgb565(0xff0000) && at(16, 16) == rgb565(0x00ff00), "ColorRect fills; child Control is relative to its parent");
     size_t white = 0;
-    for (int y = 200; y < 230; ++y) for (int x = 100; x < 128; ++x) white += at(x, y) == rgb565(0xffffff);
+
+    for(int y = 200; y < 230; ++y) for(int x = 100; x < 128; ++x) white += at(x, y) == rgb565(0xffffff);
+
     check(white > 40, "Label draws scaled bitmap text");
-    check(at(250, 20) == two_colour.palette[two_colour.indices[0]] && at(281, 51) == two_colour.palette[two_colour.indices[255]],
+    check(at(250, 20) == twoColour.palette[twoColour.indices[0]] && at(281, 51) == twoColour.palette[twoColour.indices[255]],
           "TextureRect draws the texture at integer scale");
     check(overlay.pick(12, 12) == 10 && overlay.pick(16, 16) == 11 && overlay.pick(110, 205) == 12 && overlay.pick(260, 30) == 13,
           "2D nodes are picked before 3D objects");
@@ -523,13 +565,13 @@ void model_tests() {
     hud.nodes[5].visible = true;
     hud.scripts.push_back({"res://hud.jet", "extends Label\nfunc _process(delta):\n\ttext = \"SCORE 99\"\n\tposition.x = 20.0\n", {}});
     hud.nodes[6].script = 0;
-    check(play_scene(hud, 0.1f) != render_scene(hud), "scripts change Label text and Control position");
+    check(playScene(hud, 0.1f) != renderScene(hud), "scripts change Label text and Control position");
 
-    // A plain Control draws nothing; its children sit relative to it and hide and fade with it.
+    //a plain Control draws nothing; its children sit relative to it and hide and fade with it.
     Description group = scene();
-    auto group_root = node(10, 0, NodeType::Control, "HUD");
-    group_root.position = {40, 40, 0};
-    group.nodes.push_back(group_root);
+    auto groupRoot = node(10, 0, NodeType::Control, "HUD");
+    groupRoot.position = {40, 40, 0};
+    group.nodes.push_back(groupRoot);
     auto bar = node(11, 4, NodeType::ColorRect, "Bar");
     bar.position = {2, 2, 0}; bar.extras().size = {6, 6, 0}; bar.color = 0xff0000; bar.alpha = 1;
     group.nodes.push_back(bar);
@@ -546,24 +588,25 @@ void model_tests() {
     check(overlay.load(group, error), "hidden Control loads");
     px = frame(overlay);
     check(faded != rgb565(0xff0000) && faded != at(43, 43) && at(43, 43) != rgb565(0xff0000), "children fade and hide with their Control");
-    const auto group_bytes = encode_pack(group, error);
-    Description group_back;
-    check(decode_pack(group_bytes.data(), group_bytes.size(), group_back, error) && group_back.nodes[4].type == NodeType::Control,
+    const auto groupBytes = encode_pack(group, error);
+    Description groupBack;
+    check(decode_pack(groupBytes.data(), groupBytes.size(), groupBack, error) && groupBack.nodes[4].type == NodeType::Control,
           "the package keeps plain Controls");
 
-    // Draw order bands: Background never hides later geometry, On Top covers it.
-    auto pair = [](DrawOrder near_order, DrawOrder far_order) {
+    //draw order bands: Background never hides later geometry, On Top covers it.
+    auto pair = [](DrawOrder nearOrder, DrawOrder farOrder){
         Description d = scene();
         d.nodes[3].shading = Shading::Unlit;
         d.nodes[3].color = 0xff0000;
-        d.nodes[3].position = {0, 0.6f, 2.5f}; // near the camera
-        d.nodes[3].draw_order = near_order;
+        //near the camera
+        d.nodes[3].position = {0, 0.6f, 2.5f};
+        d.nodes[3].draw_order = nearOrder;
         auto far = node(5, 0, NodeType::MeshInstance3D, "Far");
         far.shading = Shading::Unlit;
         far.color = 0x0000ff;
         far.position = {0, 0.6f, -1};
         far.scale = {2, 2, 2};
-        far.draw_order = far_order;
+        far.draw_order = farOrder;
         d.nodes.push_back(far);
         Runtime r;
         std::string e;
@@ -572,10 +615,11 @@ void model_tests() {
         r.render();
         return r.pixels()[size_t(Height / 2 + 6) * Width + Width / 2];
     };
+
     check(pair(DrawOrder::Default, DrawOrder::Default) == rgb565(0xff0000), "nearer object hides the farther one");
     check(pair(DrawOrder::Background, DrawOrder::Default) == rgb565(0x0000ff), "Background geometry never hides later geometry");
     check(pair(DrawOrder::Default, DrawOrder::OnTop) == rgb565(0x0000ff), "On Top geometry covers nearer geometry");
-    // Translucent surfaces in front blend with what is behind them.
+    //translucent surfaces in front blend with what is behind them.
     {
         Description d = scene();
         d.nodes[3].shading = Shading::Unlit;
@@ -594,11 +638,11 @@ void model_tests() {
         r.set_editor_camera({0, 0.5f, 6}, {0, 0, 0}, 70);
         r.render();
         const uint16_t c = r.pixels()[size_t(Height / 2) * Width + Width / 2];
-        // Jet's blend is not linear in alpha: both colours just have to be present.
+        //Jet's blend is not linear in alpha: both colours just have to be present.
         check((c >> 11) >= 4 && (c & 31) >= 4, "a translucent quad in front shows the object behind it");
     }
 
-    // The screen resolution travels with the scene and the package.
+    //the screen resolution travels with the scene and the package.
     {
         Description wide = scene();
         wide.width = 480;
@@ -613,7 +657,7 @@ void model_tests() {
         check(r.load(scene(), error) && r.pixels().size() == size_t(Width * Height), "loading a 320x240 scene resizes back");
     }
 
-    // Package v7: resolution, meshes, primitives, 2D nodes, draw order and the new material fields.
+    //package v7: resolution, meshes, primitives, 2D nodes, draw order and the new material fields.
     Description packed = hud;
     packed.meshes = model.meshes;
     auto car = model.nodes[3];
@@ -624,7 +668,9 @@ void model_tests() {
     ring.id = 21; ring.parent = 0; ring.name = "Ring"; ring.position = {1.5f, 0.5f, 0};
     packed.nodes.push_back(ring);
     const auto bytes = encode_pack(packed, error);
-    if (bytes.empty()) std::cerr << "pack: " << error << '\n';
+
+    if(bytes.empty()) std::cerr << "pack: " << error << '\n';
+
     Description back;
     check(decode_pack(bytes.data(), bytes.size(), back, error), "pack v17 round trips");
     check(back.meshes.size() == 2 && back.meshes[0].vertices.size() == model.meshes[0].vertices.size()
@@ -635,16 +681,16 @@ void model_tests() {
           "pack keeps mesh references and material fields");
     check(back.nodes[6].type == NodeType::Label && back.nodes[6].more().text == "HI" && back.nodes[6].more().text_scale == 2
           && back.nodes[4].more().size.x == 40, "pack keeps 2D nodes");
-    check(render_scene(packed) == render_scene(back), "decoded v14 pack renders identically");
+    check(renderScene(packed) == renderScene(back), "decoded v14 pack renders identically");
 }
 
-NodeDesc shape(uint32_t id, int32_t parent, CollisionKind kind, Vec3 size = {1, 1, 1}, float radius = 0.5f, float height = 2) {
+NodeDesc shape(uint32_t id, int32_t parent, CollisionKind kind, Vec3 size = {1, 1, 1}, float radius = 0.5f, float height = 2){
     NodeDesc n = node(id, parent, NodeType::CollisionShape3D, "Shape");
-    n.extras().collision = kind; n.extras().box_size = size; n.extras().radius = radius; n.extras().height = height;
+    n.extras().collision = kind; n.extras().boxSize = size; n.extras().radius = radius; n.extras().height = height;
     return n;
 }
 // Static 20x1x20 floor with its top at y = 0.
-Description floor_scene() {
+Description floorScene(){
     Description d;
     d.nodes.push_back(node(1, -1, NodeType::Node3D, "World"));
     auto floor = node(2, 0, NodeType::StaticBody3D, "Floor");
@@ -654,7 +700,7 @@ Description floor_scene() {
     return d;
 }
 // Adds a body with one shape child; returns the body's node index.
-int add_body(Description& d, uint32_t id, NodeType type, const char* name, Vec3 position, NodeDesc collision) {
+int addBody(Description& d, uint32_t id, NodeType type, const char* name, Vec3 position, NodeDesc collision){
     auto body = node(id, 0, type, name);
     body.position = position;
     d.nodes.push_back(body);
@@ -664,66 +710,79 @@ int add_body(Description& d, uint32_t id, NodeType type, const char* name, Vec3 
     d.nodes.push_back(collision);
     return index;
 }
-Vec3 position_of(Runtime& runtime, uint32_t id) {
+Vec3 positionOf(Runtime& runtime, uint32_t id){
     NodeDesc out;
     runtime.node_state(id, out);
     return out.position;
 }
-void simulate(Runtime& runtime, float seconds) {
-    for (float t = 0; t < seconds; t += 1.0f / 60) runtime.update(1.0f / 60);
+void simulate(Runtime& runtime, float seconds){
+    for(float t = 0; t < seconds; t += 1.0f / 60) runtime.update(1.0f / 60);
 }
-bool start_scene(Runtime& runtime, const Description& d) {
+bool startScene(Runtime& runtime, const Description& d){
     std::string error;
     std::vector<ScriptDiagnostic> diagnostics;
     const bool ok = runtime.load(d, error) && runtime.start(diagnostics);
-    if (!ok) {
+
+    if(!ok){
         std::cerr << error;
-        for (const auto& e : diagnostics) std::cerr << e.path << ':' << e.line << ' ' << e.message << '\n';
+
+        for(const auto& e : diagnostics) std::cerr << e.path << ':' << e.line << ' ' << e.message << '\n';
     }
+
     return ok;
 }
 
-void physics_tests() {
+void physicsTests(){
     std::string error;
-    {   // A ball falls, lands on the floor and goes to sleep.
-        Description d = floor_scene();
-        add_body(d, 10, NodeType::RigidBody3D, "Ball", {0, 3, 0}, shape(0, 0, CollisionKind::Sphere));
+    //a ball falls, lands on the floor and goes to sleep.
+    {
+        Description d = floorScene();
+        addBody(d, 10, NodeType::RigidBody3D, "Ball", {0, 3, 0}, shape(0, 0, CollisionKind::Sphere));
         Runtime r;
-        check(start_scene(r, d), "physics scene starts");
+        check(startScene(r, d), "physics scene starts");
         simulate(r, 0.3f);
-        check(position_of(r, 10).y < 2.7f, "a rigid body falls");
+        check(positionOf(r, 10).y < 2.7f, "a rigid body falls");
         simulate(r, 3);
-        const float y = position_of(r, 10).y;
+        const float y = positionOf(r, 10).y;
         check(std::abs(y - 0.5f) < 0.03f, "the ball rests on the floor");
         NodeDesc state;
         check(r.node_state(10, state), "rigid body state");
     }
-    {   // Bounce.
-        Description d = floor_scene();
-        const int ball = add_body(d, 10, NodeType::RigidBody3D, "Ball", {0, 3, 0}, shape(0, 0, CollisionKind::Sphere));
+
+    //bounce.
+    {
+        Description d = floorScene();
+        const int ball = addBody(d, 10, NodeType::RigidBody3D, "Ball", {0, 3, 0}, shape(0, 0, CollisionKind::Sphere));
         d.nodes[size_t(ball)].extras().bounce = 0.8f;
         Runtime r;
-        start_scene(r, d);
-        float lowest = 10, highest_after = 0;
+        startScene(r, d);
+        float lowest = 10, highestAfter = 0;
         bool landed = false;
-        for (int i = 0; i < 180; ++i) {
+
+        for(int i = 0; i < 180; ++i){
             r.update(1.0f / 60);
-            const float y = position_of(r, 10).y;
-            if (y < 0.6f) landed = true;
-            if (!landed) lowest = std::min(lowest, y);
-            else highest_after = std::max(highest_after, y);
+            const float y = positionOf(r, 10).y;
+
+            if(y < 0.6f) landed = true;
+
+            if(!landed) lowest = std::min(lowest, y);
+            else highestAfter = std::max(highestAfter, y);
         }
-        check(landed && highest_after > 1.5f, "a bouncy ball bounces back up");
+
+        check(landed && highestAfter > 1.5f, "a bouncy ball bounces back up");
     }
-    {   // A box lands on a box.
-        Description d = floor_scene();
-        add_body(d, 10, NodeType::StaticBody3D, "Crate", {0, 0.5f, 0}, shape(0, 0, CollisionKind::Box));
-        add_body(d, 20, NodeType::RigidBody3D, "Top", {0.2f, 3, 0}, shape(0, 0, CollisionKind::Box));
+
+    //a box lands on a box.
+    {
+        Description d = floorScene();
+        addBody(d, 10, NodeType::StaticBody3D, "Crate", {0, 0.5f, 0}, shape(0, 0, CollisionKind::Box));
+        addBody(d, 20, NodeType::RigidBody3D, "Top", {0.2f, 3, 0}, shape(0, 0, CollisionKind::Box));
         Runtime r;
-        start_scene(r, d);
+        startScene(r, d);
         simulate(r, 3);
-        check(std::abs(position_of(r, 20).y - 1.5f) < 0.03f, "a rigid box rests on a box");
+        check(std::abs(positionOf(r, 20).y - 1.5f) < 0.03f, "a rigid box rests on a box");
     }
+
     const char* walker = R"(extends CharacterBody3D
 @export var walk := Vector3.ZERO
 var floor_time := 0.0
@@ -738,112 +797,128 @@ func _physics_process(delta):
 	if floor_time > 0.5 and floor_time < 0.52:
 		print("floor ", is_on_floor())
 )";
-    {   // Character: falls, stands on the floor, stops at a wall.
-        Description d = floor_scene();
-        const int c = add_body(d, 10, NodeType::CharacterBody3D, "Player", {0, 2, 0}, shape(0, 0, CollisionKind::Capsule));
+    //character: falls, stands on the floor, stops at a wall.
+    {
+        Description d = floorScene();
+        const int c = addBody(d, 10, NodeType::CharacterBody3D, "Player", {0, 2, 0}, shape(0, 0, CollisionKind::Capsule));
         d.scripts.push_back({"res://walker.jet", walker, {}});
         d.nodes[size_t(c)].script = 0;
         d.nodes[size_t(c)].overrides.push_back({"walk", jetscript::Value(jetscript::Vector3{4, 0, 0})});
-        add_body(d, 30, NodeType::StaticBody3D, "Wall", {3, 1, 0}, shape(0, 0, CollisionKind::Box, {1, 2, 4}));
+        addBody(d, 30, NodeType::StaticBody3D, "Wall", {3, 1, 0}, shape(0, 0, CollisionKind::Box, {1, 2, 4}));
         Runtime r;
-        check(start_scene(r, d), "character scene starts");
+        check(startScene(r, d), "character scene starts");
         simulate(r, 2);
-        const Vec3 p = position_of(r, 10);
-        check(has_log(r, "floor true", false), "the character lands on the floor (is_on_floor)");
+        const Vec3 p = positionOf(r, 10);
+        check(hasLog(r, "floor true", false), "the character lands on the floor (is_on_floor)");
         check(std::abs(p.y - 1.0f) < 0.05f, "the capsule stands on the floor");
         check(p.x > 1.8f && p.x < 2.05f, "the character stops at the wall");
     }
-    auto slope = [&](float degrees_) {
-        Description d = floor_scene();
+
+    auto slope = [&](float degrees_){
+        Description d = floorScene();
         auto ramp = node(30, 0, NodeType::StaticBody3D, "Ramp");
         ramp.position = {0, 0, 0};
         ramp.rotation = {0, 0, degrees_};
         d.nodes.push_back(ramp);
         d.nodes.push_back(shape(31, int32_t(d.nodes.size()) - 1, CollisionKind::Box, {10, 1, 4}));
-        const int c = add_body(d, 10, NodeType::CharacterBody3D, "Player", {0, 2.5f, 0}, shape(0, 0, CollisionKind::Capsule));
+        const int c = addBody(d, 10, NodeType::CharacterBody3D, "Player", {0, 2.5f, 0}, shape(0, 0, CollisionKind::Capsule));
         d.scripts.push_back({"res://walker.jet", walker, {}});
         d.nodes[size_t(c)].script = 0;
         Runtime r;
-        start_scene(r, d);
+        startScene(r, d);
         simulate(r, 1);
-        const float start_x = position_of(r, 10).x;
+        const float startX = positionOf(r, 10).x;
         simulate(r, 2);
-        return std::abs(position_of(r, 10).x - start_x);
+        return std::abs(positionOf(r, 10).x - startX);
     };
+
     check(slope(20) < 0.05f, "standing on a gentle slope does not slide");
     check(slope(60) > 0.5f, "a steep slope is a wall: the character slides down");
-    {   // A script disables the floor's shape: the ball resting on it falls.
-        Description d = floor_scene();
+    //a script disables the floor's shape: the ball resting on it falls.
+    {
+        Description d = floorScene();
         d.scripts.push_back({"res://floor.jet", "extends StaticBody3D\nvar t := 0.0\nfunc _physics_process(delta):\n"
                              "\tt += delta\n\tif t > 1.0:\n\t\tget_node(\"Shape\").disabled = true\n", {}});
         d.nodes[1].script = 0;
-        add_body(d, 10, NodeType::RigidBody3D, "Ball", {0, 1, 0}, shape(0, 0, CollisionKind::Sphere));
+        addBody(d, 10, NodeType::RigidBody3D, "Ball", {0, 1, 0}, shape(0, 0, CollisionKind::Sphere));
         Runtime r;
-        start_scene(r, d);
+        startScene(r, d);
         simulate(r, 0.9f);
-        const float resting = position_of(r, 10).y;
+        const float resting = positionOf(r, 10).y;
         simulate(r, 1);
-        check(std::abs(resting - 0.5f) < 0.03f && position_of(r, 10).y < -1, "disabling a shape at run time removes it");
+        check(std::abs(resting - 0.5f) < 0.03f && positionOf(r, 10).y < -1, "disabling a shape at run time removes it");
     }
-    {   // A character standing on a moving platform rides it.
-        Description d = floor_scene();
-        const int platform = add_body(d, 30, NodeType::StaticBody3D, "Platform", {0, 1, 0}, shape(0, 0, CollisionKind::Box, {3, 0.2f, 3}));
+
+    //a character standing on a moving platform rides it.
+    {
+        Description d = floorScene();
+        const int platform = addBody(d, 30, NodeType::StaticBody3D, "Platform", {0, 1, 0}, shape(0, 0, CollisionKind::Box, {3, 0.2f, 3}));
         d.scripts.push_back({"res://walker.jet", walker, {}});
         d.scripts.push_back({"res://mover.jet", "extends StaticBody3D\nfunc _physics_process(delta):\n\tposition.x += 1.0 * delta\n", {}});
         d.nodes[size_t(platform)].script = 1;
-        const int c = add_body(d, 10, NodeType::CharacterBody3D, "Player", {0, 2.2f, 0}, shape(0, 0, CollisionKind::Capsule));
+        const int c = addBody(d, 10, NodeType::CharacterBody3D, "Player", {0, 2.2f, 0}, shape(0, 0, CollisionKind::Capsule));
         d.nodes[size_t(c)].script = 0;
         Runtime r;
-        start_scene(r, d);
+        startScene(r, d);
         simulate(r, 0.5f);
-        const float offset = position_of(r, 10).x - position_of(r, 30).x;
+        const float offset = positionOf(r, 10).x - positionOf(r, 30).x;
         simulate(r, 1.5f);
-        check(std::abs(position_of(r, 10).x - position_of(r, 30).x - offset) < 0.05f && position_of(r, 30).x > 1.5f,
+        check(std::abs(positionOf(r, 10).x - positionOf(r, 30).x - offset) < 0.05f && positionOf(r, 30).x > 1.5f,
               "a character rides a moving platform");
     }
-    {   // Area: a falling ball enters and leaves it.
-        Description d = floor_scene();
-        add_body(d, 10, NodeType::RigidBody3D, "Ball", {0, 5, 0}, shape(0, 0, CollisionKind::Sphere));
-        const int area = add_body(d, 20, NodeType::Area3D, "Zone", {0, 3, 0}, shape(0, 0, CollisionKind::Box, {2, 0.5f, 2}));
+
+    //area: a falling ball enters and leaves it.
+    {
+        Description d = floorScene();
+        addBody(d, 10, NodeType::RigidBody3D, "Ball", {0, 5, 0}, shape(0, 0, CollisionKind::Sphere));
+        const int area = addBody(d, 20, NodeType::Area3D, "Zone", {0, 3, 0}, shape(0, 0, CollisionKind::Box, {2, 0.5f, 2}));
         d.scripts.push_back({"res://zone.jet", "extends Area3D\nfunc _on_body_entered(body):\n\tprint(\"in \", body.name, \" \", get_overlapping_bodies().size())\nfunc _on_body_exited(body):\n\tprint(\"out \", body.name)\n", {}});
         d.nodes[size_t(area)].script = 0;
         Runtime r;
-        check(start_scene(r, d), "area scene starts");
+        check(startScene(r, d), "area scene starts");
         simulate(r, 3);
-        const auto log = run_log(r);
+        const auto log = runLog(r);
         const bool in = std::find(log.begin(), log.end(), "in Ball 1") != log.end();
         const bool out = std::find(log.begin(), log.end(), "out Ball") != log.end();
         check(in && out, "Area3D calls _on_body_entered and _on_body_exited");
     }
-    {   // The character pushes a crate.
-        Description d = floor_scene();
-        const int c = add_body(d, 10, NodeType::CharacterBody3D, "Player", {0, 1, 0}, shape(0, 0, CollisionKind::Capsule));
+
+    //the character pushes a crate.
+    {
+        Description d = floorScene();
+        const int c = addBody(d, 10, NodeType::CharacterBody3D, "Player", {0, 1, 0}, shape(0, 0, CollisionKind::Capsule));
         d.scripts.push_back({"res://walker.jet", walker, {}});
         d.nodes[size_t(c)].script = 0;
         d.nodes[size_t(c)].overrides.push_back({"walk", jetscript::Value(jetscript::Vector3{3, 0, 0})});
-        add_body(d, 30, NodeType::RigidBody3D, "Crate", {1.5f, 0.5f, 0}, shape(0, 0, CollisionKind::Box));
+        addBody(d, 30, NodeType::RigidBody3D, "Crate", {1.5f, 0.5f, 0}, shape(0, 0, CollisionKind::Box));
         Runtime r;
-        start_scene(r, d);
+        startScene(r, d);
         simulate(r, 2);
-        check(position_of(r, 30).x > 3 && position_of(r, 10).x > 2, "the character pushes a rigid crate");
+        check(positionOf(r, 30).x > 3 && positionOf(r, 10).x > 2, "the character pushes a rigid crate");
     }
-    {   // Layers and masks.
-        Description d = floor_scene();
-        const int ball = add_body(d, 10, NodeType::RigidBody3D, "Ghost", {0, 2, 0}, shape(0, 0, CollisionKind::Sphere));
+
+    //layers and masks.
+    {
+        Description d = floorScene();
+        const int ball = addBody(d, 10, NodeType::RigidBody3D, "Ghost", {0, 2, 0}, shape(0, 0, CollisionKind::Sphere));
         d.nodes[size_t(ball)].extras().collision_layer = 2;
         d.nodes[size_t(ball)].extras().collision_mask = 2;
         Runtime r;
-        start_scene(r, d);
+        startScene(r, d);
         simulate(r, 1.5f);
-        check(position_of(r, 10).y < -1, "bodies on other layers do not collide");
+        check(positionOf(r, 10).y < -1, "bodies on other layers do not collide");
     }
-    {   // Package v14 keeps the physics fields; 30 balls cost a few milliseconds per second.
-        Description d = floor_scene();
-        for (int i = 0; i < 30; ++i) {
-            const int ball = add_body(d, uint32_t(100 + i * 2), NodeType::RigidBody3D, "Ball", {float(i % 6) - 2.5f, 1.0f + float(i / 6) * 1.2f, 0},
+
+    //package v14 keeps the physics fields; 30 balls cost a few milliseconds per second.
+    {
+        Description d = floorScene();
+
+        for(int i = 0; i < 30; ++i){
+            const int ball = addBody(d, uint32_t(100 + i * 2), NodeType::RigidBody3D, "Ball", {float(i % 6) - 2.5f, 1.0f + float(i / 6) * 1.2f, 0},
                                       shape(0, 0, CollisionKind::Sphere, {1, 1, 1}, 0.4f));
             d.nodes[size_t(ball)].name = "Ball" + std::to_string(i);
         }
+
         d.nodes[3].extras().bounce = 0.3f;
         d.nodes[3].extras().linear_velocity = {1, 2, 3};
         const auto bytes = encode_pack(d, error);
@@ -851,54 +926,61 @@ func _physics_process(delta):
         check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[3].more().bounce == 0.3f && back.nodes[4].more().radius == 0.4f
               && back.nodes[4].more().collision == CollisionKind::Sphere && back.nodes[3].more().linear_velocity.z == 3, "pack keeps the physics fields");
         Runtime r;
-        start_scene(r, d);
+        startScene(r, d);
         const auto t0 = std::chrono::steady_clock::now();
         simulate(r, 1);
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
         std::cout << "timing: 30 rigid spheres, 60 physics steps " << ms << " ms\n";
         bool above = true;
-        for (int i = 0; i < 30; ++i) above = above && position_of(r, uint32_t(100 + i * 2)).y > 0.3f;
+
+        for(int i = 0; i < 30; ++i) above = above && positionOf(r, uint32_t(100 + i * 2)).y > 0.3f;
+
         check(above, "a pile of balls stays above the floor");
     }
 }
 
 // CPUParticles3D: Godot's emission cycle on the pool of Jet's ParticleSystem.
-void particle_tests() {
+void particleTests(){
     std::string error;
     auto emitter = [](Description& d) -> NodeDesc& {
         auto p = node(20, 0, NodeType::CPUParticles3D, "Particles");
         p.position = {0, 1, 0};
         p.extras().direction = {0, 1, 0};
         p.extras().spread = 20;
-        p.extras().velocity_min = p.extras().velocity_max = 2;
+        p.extras().velocityMin = p.extras().velocityMax = 2;
         d.nodes.push_back(p);
         return d.nodes.back();
     };
-    auto step = [](Runtime& r, float seconds) {
-        for (float t = 0; t < seconds; t += 1.0f / 60) { r.update(1.0f / 60); r.render(); }
+
+    auto step = [](Runtime& r, float seconds){
+        for(float t = 0; t < seconds; t += 1.0f / 60){ r.update(1.0f / 60); r.render(); }
     };
-    {   // Continuous emission: `amount` particles over each lifetime, drawn over the scene.
+
+    //continuous emission: `amount` particles over each lifetime, drawn over the scene.
+    {
         Description d = scene();
         auto& p = emitter(d);
         p.extras().amount = 20;
         p.extras().lifetime = 1;
         Runtime r;
-        check(start_scene(r, d), "particle scene starts");
+        check(startScene(r, d), "particle scene starts");
         step(r, 0.5f);
-        const int half = r.live_particles();
+        const int half = r.liveParticles();
         step(r, 1.5f);
-        const int steady = r.live_particles();
+        const int steady = r.liveParticles();
         check(half >= 9 && half <= 11 && steady >= 19 && steady <= 20, "particles: amount per lifetime");
         const auto with = frame(r);
         const int drawn = r.triangles();
         Description off = d;
         off.nodes.back().extras().emitting = false;
         Runtime quiet;
-        start_scene(quiet, off);
+        startScene(quiet, off);
         step(quiet, 2);
-        check(quiet.live_particles() == 0 && frame(quiet) != with && drawn > quiet.triangles(), "particles are drawn (one streak each)");
+        check(quiet.liveParticles() == 0 && frame(quiet) != with && drawn > quiet.triangles(), "particles are drawn (one streak each)");
     }
-    {   // One shot, explosiveness 1: the whole amount at once, then the emitter stops.
+
+    //one shot, explosiveness 1: the whole amount at once, then the emitter stops.
+    {
         Description d = scene();
         auto& p = emitter(d);
         p.extras().amount = 30;
@@ -906,15 +988,17 @@ void particle_tests() {
         p.extras().explosiveness = 1;
         p.extras().one_shot = true;
         Runtime r;
-        start_scene(r, d);
+        startScene(r, d);
         step(r, 1.0f / 60);
-        const int burst = r.live_particles();
+        const int burst = r.liveParticles();
         step(r, 0.6f);
         NodeDesc state;
         r.node_state(20, state);
-        check(burst == 30 && r.live_particles() == 0 && !state.more().emitting, "one-shot explosive burst ends and stops emitting");
+        check(burst == 30 && r.liveParticles() == 0 && !state.more().emitting, "one-shot explosive burst ends and stops emitting");
     }
-    {   // Pool limit and lifetime randomness; emission shapes stay inside their volume.
+
+    //pool limit and lifetime randomness; emission shapes stay inside their volume.
+    {
         Description d = scene();
         auto& p = emitter(d);
         p.extras().amount = 200;
@@ -922,16 +1006,18 @@ void particle_tests() {
         p.extras().explosiveness = 1;
         p.extras().lifetime_randomness = 1;
         p.extras().emission_shape = EmissionShape::Box;
-        p.extras().emission_box = {3, 0.1f, 3};
+        p.extras().emissionBox = {3, 0.1f, 3};
         Runtime r;
-        start_scene(r, d);
+        startScene(r, d);
         step(r, 1.0f / 60);
-        const int all = r.live_particles();
+        const int all = r.liveParticles();
         step(r, 1);
-        // Lifetimes shorter than the first frame expire at once.
-        check(all >= 195 && all <= 200 && r.live_particles() > 20 && r.live_particles() < 180, "200-particle pool, randomized lifetimes");
+        //lifetimes shorter than the first frame expire at once.
+        check(all >= 195 && all <= 200 && r.liveParticles() > 20 && r.liveParticles() < 180, "200-particle pool, randomized lifetimes");
     }
-    {   // Puff style (smoke): soft discs over the scene, coloured by the node; damping slows them.
+
+    //puff style (smoke): soft discs over the scene, coloured by the node; damping slows them.
+    {
         Description d = scene();
         auto& p = emitter(d);
         p.extras().particle_style = ParticleStyle::Puff;
@@ -941,68 +1027,82 @@ void particle_tests() {
         p.extras().color_end = 0xff0000;
         p.alpha = 1;
         p.extras().puff_size = p.extras().puff_size_end = 0.5f;
-        p.extras().velocity_min = p.extras().velocity_max = 3;
+        p.extras().velocityMin = p.extras().velocityMax = 3;
         p.extras().gravity = {};
         Runtime r;
-        start_scene(r, d);
+        startScene(r, d);
         step(r, 1);
         const auto smoke = frame(r);
-        const size_t red = size_t(std::count_if(smoke.begin(), smoke.end(), [](uint16_t c) { return (c >> 11) > 24 && ((c >> 5) & 63) < 20; }));
+        const size_t red = size_t(std::count_if(smoke.begin(), smoke.end(), [](uint16_t c){ return (c >> 11) > 24 && ((c >> 5) & 63) < 20; }));
         Description slow = d;
-        slow.nodes.back().extras().damping_min = slow.nodes.back().extras().damping_max = 3; // stops within a second: puffs stay near the emitter
+        //stops within a second: puffs stay near the emitter
+        slow.nodes.back().extras().damping_min = slow.nodes.back().extras().damping_max = 3;
         Runtime damped;
-        start_scene(damped, slow);
+        startScene(damped, slow);
         step(damped, 1);
         check(red > 200 && r.triangles() > 0 && frame(damped) != smoke, "puff particles draw coloured discs; damping changes the motion");
     }
-    {   // A mesh in front hides the puffs behind it (z-buffer), not those beside it.
+
+    //a mesh in front hides the puffs behind it (z-buffer), not those beside it.
+    {
         Description d = scene();
         d.nodes[3].shading = Shading::Unlit;
         d.nodes[3].color = 0x0000ff;
         d.nodes[3].position = {0, 1, 0};
         auto& p = emitter(d);
-        p.position = {0, 0.6f, -2}; // behind the cube, on the line from the camera (0, 2, 5)
+        //behind the cube, on the line from the camera (0, 2, 5)
+        p.position = {0, 0.6f, -2};
         p.extras().particle_style = ParticleStyle::Puff;
         p.extras().amount = 1; p.extras().explosiveness = 1; p.extras().lifetime = 10;
         p.extras().gravity = {}; p.color = p.extras().color_end = 0x00ff00; p.alpha = 1; p.extras().puff_size = p.extras().puff_size_end = 4;
-        p.extras().velocity_min = p.extras().velocity_max = 0; // stays where it is emitted
-        auto green = [](uint16_t c) { return ((c >> 5) & 63) > 30 && (c >> 11) < 8; };
-        const auto plain = render_scene(d);
+        //stays where it is emitted
+        p.extras().velocityMin = p.extras().velocityMax = 0;
+        auto green = [](uint16_t c){ return ((c >> 5) & 63) > 30 && (c >> 11) < 8; };
+        const auto plain = renderScene(d);
         int x0 = Width, y0 = Height, x1 = -1, y1 = -1;
-        for (int y = 0; y < Height; ++y)
-            for (int x = 0; x < Width; ++x)
-                if (plain[size_t(y) * Width + x] == rgb565(0x0000ff)) { x0 = std::min(x0, x); x1 = std::max(x1, x); y0 = std::min(y0, y); y1 = std::max(y1, y); }
+
+        //an empty frame means the scene did not load
+        check(plain.size() == size_t(Width) * Height, "the occlusion scene renders");
+
+        for(int y = 0; y < Height && plain.size() == size_t(Width) * Height; ++y)
+            for(int x = 0; x < Width; ++x)
+                if(plain[size_t(y) * Width + x] == rgb565(0x0000ff)){ x0 = std::min(x0, x); x1 = std::max(x1, x); y0 = std::min(y0, y); y1 = std::max(y1, y); }
         const size_t centre = size_t((y0 + y1) / 2) * Width + size_t((x0 + x1) / 2), beside = size_t((y0 + y1) / 2) * Width + size_t(std::max(0, x0 - 8));
         Runtime r;
-        start_scene(r, d);
+        startScene(r, d);
         step(r, 1.5f);
         const auto pixels = frame(r);
         check(x1 >= 0 && pixels[centre] == rgb565(0x0000ff) && green(pixels[beside]), "a mesh in front hides the puffs behind it");
         Description over = d;
         over.nodes.back().extras().no_depth_test = true;
-        Runtime r_over;
-        start_scene(r_over, over);
-        step(r_over, 1.5f);
-        check(green(frame(r_over)[centre]), "No Depth Test puffs are drawn over the meshes");
-        // Jet's sparks: hidden by the z-buffer, over the cube with No Depth Test.
-        auto sparks_on_cube = [&](bool over_meshes) {
+        Runtime rOver;
+        startScene(rOver, over);
+        step(rOver, 1.5f);
+        check(green(frame(rOver)[centre]), "No Depth Test puffs are drawn over the meshes");
+        //Jet's sparks: hidden by the z-buffer, over the cube with No Depth Test.
+        auto sparksOnCube = [&](bool overMeshes){
             Description s = d;
             auto& e = s.nodes.back();
-            e.extras().particle_style = ParticleStyle::Sparks; e.extras().additive = false; e.extras().no_depth_test = over_meshes;
-            e.extras().amount = 150; e.extras().spread = 180; e.extras().velocity_min = e.extras().velocity_max = 0.3f; e.extras().emission_shape = EmissionShape::Sphere;
-            e.extras().emission_radius = 0.3f;
+            e.extras().particle_style = ParticleStyle::Sparks; e.extras().additive = false; e.extras().no_depth_test = overMeshes;
+            e.extras().amount = 150; e.extras().spread = 180; e.extras().velocityMin = e.extras().velocityMax = 0.3f; e.extras().emission_shape = EmissionShape::Sphere;
+            e.extras().emissionRadius = 0.3f;
             Runtime rs;
-            start_scene(rs, s);
+            startScene(rs, s);
             step(rs, 0.1f);
             const auto px = frame(rs);
             int white = 0;
-            for (int y = y0; y <= y1; ++y)
-                for (int x = x0; x <= x1; ++x) white += (px[size_t(y) * Width + x] >> 11) > 24;
+
+            for(int y = y0; y <= y1; ++y)
+                for(int x = x0; x <= x1; ++x) white += (px[size_t(y) * Width + x] >> 11) > 24;
+
             return white;
         };
-        check(sparks_on_cube(false) == 0 && sparks_on_cube(true) > 10, "Jet's sparks: depth tested, or over the meshes with No Depth Test");
+
+        check(sparksOnCube(false) == 0 && sparksOnCube(true) > 10, "Jet's sparks: depth tested, or over the meshes with No Depth Test");
     }
-    {   // Script API: properties and restart(), as in Godot.
+
+    //script API: properties and restart(), as in Godot.
+    {
         Description d = scene();
         auto& p = emitter(d);
         p.extras().emitting = false;
@@ -1011,22 +1111,24 @@ void particle_tests() {
             "\tamount = 5\n\tone_shot = true\n\texplosiveness = 1.0\n\tlifetime = 0.2\n\tgravity = Vector3(0, -2, 0)\n\trestart()\n"
             "func _process(delta):\n\tif not emitting and not done:\n\t\tdone = true\n\t\tprint(\"finished \", amount, \" \", gravity.y)\n", {}});
         Runtime r;
-        check(start_scene(r, d), "particle script starts");
+        check(startScene(r, d), "particle script starts");
         step(r, 0.5f);
-        check(has_log(r, "finished 5 -2", false), "restart() runs one cycle; properties read back");
+        check(hasLog(r, "finished 5 -2", false), "restart() runs one cycle; properties read back");
     }
-    {   // Package v14 keeps the particle fields; out-of-range values are rejected.
+
+    //package v14 keeps the particle fields; out-of-range values are rejected.
+    {
         Description d = scene();
         auto& p = emitter(d);
         p.extras().amount = 64; p.extras().lifetime = 1.5f; p.extras().one_shot = true; p.extras().additive = false; p.extras().spread = 90; p.extras().gravity = {0, -3, 1};
         p.extras().damping_min = 0.5f; p.extras().damping_max = 2;
         p.extras().color_end = 0x123456; p.extras().puff_size_end = 1.25f; p.extras().no_depth_test = true;
-        p.extras().particle_style = ParticleStyle::Water; p.extras().emission_shape = EmissionShape::Sphere; p.extras().emission_radius = 0.25f;
+        p.extras().particle_style = ParticleStyle::Water; p.extras().emission_shape = EmissionShape::Sphere; p.extras().emissionRadius = 0.25f;
         const auto bytes = encode_pack(d, error);
         Description back;
         check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes.back().more().amount == 64 && back.nodes.back().more().one_shot
               && !back.nodes.back().more().additive && back.nodes.back().more().particle_style == ParticleStyle::Water
-              && back.nodes.back().more().emission_shape == EmissionShape::Sphere && back.nodes.back().more().emission_radius == 0.25f
+              && back.nodes.back().more().emission_shape == EmissionShape::Sphere && back.nodes.back().more().emissionRadius == 0.25f
               && back.nodes.back().more().gravity.z == 1 && back.nodes.back().more().lifetime == 1.5f && back.nodes.back().more().damping_max == 2
               && back.nodes.back().more().color_end == 0x123456 && back.nodes.back().more().puff_size_end == 1.25f && back.nodes.back().more().no_depth_test,
               "pack keeps the particle fields");
@@ -1037,7 +1139,7 @@ void particle_tests() {
     }
 }
 
-void scene_tests() {
+void sceneTests(){
     std::string error;
     Description d;
     d.path = "res://menu.jetscene";
@@ -1057,18 +1159,23 @@ void scene_tests() {
         "\tif frames == 2:\n\t\tget_tree().reload_current_scene()\n", {}});
     d.scenes.push_back(level);
     Runtime r;
-    check(start_scene(r, d), "multi-scene project starts");
-    for (int i = 0; i < 3; ++i) r.update(1.0f / 60);
+    check(startScene(r, d), "multi-scene project starts");
+
+    for(int i = 0; i < 3; ++i) r.update(1.0f / 60);
+
     const auto log = r.take_log();
-    auto logged = [&](const std::string& text) {
-        return std::any_of(log.begin(), log.end(), [&](const LogLine& l) { return l.text.find(text) != std::string::npos; });
+    auto logged = [&](const std::string& text){
+        return std::any_of(log.begin(), log.end(), [&](const LogLine& l){ return l.text.find(text) != std::string::npos; });
     };
+
     check(logged("missing 19") && logged("go 0") && logged("level ready Level") && r.current_scene() == "res://level.jetscene",
           "change_scene_to_file() switches at the end of the frame; unknown scenes return ERR_CANT_OPEN");
     NodeDesc state;
     check(r.node_state(2, state) && state.name == "Cube", "the new scene's nodes are live");
-    for (int i = 0; i < 3; ++i) r.update(1.0f / 60);
-    check(has_log(r, "level ready Level", false), "reload_current_scene() starts the scene again");
+
+    for(int i = 0; i < 3; ++i) r.update(1.0f / 60);
+
+    check(hasLog(r, "level ready Level", false), "reload_current_scene() starts the scene again");
     r.stop();
     check(r.current_scene() == "res://menu.jetscene" && r.node_state(1, state) && state.name == "Menu", "Stop goes back to the edited scene");
     const auto bytes = encode_pack(d, error);
@@ -1079,20 +1186,22 @@ void scene_tests() {
     clash.scenes.push_back(level);
     check(!r.load(clash, error), "duplicate scene paths are rejected");
 
-    // A package played in place, like the firmware: only the current scene stays decoded.
+    //a package played in place, like the firmware: only the current scene stays decoded.
     Runtime packed;
     std::vector<ScriptDiagnostic> diagnostics;
     check(packed.load_pack(bytes.data(), bytes.size(), error) && packed.start(diagnostics), "a package starts from load_pack()");
     check(packed.description().nodes.empty() && packed.description().scenes[0].nodes.empty() && packed.node_count() == 1,
           "load_pack() keeps no scene nodes besides the live ones");
-    for (int i = 0; i < 6; ++i) packed.update(1.0f / 60);
+
+    for(int i = 0; i < 6; ++i) packed.update(1.0f / 60);
+
     check(packed.current_scene() == "res://level.jetscene" && packed.node_state(2, state) && state.name == "Cube"
-          && has_log(packed, "level ready Level", false), "scenes are read again from the package when entered and reloaded");
+          && hasLog(packed, "level ready Level", false), "scenes are read again from the package when entered and reloaded");
     packed.stop();
     check(packed.current_scene() == "res://menu.jetscene" && packed.node_state(1, state) && state.name == "Menu",
           "Stop rebuilds the starting scene from the package");
 
-    // Autoloads keep their state across scene changes and are reachable by name.
+    //autoloads keep their state across scene changes and are reachable by name.
     Description game = d;
     game.scripts.push_back({"res://game.jet", "extends Node\nvar score := 0\nfunc _ready():\n\tprint(\"game ready\")\n", {}});
     game.autoloads.push_back({"Game", int32_t(game.scripts.size()) - 1});
@@ -1100,33 +1209,36 @@ void scene_tests() {
         "\tget_tree().change_scene_to_file(\"res://level.jetscene\")\n";
     game.scripts[1].source = "extends MeshInstance3D\nfunc _ready():\n"
         "\tprint(\"score \", Game.score, \" \", get_node(\"/root/Game\").score)\n";
-    Runtime with_game;
-    check(start_scene(with_game, game), "a project with an autoload starts");
-    with_game.update(1.0f / 60);
-    const auto lines = with_game.take_log();
-    auto index_of_line = [&](const std::string& text) {
-        for (size_t i = 0; i < lines.size(); ++i) if (lines[i].text.find(text) != std::string::npos) return int(i);
+    Runtime withGame;
+    check(startScene(withGame, game), "a project with an autoload starts");
+    withGame.update(1.0f / 60);
+    const auto lines = withGame.take_log();
+    auto indexOfLine = [&](const std::string& text){
+        for(size_t i = 0; i < lines.size(); ++i) if(lines[i].text.find(text) != std::string::npos) return int(i);
+
         return -1;
     };
-    check(index_of_line("game ready") >= 0 && index_of_line("game ready") < index_of_line("menu ready"), "autoloads are ready before the scene");
-    check(index_of_line("score 7 7") >= 0, "an autoload keeps its state across a scene change (Game and /root/Game)");
 
-    const auto game_bytes = encode_pack(game, error);
-    Description game_back;
-    check(decode_pack(game_bytes.data(), game_bytes.size(), game_back, error) && game_back.autoloads.size() == 1
-          && game_back.autoloads[0].name == "Game", "the package keeps the autoloads (scripts compiled with their names)");
-    Description bad_autoload = game;
-    bad_autoload.autoloads.push_back({"Input", 0});
-    check(!r.load(bad_autoload, error), "an autoload can't be called Input");
+    check(indexOfLine("game ready") >= 0 && indexOfLine("game ready") < indexOfLine("menu ready"), "autoloads are ready before the scene");
+    check(indexOfLine("score 7 7") >= 0, "an autoload keeps its state across a scene change (Game and /root/Game)");
+
+    const auto gameBytes = encode_pack(game, error);
+    Description gameBack;
+    check(decode_pack(gameBytes.data(), gameBytes.size(), gameBack, error) && gameBack.autoloads.size() == 1
+          && gameBack.autoloads[0].name == "Game", "the package keeps the autoloads (scripts compiled with their names)");
+    Description badAutoload = game;
+    badAutoload.autoloads.push_back({"Input", 0});
+    check(!r.load(badAutoload, error), "an autoload can not be called Input");
 }
 
-void sprite_tests() {
+void spriteTests(){
     std::string error;
-    // A 4×2 sheet of two frames: frame 0 is red then green, frame 1 is blue.
-    const uint32_t red = 0xff0000ff, green = 0xff00ff00, blue = 0xffff0000; // RGBA bytes, little endian
+    //a 4×2 sheet of two frames: frame 0 is red then green, frame 1 is blue.
+    //RGBA bytes, little endian
+    const uint32_t red = 0xff0000ff, green = 0xff00ff00, blue = 0xffff0000;
     const std::vector<uint32_t> rgba = {red, green, blue, blue, red, green, blue, blue};
     TextureAsset sheet;
-    check(make_texture("res://sheet.png", 4, 2, reinterpret_cast<const uint8_t*>(rgba.data()), sheet, error), "sprite sheet converts");
+    check(makeTexture("res://sheet.png", 4, 2, reinterpret_cast<const uint8_t*>(rgba.data()), sheet, error), "sprite sheet converts");
     Description d;
     d.nodes.push_back(node(1, -1, NodeType::Node3D, "World"));
     auto camera = node(2, 0, NodeType::Camera3D, "Camera3D");
@@ -1136,7 +1248,7 @@ void sprite_tests() {
     sprite.texture = 0; sprite.hframes = 2; sprite.pixel_size = 0.5f; sprite.color = 0xffffff;
     d.nodes.push_back(sprite);
     d.textures.push_back(sheet);
-    auto pixel = [](Runtime& r, int dx) { r.render(); return r.pixels()[size_t(r.height() / 2) * size_t(r.width()) + size_t(r.width() / 2 + dx)]; };
+    auto pixel = [](Runtime& r, int dx){ r.render(); return r.pixels()[size_t(r.height() / 2) * size_t(r.width()) + size_t(r.width() / 2 + dx)]; };
     Runtime r;
     check(r.load(d, error), "a Sprite3D scene loads");
     check(pixel(r, -6) == rgb565(0xff0000) && pixel(r, 6) == rgb565(0x00ff00), "Sprite3D shows frame 0 of the sheet, unlit");
@@ -1160,148 +1272,163 @@ void sprite_tests() {
 }
 
 // Only the node types that use them get the extra fields and the body state.
-void memory_tests() {
+void memoryTests(){
     std::string error;
-    Description d = floor_scene();
-    add_body(d, 10, NodeType::RigidBody3D, "Ball", {0, 3, 0}, shape(0, 0, CollisionKind::Sphere));
+    Description d = floorScene();
+    addBody(d, 10, NodeType::RigidBody3D, "Ball", {0, 3, 0}, shape(0, 0, CollisionKind::Sphere));
     auto camera = node(30, 0, NodeType::Camera3D, "Camera3D");
     camera.position = {0, 2, 8}; camera.extras().current = true;
     d.nodes.push_back(camera);
-    for (uint32_t i = 0; i < 20; ++i) {
+
+    for(uint32_t i = 0; i < 20; ++i){
         const std::string name = "Cube" + std::to_string(i);
         auto cube = node(40 + i, 0, i % 2 ? NodeType::MeshInstance3D : NodeType::Sprite3D, name.c_str());
         cube.position = {float(i) - 10, 1, 0};
         d.nodes.push_back(cube);
     }
-    // Through a package, as on the device.
+
+    //through a package, as on the device.
     const auto bytes = encode_pack(d, error);
     Runtime r;
     std::vector<ScriptDiagnostic> diagnostics;
     check(r.load_pack(bytes.data(), bytes.size(), error) && r.start(diagnostics), "scene for the memory check starts");
-    for (int i = 0; i < 30; ++i) r.update(1.0f / 60);
+
+    for(int i = 0; i < 30; ++i) r.update(1.0f / 60);
+
     r.render();
-    // Floor, ball, their shapes and the camera have extra fields; floor and ball are the bodies.
-    const size_t slots = (r.node_count() + 7) / 8 * 8; // nodes live in blocks of 8
-    check(r.node_bytes() == slots * sizeof(Runtime::Live) + 5 * sizeof(NodeExtras) + 2 * sizeof(Runtime::Motion),
+    //floor, ball, their shapes and the camera have extra fields; floor and ball are the bodies.
+    //nodes live in blocks of 8
+    const size_t slots = (r.node_count() + 7) / 8 * 8;
+    check(r.nodeBytes() == slots * sizeof(Runtime::Live) + 5 * sizeof(NodeExtras) + 2 * sizeof(Runtime::Motion),
           "meshes and sprites keep no extra fields or body state");
 
-    // The board estimate counts the device's half-width fields whatever this build draws.
-    // The editor estimates a loaded description: a package keeps only the scene being played.
+    //the board estimate counts the device's half-width fields whatever this build draws.
+    //the editor estimates a loaded description: a package keeps only the scene being played.
     Runtime full;
     check(full.load(d, error), "scene for the estimate loads");
-    const auto report = full.estimate_memory(false);
+    const auto report = full.estimateMemory(false);
     check(report.field == size_t(DefaultWidth / 2) * (DefaultHeight / 2) * 2 && report.frames > report.field,
           "estimate counts device-sized field buffers");
-    check(report.scenes.size() == 1 && report.largest_scene() == report.scenes[0].total() && report.scenes[0].meshes > 0,
+    check(report.scenes.size() == 1 && report.largestScene() == report.scenes[0].total() && report.scenes[0].meshes > 0,
           "estimate covers the scene and its meshes");
 
-    // Identical meshes share their geometry; palette textures read in place cost only their palette.
-    auto estimate = [&](bool varied, bool in_place) {
-        Description e = floor_scene();
-        for (uint32_t i = 0; i < 10; ++i) {
+    //identical meshes share their geometry; palette textures read in place cost only their palette.
+    auto estimate = [&](bool varied, bool in_place){
+        Description e = floorScene();
+
+        for(uint32_t i = 0; i < 10; ++i){
             const std::string name = "Cube" + std::to_string(i);
             auto cube = node(40 + i, 0, NodeType::MeshInstance3D, name.c_str());
-            if (varied) cube.scale = {1.0f + float(i), 1, 1};
+
+            if(varied) cube.scale = {1.0f + float(i), 1, 1};
+
             cube.texture = 0;
             e.nodes.push_back(cube);
         }
+
         std::vector<uint8_t> pixels(64 * 64 * 4, 255);
         TextureAsset texture;
-        make_texture("res://t.png", 64, 64, pixels.data(), texture, error);
+        makeTexture("res://t.png", 64, 64, pixels.data(), texture, error);
         e.textures.push_back(std::move(texture));
         Runtime other;
         check(other.load(e, error), "scene for the estimate loads");
-        return other.estimate_memory(in_place);
+        return other.estimateMemory(in_place);
     };
+
     check(estimate(true, false).scenes[0].meshes > estimate(false, false).scenes[0].meshes, "identical meshes share geometry in the estimate");
     check(estimate(false, true).textures + 64 * 64 / 2 < estimate(false, false).textures, "palette textures read in place cost less");
 
-    // Emitters keep only their amount of particles; streaks also need Jet's shared pool of 200.
-    auto particles = [&](ParticleStyle style) {
-        Description e = floor_scene();
+    //emitters keep only their amount of particles; streaks also need Jet's shared pool of 200.
+    auto particles = [&](ParticleStyle style){
+        Description e = floorScene();
         auto emitter = node(50, 0, NodeType::CPUParticles3D, "Smoke");
         emitter.extras().amount = 8;
         emitter.extras().particle_style = style;
         e.nodes.push_back(emitter);
         Runtime other;
         other.load(e, error);
-        return other.estimate_memory(false).scenes[0].particles;
+        return other.estimateMemory(false).scenes[0].particles;
     };
+
     check(particles(ParticleStyle::Puff) < 512 && particles(ParticleStyle::Sparks) > 7000 && particles(ParticleStyle::Sparks) < 8000,
           "particle memory follows the amount");
 }
 
 // 2D bodies, areas and shapes: the 3D physics on the canvas plane, in pixels with y down.
-void physics2d_tests() {
-    auto shape2d = [](CollisionKind kind, Vec3 size, float radius = 10, float height = 30) {
+void physics2dTests(){
+    auto shape2d = [](CollisionKind kind, Vec3 size, float radius = 10, float height = 30){
         NodeDesc n = node(0, 0, NodeType::CollisionShape2D, "Shape");
-        n.extras().collision = kind; n.extras().box_size = size; n.extras().radius = radius; n.extras().height = height;
+        n.extras().collision = kind; n.extras().boxSize = size; n.extras().radius = radius; n.extras().height = height;
         return n;
     };
-    // A 2000 px wide ground with its top at y = 400.
-    auto ground_scene = [&]() {
+
+    //a 2000 px wide ground with its top at y = 400.
+    auto groundScene = [&](){
         Description d;
         d.nodes.push_back(node(1, -1, NodeType::Node2D, "World"));
-        add_body(d, 2, NodeType::StaticBody2D, "Ground", {0, 420, 0}, shape2d(CollisionKind::Box, {2000, 40, 0}));
+        addBody(d, 2, NodeType::StaticBody2D, "Ground", {0, 420, 0}, shape2d(CollisionKind::Box, {2000, 40, 0}));
         return d;
     };
-    auto logged = [](Runtime& r, const std::string& text) {
-        const auto log = run_log(r);
+
+    auto logged = [](Runtime& r, const std::string& text){
+        const auto log = runLog(r);
         return std::find(log.begin(), log.end(), text) != log.end();
     };
 
-    {   // A ball falls down the screen onto the ground, through a 3D floor it never meets.
-        Description d = ground_scene();
-        add_body(d, 10, NodeType::RigidBody2D, "Ball", {0, -50, 0}, shape2d(CollisionKind::Sphere, {20, 20, 0}, 10));
-        add_body(d, 20, NodeType::StaticBody3D, "Floor3D", {0, 0, 0}, shape(0, 0, CollisionKind::Box, {1000, 1, 1000}));
+    //a ball falls down the screen onto the ground, through a 3D floor it never meets.
+    {
+        Description d = groundScene();
+        addBody(d, 10, NodeType::RigidBody2D, "Ball", {0, -50, 0}, shape2d(CollisionKind::Sphere, {20, 20, 0}, 10));
+        addBody(d, 20, NodeType::StaticBody3D, "Floor3D", {0, 0, 0}, shape(0, 0, CollisionKind::Box, {1000, 1, 1000}));
         Runtime r;
-        check(start_scene(r, d), "2D physics scene starts");
+        check(startScene(r, d), "2D physics scene starts");
         simulate(r, 0.3f);
-        check(position_of(r, 10).y > -20, "a RigidBody2D falls towards +y (980 px/s²)");
+        check(positionOf(r, 10).y > -20, "a RigidBody2D falls towards +y (980 px/s²)");
         simulate(r, 4);
-        check(std::abs(position_of(r, 10).y - 390) < 1.5f && std::abs(position_of(r, 10).x) < 0.5f, "the ball rests on the 2D ground, through the 3D floor");
+        check(std::abs(positionOf(r, 10).y - 390) < 1.5f && std::abs(positionOf(r, 10).x) < 0.5f, "the ball rests on the 2D ground, through the 3D floor");
     }
 
-    // A character that walks right under gravity; it can jump once at the start.
+    //a character that walks right under gravity; it can jump once at the start.
     const char* walker = "extends CharacterBody2D\n@export var jump := 0.0\nvar landed := false\n"
         "func _ready():\n\tvelocity.y = -jump\n"
         "func _physics_process(delta):\n\tvelocity.y += 980 * delta\n\tvelocity.x = 60\n\tmove_and_slide()\n"
         "\tif is_on_floor() and not landed:\n\t\tlanded = true\n\t\tprint(\"landed \", get_floor_normal().is_equal_approx(Vector2.UP), \" \", velocity is Vector2)\n";
     {
-        Description d = ground_scene();
-        const int c = add_body(d, 10, NodeType::CharacterBody2D, "Player", {0, 300, 0}, shape2d(CollisionKind::Capsule, {20, 20, 0}, 10, 30));
+        Description d = groundScene();
+        const int c = addBody(d, 10, NodeType::CharacterBody2D, "Player", {0, 300, 0}, shape2d(CollisionKind::Capsule, {20, 20, 0}, 10, 30));
         d.scripts.push_back({"res://walker.jet", walker, {}});
         d.nodes[size_t(c)].script = 0;
         Runtime r;
-        check(start_scene(r, d), "2D character scene starts");
+        check(startScene(r, d), "2D character scene starts");
         simulate(r, 2);
-        check(std::abs(position_of(r, 10).y - 385) < 1 && std::abs(position_of(r, 10).x - 120) < 4, "a CharacterBody2D walks on the ground");
+        check(std::abs(positionOf(r, 10).y - 385) < 1 && std::abs(positionOf(r, 10).x - 120) < 4, "a CharacterBody2D walks on the ground");
         check(logged(r, "landed true true"), "is_on_floor(), get_floor_normal() is Vector2.UP, velocity is a Vector2");
     }
 
-    // Jumping from the ground under a platform: through it when it's one-way, against it otherwise.
-    for (bool one_way : {true, false}) {
-        Description d = ground_scene();
-        const int c = add_body(d, 10, NodeType::CharacterBody2D, "Player", {0, 385, 0}, shape2d(CollisionKind::Capsule, {20, 20, 0}, 10, 30));
+    //jumping from the ground under a platform: through it when it is one-way, against it otherwise.
+    for(bool oneWay : {true, false}){
+        Description d = groundScene();
+        const int c = addBody(d, 10, NodeType::CharacterBody2D, "Player", {0, 385, 0}, shape2d(CollisionKind::Capsule, {20, 20, 0}, 10, 30));
         auto platform = shape2d(CollisionKind::Box, {400, 10, 0});
-        platform.extras().one_way = one_way;
-        add_body(d, 30, NodeType::StaticBody2D, "Platform", {0, 300, 0}, platform);
+        platform.extras().oneWay = oneWay;
+        addBody(d, 30, NodeType::StaticBody2D, "Platform", {0, 300, 0}, platform);
         d.scripts.push_back({"res://walker.jet", walker, {}});
         d.nodes[size_t(c)].script = 0;
         d.nodes[size_t(c)].overrides.push_back({"jump", jetscript::Value(600.0)});
         Runtime r;
-        start_scene(r, d);
+        startScene(r, d);
         simulate(r, 2);
-        const float y = position_of(r, 10).y;
-        check(one_way ? std::abs(y - 280) < 1 : std::abs(y - 385) < 1,
-              one_way ? "a one-way platform lets a jump through and holds the landing" : "a solid platform stops the jump");
+        const float y = positionOf(r, 10).y;
+        check(oneWay ? std::abs(y - 280) < 1 : std::abs(y - 385) < 1,
+              oneWay ? "a one-way platform lets a jump through and holds the landing" : "a solid platform stops the jump");
     }
 
-    {   // Areas: a ball falls through a zone, a moving area hits it; each sees the other kind.
-        Description d = ground_scene();
-        add_body(d, 10, NodeType::RigidBody2D, "Ball", {0, 100, 0}, shape2d(CollisionKind::Sphere, {20, 20, 0}, 10));
-        const int zone = add_body(d, 20, NodeType::Area2D, "Zone", {0, 200, 0}, shape2d(CollisionKind::Box, {100, 20, 0}));
-        const int bullet = add_body(d, 30, NodeType::Area2D, "Bullet", {-200, 200, 0}, shape2d(CollisionKind::Sphere, {20, 20, 0}, 4));
+    //areas: a ball falls through a zone, a moving area hits it; each sees the other kind.
+    {
+        Description d = groundScene();
+        addBody(d, 10, NodeType::RigidBody2D, "Ball", {0, 100, 0}, shape2d(CollisionKind::Sphere, {20, 20, 0}, 10));
+        const int zone = addBody(d, 20, NodeType::Area2D, "Zone", {0, 200, 0}, shape2d(CollisionKind::Box, {100, 20, 0}));
+        const int bullet = addBody(d, 30, NodeType::Area2D, "Bullet", {-200, 200, 0}, shape2d(CollisionKind::Sphere, {20, 20, 0}, 4));
         d.scripts.push_back({"res://zone.jet", "extends Area2D\nfunc _on_body_entered(body):\n\tprint(\"in \", body.name)\n"
             "func _on_body_exited(body):\n\tprint(\"out \", body.name)\n"
             "func _on_area_entered(area):\n\tprint(\"hit \", area.name, \" \", get_overlapping_areas().size(), \" \", overlaps_area(area))\n", {}});
@@ -1309,17 +1436,18 @@ void physics2d_tests() {
         d.nodes[size_t(zone)].script = 0;
         d.nodes[size_t(bullet)].script = 1;
         Runtime r;
-        check(start_scene(r, d), "2D area scene starts");
+        check(startScene(r, d), "2D area scene starts");
         simulate(r, 2);
-        const auto log = run_log(r);
-        auto has = [&](const char* text) { return std::find(log.begin(), log.end(), text) != log.end(); };
+        const auto log = runLog(r);
+        auto has = [&](const char* text){ return std::find(log.begin(), log.end(), text) != log.end(); };
         check(has("in Ball") && has("out Ball"), "Area2D calls _on_body_entered and _on_body_exited");
         check(has("hit Bullet 1 true"), "Area2D sees other areas: _on_area_entered, get_overlapping_areas(), overlaps_area()");
     }
 
-    {   // Validation: 2D shapes are in pixels and belong to 2D bodies.
-        Description d = ground_scene();
-        d.nodes.back().extras().box_size = {200000, 10, 0};
+    //validation: 2D shapes are in pixels and belong to 2D bodies.
+    {
+        Description d = groundScene();
+        d.nodes.back().extras().boxSize = {200000, 10, 0};
         std::string error;
         Runtime r;
         check(!r.load(d, error), "a 2D shape over 100000 px is refused");
@@ -1327,14 +1455,14 @@ void physics2d_tests() {
 }
 
 // PackedScene.instantiate(), add_child(), remove_child() and freeing what was spawned.
-void instancing_tests() {
+void instancingTests(){
     std::string error;
-    auto logged = [](const std::vector<LogLine>& log, const std::string& text) {
-        return std::any_of(log.begin(), log.end(), [&](const LogLine& l) { return l.text.find(text) != std::string::npos; });
+    auto logged = [](const std::vector<LogLine>& log, const std::string& text){
+        return std::any_of(log.begin(), log.end(), [&](const LogLine& l){ return l.text.find(text) != std::string::npos; });
     };
 
-    // A world that spawns a bullet a frame; each bullet (with a particle emitter) frees itself after 5 frames.
-    Description d = floor_scene();
+    //a world that spawns a bullet a frame; each bullet (with a particle emitter) frees itself after 5 frames.
+    Description d = floorScene();
     d.path = "res://main.jetscene";
     auto camera = node(4, 0, NodeType::Camera3D, "Camera3D");
     camera.position = {0, 2, 8}; camera.extras().current = true;
@@ -1358,30 +1486,34 @@ void instancing_tests() {
     d.scripts.push_back({"res://bullet.jet", "extends MeshInstance3D\nvar age := 0\nfunc _ready():\n\tget_parent().readied += 1\n"
         "func _process(delta):\n\tage += 1\n\tif age == 5:\n\t\tqueue_free()\n", {}});
 
-    // Played from a package too, where the bullet scene is read from it at each instantiate().
+    //played from a package too, where the bullet scene is read from it at each instantiate().
     const auto bytes = encode_pack(d, error);
-    for (int packed = 0; packed < 2; ++packed) {
+
+    for(int packed = 0; packed < 2; ++packed){
         Runtime r;
         std::vector<ScriptDiagnostic> diagnostics;
-        const bool started = packed ? r.load_pack(bytes.data(), bytes.size(), error) && r.start(diagnostics) : start_scene(r, d);
+        const bool started = packed ? r.load_pack(bytes.data(), bytes.size(), error) && r.start(diagnostics) : startScene(r, d);
         check(started, "a scene that spawns scenes starts");
         const size_t base = r.node_count();
         int most = 0, drawn = 0;
         std::vector<LogLine> log;
-        for (int i = 0; i < 60; ++i) {
+
+        for(int i = 0; i < 60; ++i){
             r.update(1.0f / 60);
             r.render();
             most = std::max(most, int(r.node_count()));
             drawn = std::max(drawn, r.triangles());
-            for (auto& line : r.take_log()) log.push_back(line);
+
+            for(auto& line : r.take_log()) log.push_back(line);
         }
+
         check(logged(log, "all freed 30 names ") && !logged(log, "names 1\n") && r.node_count() == base && most > int(base) + 4
-              && most <= int(base) + 14 && drawn > 0 && r.live_particles() == 0,
+              && most <= int(base) + 14 && drawn > 0 && r.liveParticles() == 0,
               packed ? "spawned scenes from a package are ready once, drawn, freed with their children, and leave nothing behind"
                      : "spawned scenes are ready once, get distinct names, are drawn, freed with their children, and leave nothing behind");
     }
 
-    // Outside the tree nothing runs or shows; add_child() under a later node; remove_child() and back; errors.
+    //outside the tree nothing runs or shows; add_child() under a later node; remove_child() and back; errors.
     Description t = scene();
     t.path = "res://main.jetscene";
     t.nodes[0].script = 0;
@@ -1401,19 +1533,22 @@ void instancing_tests() {
     t.scenes.push_back(thing);
     t.scripts.push_back({"res://thing.jet", "extends MeshInstance3D\nvar processed := 0\nfunc _process(delta):\n\tprocessed += 1\n", {}});
     Runtime r;
-    check(start_scene(r, t), "a scene that builds a subtree starts");
+    check(startScene(r, t), "a scene that builds a subtree starts");
     std::vector<LogLine> log = r.take_log();
-    for (int i = 0; i < 6; ++i) {
+
+    for(int i = 0; i < 6; ++i){
         r.update(1.0f / 60);
-        for (auto& line : r.take_log()) log.push_back(line);
+
+        for(auto& line : r.take_log()) log.push_back(line);
     }
+
     check(logged(log, "missing true") && logged(log, "Resource file not found: res://nope.jetscene")
           && logged(log, "already has a parent"), "load() of a missing scene is null; add_child() twice is an error");
     check(logged(log, "global true true") && logged(log, "removed true"), "add_child() builds subtrees and reparents in any order");
-    check(logged(log, "orphan 0 b 3 a 3"), "nodes outside the tree don't run; remove_child() pauses them until add_child()");
+    check(logged(log, "orphan 0 b 3 a 3"), "nodes outside the tree do not run; remove_child() pauses them until add_child()");
 
-    // An instanced rigid body falls on the floor like one of the scene.
-    Description f = floor_scene();
+    //an instanced rigid body falls on the floor like one of the scene.
+    Description f = floorScene();
     f.path = "res://main.jetscene";
     f.nodes[0].script = 0;
     f.scripts.push_back({"res://drop.jet", "extends Node3D\nvar ball\nvar frames := 0\nfunc _ready():\n"
@@ -1427,23 +1562,25 @@ void instancing_tests() {
     ball.nodes.push_back(shape(2, 0, CollisionKind::Sphere));
     f.scenes.push_back(ball);
     Runtime fall;
-    check(start_scene(fall, f), "a scene that drops an instanced body starts");
-    for (int i = 0; i < 120; ++i) fall.update(1.0f / 60);
-    check(has_log(fall, "rest true", false), "an instanced RigidBody3D collides with the scene");
+    check(startScene(fall, f), "a scene that drops an instanced body starts");
+
+    for(int i = 0; i < 120; ++i) fall.update(1.0f / 60);
+
+    check(hasLog(fall, "rest true", false), "an instanced RigidBody3D collides with the scene");
 }
 
 // Node2D, Sprite2D, AnimatedSprite2D and Camera2D: drawn over the 3D scene, in canvas pixels.
-void twod_tests() {
+void twodTests(){
     std::string error;
-    // A 4x2 sheet of two frames: frame 0 is red then green, frame 1 is blue.
+    //a 4x2 sheet of two frames: frame 0 is red then green, frame 1 is blue.
     const uint32_t red = 0xff0000ff, green = 0xff00ff00, blue = 0xffff0000;
     const std::vector<uint32_t> rgba = {red, green, blue, blue, red, green, blue, blue};
     TextureAsset sheet;
-    check(make_texture("res://sheet.png", 4, 2, reinterpret_cast<const uint8_t*>(rgba.data()), sheet, error), "2D sheet converts");
+    check(makeTexture("res://sheet.png", 4, 2, reinterpret_cast<const uint8_t*>(rgba.data()), sheet, error), "2D sheet converts");
     const uint16_t r565 = rgb565(0xff0000), g565 = rgb565(0x00ff00), b565 = rgb565(0x0000ff);
-    auto at = [](Runtime& r, int x, int y) { r.render(); return r.pixels()[size_t(y) * size_t(r.width()) + size_t(x)]; };
+    auto at = [](Runtime& r, int x, int y){ r.render(); return r.pixels()[size_t(y) * size_t(r.width()) + size_t(x)]; };
 
-    // A 2x2 frame at 10x: 20x20 pixels, red on the left, green on the right.
+    //a 2x2 frame at 10x: 20x20 pixels, red on the left, green on the right.
     Description d;
     d.nodes.push_back(node(1, -1, NodeType::Node2D, "World"));
     auto ship = node(2, 0, NodeType::Sprite2D, "Ship");
@@ -1454,7 +1591,8 @@ void twod_tests() {
     check(r.load(d, error), "a 2D scene loads");
     check(at(r, 95, 80) == r565 && at(r, 105, 80) == g565 && at(r, 85, 80) != r565 && at(r, 115, 80) != g565,
           "Sprite2D draws its frame centred on its position");
-    {   // The editor's 2D view: zoom 2 from (50, 40), so the 20 px sprite spans 80-120 on the screen; no 3D.
+    //the editor's 2D view: zoom 2 from (50, 40), so the 20 px sprite spans 80-120 on the screen; no 3D.
+    {
         r.set_editor_canvas(true, 2, {50, 40, 0});
         check(at(r, 85, 80) == r565 && at(r, 115, 80) == g565 && at(r, 75, 80) != r565 && r.pick(85, 80) == 2,
               "the editor's 2D view moves and zooms the canvas; picking follows it");
@@ -1464,7 +1602,7 @@ void twod_tests() {
         check(world.load(scene(), error), "3D scene loads");
         world.set_editor_canvas(true);
         check(lit(frame(world)) == 0, "the 2D view leaves the 3D world out");
-        // A Label at text scale 2 seen at zoom 0.5 shrinks to scale 1 (not to whole pixels only).
+        //a Label at text scale 2 seen at zoom 0.5 shrinks to scale 1 (not to whole pixels only).
         Description hud;
         hud.nodes.push_back(node(1, -1, NodeType::Control, "HUD"));
         auto label = node(2, 0, NodeType::Label, "Score");
@@ -1480,58 +1618,62 @@ void twod_tests() {
         check(std::count(pixels.begin(), pixels.end(), rgb565(0xffffff)) > 20, "zoomed Labels are drawn");
     }
 
-    auto variant = [&](Runtime& x, auto change) {
+    auto variant = [&](Runtime& x, auto change){
         Description v = d;
         change(v);
         x.load(v, error);
     };
+
     Runtime flipped;
-    variant(flipped, [](Description& v) { v.nodes[1].flip_h = true; });
+    variant(flipped, [](Description& v){ v.nodes[1].flip_h = true; });
     check(at(flipped, 95, 80) == g565 && at(flipped, 105, 80) == r565, "flip_h mirrors the frame");
     Runtime corner;
-    variant(corner, [](Description& v) { v.nodes[1].centered = false; v.nodes[1].offset[0] = 2; });
+    variant(corner, [](Description& v){ v.nodes[1].centered = false; v.nodes[1].offset[0] = 2; });
     check(at(corner, 125, 85) == r565 && at(corner, 135, 85) == g565, "centered off and offset (in the node's scaled space) move the frame");
     Runtime turned;
-    variant(turned, [](Description& v) { v.nodes[1].rotation.z = 90; });
+    variant(turned, [](Description& v){ v.nodes[1].rotation.z = 90; });
     check(at(turned, 100, 75) == r565 && at(turned, 100, 85) == g565 && at(turned, 95, 80) != r565,
           "rotation turns the sprite clockwise, as y grows downwards");
     Runtime moved;
-    variant(moved, [](Description& v) { v.nodes[0].position = {50, 0, 0}; });
+    variant(moved, [](Description& v){ v.nodes[0].position = {50, 0, 0}; });
     check(at(moved, 145, 80) == r565 && at(moved, 95, 80) != r565, "a child moves with its Node2D parent");
     Runtime hidden;
-    variant(hidden, [](Description& v) { v.nodes[0].visible = false; });
+    variant(hidden, [](Description& v){ v.nodes[0].visible = false; });
     check(at(hidden, 95, 80) != r565, "a hidden Node2D hides its children");
 
-    // Draw order: z_index first, then the tree.
+    //draw order: z_index first, then the tree.
     Runtime layered;
-    variant(layered, [](Description& v) {
+    variant(layered, [](Description& v){
         auto cover = v.nodes[1];
         cover.id = 3; cover.name = "Cover"; cover.frame = 1;
         v.nodes.push_back(cover);
     });
+
     check(at(layered, 95, 80) == b565, "a later sibling covers an earlier one");
     Runtime raised;
-    variant(raised, [](Description& v) {
+    variant(raised, [](Description& v){
         v.nodes[1].z_index = 1;
         auto cover = v.nodes[1];
         cover.id = 3; cover.name = "Cover"; cover.frame = 1; cover.z_index = 0;
         v.nodes.push_back(cover);
     });
+
     check(at(raised, 95, 80) == r565, "z_index draws in front of later siblings");
 
-    // The current Camera2D shows its position at the screen centre; zoom scales.
+    //the current Camera2D shows its position at the screen centre; zoom scales.
     Runtime followed;
-    variant(followed, [](Description& v) {
+    variant(followed, [](Description& v){
         v.nodes[1].position = {1000, 1000, 0};
         auto camera = node(3, 0, NodeType::Camera2D, "Camera2D");
         camera.position = {1000, 1000, 0}; camera.extras().current = true; camera.extras().zoom[0] = camera.extras().zoom[1] = 2;
         v.nodes.push_back(camera);
     });
+
     const int cx = Width / 2, cy = Height / 2;
     check(at(followed, cx - 15, cy) == r565 && at(followed, cx + 15, cy) == g565 && at(followed, cx - 25, cy) != r565,
           "Camera2D centres the view on itself, zoom scales it");
 
-    // Animations, autoplay and the script API.
+    //animations, autoplay and the script API.
     Description a = d;
     a.nodes[1].type = NodeType::AnimatedSprite2D;
     a.nodes[1].extras().animations = "spin 0-1 10, hit 1 5 once";
@@ -1544,8 +1686,10 @@ void twod_tests() {
     Runtime animated;
     std::vector<ScriptDiagnostic> diagnostics;
     check(animated.load(a, error) && animated.start(diagnostics), "an AnimatedSprite2D scene starts");
-    for (int i = 0; i < 30; ++i) animated.update(1.0f / 60);
-    check(has_log(animated, "pos (30.0, 40.0) deg 90.0 global (80.0, 40.0) anim spin true", false), "Node2D properties are Vector2s and radians; autoplay starts the first animation");
+
+    for(int i = 0; i < 30; ++i) animated.update(1.0f / 60);
+
+    check(hasLog(animated, "pos (30.0, 40.0) deg 90.0 global (80.0, 40.0) anim spin true", false), "Node2D properties are Vector2s and radians; autoplay starts the first animation");
     Description bad = a;
     bad.nodes[1].extras().animations = "spin 0-5 10";
     check(!animated.load(bad, error), "animations past the sheet's frames are rejected");
@@ -1553,16 +1697,20 @@ void twod_tests() {
     Runtime timing;
     check(timing.load(a, error) && timing.start(diagnostics), "the animation scene starts again");
     std::vector<LogLine> log;
-    for (int i = 0; i < 30; ++i) {
+
+    for(int i = 0; i < 30; ++i){
         timing.update(1.0f / 60);
-        for (auto& line : timing.take_log()) log.push_back(line);
+
+        for(auto& line : timing.take_log()) log.push_back(line);
     }
-    auto logged = [&](const std::string& text) {
-        return std::any_of(log.begin(), log.end(), [&](const LogLine& l) { return l.text.find(text) != std::string::npos; });
+
+    auto logged = [&](const std::string& text){
+        return std::any_of(log.begin(), log.end(), [&](const LogLine& l){ return l.text.find(text) != std::string::npos; });
     };
+
     check(logged("frame 1") && logged("hit 1 false"), "animations advance at their fps; a once animation stops on its last frame");
 
-    // The package keeps the 2D fields.
+    //the package keeps the 2D fields.
     Description packed = a;
     packed.nodes[1].z_index = -3; packed.nodes[1].centered = false; packed.nodes[1].offset[1] = 7;
     auto camera = node(3, 0, NodeType::Camera2D, "Camera2D");
@@ -1577,14 +1725,15 @@ void twod_tests() {
 }
 
 // Godot's signals on engine nodes, and the Timer.
-void signal_tests() {
+void signalTests(){
     std::string error;
-    auto count = [](const std::vector<std::string>& log, const std::string& text) { return std::count(log.begin(), log.end(), text); };
-    auto errors = [](const std::vector<std::string>& log) {
-        return std::count_if(log.begin(), log.end(), [](const std::string& line) { return line.rfind("E ", 0) == 0; });
+    auto count = [](const std::vector<std::string>& log, const std::string& text){ return std::count(log.begin(), log.end(), text); };
+    auto errors = [](const std::vector<std::string>& log){
+        return std::count_if(log.begin(), log.end(), [](const std::string& line){ return line.rfind("E ", 0) == 0; });
     };
 
-    {   // A repeating Timer that autostarts, and a one-shot one started from a script.
+    //a repeating Timer that autostarts, and a one-shot one started from a script.
+    {
         Description d;
         d.nodes.push_back(node(1, -1, NodeType::Node, "Main"));
         auto every = node(2, 0, NodeType::Timer, "Every");
@@ -1603,9 +1752,9 @@ void signal_tests() {
             "\tif ticks == 3:\n\t\t$Every.stop()\n\t\tprint(\"stopped \", $Every.is_stopped(), \" \", $Every.time_left)\n"
             "func _on_once():\n\tprint(\"once done \", $Once.is_stopped())\n", {}});
         Runtime r;
-        check(start_scene(r, d), "Timer scene starts");
+        check(startScene(r, d), "Timer scene starts");
         simulate(r, 3);
-        const auto log = run_log(r);
+        const auto log = runLog(r);
         check(count(log, "before true false") == 1, "autostart starts a Timer, the others wait for start()");
         check(count(log, "once 0.2 false") == 1, "start(time) sets wait_time and starts the Timer");
         check(count(log, "tick 1") == 1 && count(log, "tick 3") == 1 && count(log, "tick 4") == 0,
@@ -1624,23 +1773,26 @@ void signal_tests() {
         check(!r.load(bad, error), "a Timer's wait_time must be positive");
     }
 
-    {   // Area signals reach any node; a script connected to its own _on_body_entered runs it once.
-        auto rect = [](float w, float h) {
+    //area signals reach any node; a script connected to its own _on_body_entered runs it once.
+    {
+        auto rect = [](float w, float h){
             NodeDesc n = node(0, 0, NodeType::CollisionShape2D, "Shape");
-            n.extras().box_size = {w, h, 0};
+            n.extras().boxSize = {w, h, 0};
             return n;
         };
-        auto circle = [](float radius) {
+
+        auto circle = [](float radius){
             NodeDesc n = node(0, 0, NodeType::CollisionShape2D, "Shape");
-            n.extras().collision = CollisionKind::Sphere; n.extras().box_size = {20, 20, 0}; n.extras().radius = radius;
+            n.extras().collision = CollisionKind::Sphere; n.extras().boxSize = {20, 20, 0}; n.extras().radius = radius;
             return n;
         };
+
         Description d;
         d.nodes.push_back(node(1, -1, NodeType::Node2D, "World"));
-        add_body(d, 2, NodeType::StaticBody2D, "Ground", {0, 420, 0}, rect(2000, 40));
-        add_body(d, 10, NodeType::RigidBody2D, "Ball", {0, 100, 0}, circle(10));
-        add_body(d, 20, NodeType::Area2D, "Zone", {0, 200, 0}, rect(100, 20));
-        const int own = add_body(d, 30, NodeType::Area2D, "Own", {0, 300, 0}, rect(100, 20));
+        addBody(d, 2, NodeType::StaticBody2D, "Ground", {0, 420, 0}, rect(2000, 40));
+        addBody(d, 10, NodeType::RigidBody2D, "Ball", {0, 100, 0}, circle(10));
+        addBody(d, 20, NodeType::Area2D, "Zone", {0, 200, 0}, rect(100, 20));
+        const int own = addBody(d, 30, NodeType::Area2D, "Own", {0, 300, 0}, rect(100, 20));
         d.nodes[0].script = 0;
         d.nodes[size_t(own)].script = 1;
         d.scripts.push_back({"res://world.jet", "extends Node2D\nfunc _ready():\n\t$Zone.body_entered.connect(_on_zone)\n"
@@ -1649,18 +1801,19 @@ void signal_tests() {
         d.scripts.push_back({"res://own.jet", "extends Area2D\nfunc _ready():\n\tbody_entered.connect(_on_body_entered)\n"
             "func _on_body_entered(body):\n\tprint(\"own \", body.name)\n", {}});
         Runtime r;
-        check(start_scene(r, d), "area signal scene starts");
+        check(startScene(r, d), "area signal scene starts");
         simulate(r, 2);
-        const auto log = run_log(r);
+        const auto log = runLog(r);
         check(count(log, "zone Ball") == 1 && count(log, "left Ball") == 1, "Area2D's body_entered and body_exited reach a node connected to them");
         check(count(log, "own Ball") == 1, "an area's _on_body_entered connected to its own signal runs once");
     }
 
-    {   // animation_finished, the particles' finished, and connections to a freed node are dropped.
+    //animation_finished, the particles' finished, and connections to a freed node are dropped.
+    {
         const uint32_t red = 0xff0000ff, blue = 0xffff0000;
         const std::vector<uint32_t> rgba = {red, blue, red, blue};
         TextureAsset sheet;
-        check(make_texture("res://sheet.png", 2, 2, reinterpret_cast<const uint8_t*>(rgba.data()), sheet, error), "sheet converts");
+        check(makeTexture("res://sheet.png", 2, 2, reinterpret_cast<const uint8_t*>(rgba.data()), sheet, error), "sheet converts");
         Description d;
         d.nodes.push_back(node(1, -1, NodeType::Node, "Main"));
         auto ship = node(2, 0, NodeType::AnimatedSprite2D, "Ship");
@@ -1680,15 +1833,16 @@ void signal_tests() {
             "\t$Timer.timeout.connect($Gone.hide)\n\t$Gone.queue_free()\n"
             "func _on_ship():\n\tprint(\"ship done \", $Ship.frame)\nfunc _on_burst():\n\tprint(\"burst done\")\n", {}});
         Runtime r;
-        check(start_scene(r, d), "signal scene starts");
+        check(startScene(r, d), "signal scene starts");
         simulate(r, 1);
-        const auto log = run_log(r);
+        const auto log = runLog(r);
         check(count(log, "ship done 1") == 1, "AnimatedSprite2D emits animation_finished at the end of a \"once\" animation");
         check(count(log, "burst done") == 1, "a one-shot CPUParticles3D emits finished");
         check(errors(log) == 0, "a freed node's connections are dropped with it");
     }
 
-    {   // Connections made in the editor: the scene's own, and those of an instantiated scene, through a package.
+    //connections made in the editor: the scene's own, and those of an instantiated scene, through a package.
+    {
         Description d;
         d.nodes.push_back(node(1, -1, NodeType::Node, "Main"));
         auto timer = node(2, 0, NodeType::Timer, "Timer");
@@ -1722,24 +1876,26 @@ void signal_tests() {
         std::vector<ScriptDiagnostic> diagnostics;
         check(r.load_pack(bytes.data(), bytes.size(), error) && r.start(diagnostics), "connected scene starts from its package");
         simulate(r, 1);
-        const auto log = run_log(r);
+        const auto log = runLog(r);
         check(count(log, "ready true") == 1, "editor connections are made before _ready()");
         check(count(log, "first") == 1, "a one-shot editor connection runs once");
         check(count(log, "part Part") == 1, "an instantiated scene brings its own connections");
-        check(std::count_if(log.begin(), log.end(), [](const std::string& line) {
+        check(std::count_if(log.begin(), log.end(), [](const std::string& line){
                   return line.find("Timer.timeout -> Main._missing()") != std::string::npos && line.rfind("E ", 0) == 0;
               }) == 1, "a connection to a missing method is reported once, at the start");
         Description bad = d;
         bad.connections.push_back({5, 0, "timeout", "_on_timer_timeout", 0});
-        check(!r.load(bad, error), "a connection to a node that isn't there is refused");
+        check(!r.load(bad, error), "a connection to a node that is not there is refused");
     }
 }
 
 // Godot's Tween: steps, parallel tweeners, loops, transitions, callbacks and signals.
-void tween_tests() {
+void tweenTests(){
     Description d;
     d.nodes.push_back(node(1, -1, NodeType::Node2D, "Main"));
-    for (uint32_t i = 0; i < 4; ++i) d.nodes.push_back(node(2 + i, 0, NodeType::Node2D, std::array<const char*, 4>{"Box", "Fade", "Step", "Gone"}[i]));
+
+    for(uint32_t i = 0; i < 4; ++i) d.nodes.push_back(node(2 + i, 0, NodeType::Node2D, std::array<const char*, 4>{"Box", "Fade", "Step", "Gone"}[i]));
+
     d.nodes[0].script = 0;
     d.scripts.push_back({"res://main.jet",
         "extends Node2D\nvar value := 0.0\nvar ticks := 0\nvar steps := []\nvar tween\n"
@@ -1769,56 +1925,61 @@ void tween_tests() {
         "func _set_value(v):\n\tvalue = v\n"
         "func _on_gone():\n\tprint(\"gone\")\n", {}});
     Runtime r;
-    check(start_scene(r, d), "tween scene starts");
+    check(startScene(r, d), "tween scene starts");
     simulate(r, 0.5f);
-    check(std::abs(position_of(r, 2).x - 50) < 2, "tween_property moves along its step (linear)");
+    check(std::abs(positionOf(r, 2).x - 50) < 2, "tween_property moves along its step (linear)");
     simulate(r, 1.3f);
-    const auto log = run_log(r);
-    auto has = [&](const std::string& text) { return std::find(log.begin(), log.end(), text) != log.end(); };
+    const auto log = runLog(r);
+    auto has = [&](const std::string& text){ return std::find(log.begin(), log.end(), text) != log.end(); };
     check(has("trans 1 1 true true"), "Tween.TRANS_* and EASE_* constants; a new tween is valid and running");
-    check(has("done (100.0, 50.0)") && std::abs(position_of(r, 2).y - 50) < 0.01f, "steps run one after the other; \"position:y\" tweens one component");
+    check(has("done (100.0, 50.0)") && std::abs(positionOf(r, 2).y - 50) < 0.01f, "steps run one after the other; \"position:y\" tweens one component");
     check(has("finished [0, 1, 2] false 10.0"), "step_finished for each step, then finished; a finished tween is no longer valid and kill() is fine; tween_method reached its end");
     check(has("fade 0.0 40.0"), "set_parallel() runs tweeners together, set_delay() waits, chain() starts a new step");
     check(has("tick 1 10.0") && has("tick 3 30.0") && !has("tick 4 40.0"), "set_loops(3) with as_relative() moves 10 more each loop");
     check(!has("gone"), "a node's tween dies with it");
-    for (const auto& line : log) if (line.rfind("E ", 0) == 0) std::cerr << line << '\n';
-    check(std::none_of(log.begin(), log.end(), [](const std::string& line) { return line.rfind("E ", 0) == 0; }), "no tween errors");
 
-    // Godot's errors: appending to a started tween, a property the object doesn't have, a tween that is over.
-    for (const char* body : {"\tvar t = create_tween()\n\tt.tween_interval(0.1)\n\tawait_frame = t\n",
+    for(const auto& line : log) if(line.rfind("E ", 0) == 0) std::cerr << line << '\n';
+
+    check(std::none_of(log.begin(), log.end(), [](const std::string& line){ return line.rfind("E ", 0) == 0; }), "no tween errors");
+
+    //Godot's errors: appending to a started tween, a property the object does not have, a tween that is over.
+    for(const char* body : {"\tvar t = create_tween()\n\tt.tween_interval(0.1)\n\tawait_frame = t\n",
                              "\tcreate_tween().tween_property(self, \"nope\", 1.0, 1.0)\n",
-                             "\tvar t = create_tween()\n\tt.kill()\n\tt.tween_interval(1.0)\n"}) {
+                             "\tvar t = create_tween()\n\tt.kill()\n\tt.tween_interval(1.0)\n"}){
         Description e;
         e.nodes.push_back(node(1, -1, NodeType::Node2D, "Main"));
         e.nodes[0].script = 0;
         e.scripts.push_back({"res://e.jet", std::string("extends Node2D\nvar await_frame\nvar frames := 0\nfunc _ready():\n") + body +
             "func _process(delta):\n\tframes += 1\n\tif frames == 3 and await_frame:\n\t\tawait_frame.tween_interval(1.0)\n", {}});
         Runtime x;
-        check(start_scene(x, e), "tween error scene starts");
+        check(startScene(x, e), "tween error scene starts");
         simulate(x, 0.1f);
-        const auto errors = run_log(x);
-        const bool reported = std::any_of(errors.begin(), errors.end(), [](const std::string& line) {
-            return line.find("Can't append to a Tween that has started") != std::string::npos
+        const auto errors = runLog(x);
+        const bool reported = std::any_of(errors.begin(), errors.end(), [](const std::string& line){
+            return line.find("Can not append to a Tween that has started") != std::string::npos
                 || line.find("does not exist in Main") != std::string::npos || line.find("no longer valid") != std::string::npos;
         });
+
         check(reported, "tween misuse is reported as in Godot");
     }
 }
 
 // Godot's AnimationPlayer: value tracks (linear, nearest, one component), method tracks, loops, signals.
-void animation_player_tests() {
+void animationPlayerTests(){
     using jetscript::Value;
     std::string error;
-    auto key = [](float time, Value value, float transition = 1) {
+    auto key = [](float time, Value value, float transition = 1){
         AnimationKey k;
         k.time = time; k.value = std::move(value); k.transition = transition;
         return k;
     };
-    auto call = [](float time, const char* method, std::vector<Value> args = {}) {
+
+    auto call = [](float time, const char* method, std::vector<Value> args = {}){
         AnimationKey k;
         k.time = time; k.method = method; k.args = std::move(args);
         return k;
     };
+
     Description d;
     d.nodes.push_back(node(1, -1, NodeType::Node2D, "Main"));
     d.nodes.push_back(node(2, 0, NodeType::Node2D, "Box"));
@@ -1836,7 +1997,7 @@ void animation_player_tests() {
     AnimationTrack x; x.path = "Box"; x.property = "position:x"; x.keys = {key(0, Value(0.0)), key(0.5, Value(10.0))};
     AnimationTrack ticks; ticks.path = "."; ticks.keys = {call(0, "_on_spin")};
     spin.tracks = {x, ticks};
-    player.extras().player_animations = {move, spin};
+    player.extras().playerAnimations = {move, spin};
     player.extras().animation = "move";
     d.nodes.push_back(player);
     d.nodes[0].script = 0;
@@ -1852,52 +2013,126 @@ void animation_player_tests() {
 
     const auto bytes = encode_pack(d, error);
     Description back;
-    check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[2].more().player_animations.size() == 2
-          && back.nodes[2].more().player_animations[0].tracks[2].keys[0].method == "_on_half" && back.nodes[2].more().animation == "move",
+    check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[2].more().playerAnimations.size() == 2
+          && back.nodes[2].more().playerAnimations[0].tracks[2].keys[0].method == "_on_half" && back.nodes[2].more().animation == "move",
           "the package keeps an AnimationPlayer's animations (v17)");
 
     Runtime r;
     std::vector<ScriptDiagnostic> diagnostics;
     check(r.load_pack(bytes.data(), bytes.size(), error) && r.start(diagnostics), "AnimationPlayer scene starts");
     simulate(r, 0.5f);
-    check(std::abs(position_of(r, 2).x - 50) < 2 && std::abs(position_of(r, 2).y - 25) < 1, "a value track interpolates (autoplay)");
+    check(std::abs(positionOf(r, 2).x - 50) < 2 && std::abs(positionOf(r, 2).y - 25) < 1, "a value track interpolates (autoplay)");
     simulate(r, 0.6f);
     simulate(r, 0.55f * 3);
     simulate(r, 0.05f);
-    const auto log = run_log(r);
-    auto has = [&](const std::string& text) { return std::find(log.begin(), log.end(), text) != log.end(); };
+    const auto log = runLog(r);
+    auto has = [&](const std::string& text){ return std::find(log.begin(), log.end(), text) != log.end(); };
     check(has("lists [\"move\", \"spin\"] true move"), "get_animation_list(), has_animation(), current_animation");
     check(has("half 7 0.0"), "a method key calls with its arguments; nearest keys jump");
     check(has("finished move (100.0, 50.0) false"), "animation_finished at the end of a non-looping animation, values at its end");
     check(has("stopped 0.0 "), "a looping animation calls its first key each loop; stop() goes back to its start");
     check(has("seek 0.25 (25.0, 12.5)"), "play_backwards() and seek(time, true) update the pose");
-    for (const auto& line : log) if (line.rfind("E ", 0) == 0) std::cerr << line << '\n';
 
-    // The editor previews a pose without playing.
+    for(const auto& line : log) if(line.rfind("E ", 0) == 0) std::cerr << line << '\n';
+
+    //the editor previews a pose without playing.
     Runtime editor;
-    check(editor.load(d, error) && editor.preview_animation(3, "move", 0.5f) && std::abs(position_of(editor, 2).x - 50) < 0.01f,
+    check(editor.load(d, error) && editor.preview_animation(3, "move", 0.5f) && std::abs(positionOf(editor, 2).x - 50) < 0.01f,
           "the editor previews an animation at a time");
     Description bad = d;
-    bad.nodes[2].extras().player_animations[0].tracks[0].keys[1].time = 5;
+    bad.nodes[2].extras().playerAnimations[0].tracks[0].keys[1].time = 5;
     check(!editor.load(bad, error), "keys past the animation's length are refused");
 }
 
-int main(int argc, char** argv) {
+// WorldEnvironment depth fog and GeometryInstance3D visibility range, seen through the scene camera (0, 2, 5).
+void environmentTests(){
     std::string error;
-    bytecode_tests();
-    material_tests();
-    model_tests();
-    physics_tests();
-    particle_tests();
-    scene_tests();
-    sprite_tests();
-    memory_tests();
-    instancing_tests();
-    twod_tests();
-    physics2d_tests();
-    signal_tests();
-    tween_tests();
-    animation_player_tests();
+    const Description base = scene();
+    const auto plain = playScene(base);
+    check(lit(plain) > 500, "the cube is drawn without fog or range");
+
+    auto withFog = [&](float begin, float end){
+        Description d = base;
+        auto env = node(9, 0, NodeType::WorldEnvironment, "Env");
+        env.extras().fog_enabled = true;
+        env.extras().fog_begin = begin;
+        env.extras().fog_end = end;
+        d.nodes.push_back(env);
+        return playScene(d);
+    };
+
+    //the cube is ~5 m away
+    check(lit(withFog(1, 3)) == 0, "beyond fog_depth_end the geometry is gone");
+    const auto foggy = withFog(2, 9);
+    check(lit(foggy) > 0 && foggy != plain, "inside the fog band the geometry fades into the background");
+    check(withFog(20, 40) == plain, "before fog_depth_begin nothing changes");
+
+    auto withRange = [&](uint16_t begin, uint16_t beginMargin, uint16_t end, uint16_t endMargin, bool fade){
+        Description d = base;
+        auto& cube = d.nodes[3];
+        cube.visibility_begin = begin; cube.visibility_begin_margin = beginMargin;
+        cube.visibility_end = end; cube.visibility_end_margin = endMargin; cube.visibility_fade = fade;
+        return playScene(d);
+    };
+
+    //cm, the cube centre is 522 cm away
+    check(lit(withRange(0, 0, 300, 0, false)) == 0, "beyond visibility_range_end the node is not drawn");
+    check(withRange(0, 0, 1000, 0, false) == plain, "within visibility_range_end it is");
+    check(lit(withRange(1000, 0, 0, 0, false)) == 0, "closer than visibility_range_begin it is not drawn");
+    const auto fading = withRange(0, 0, 400, 300, true);
+    check(lit(fading) > 0 && fading != plain, "with fade Self it dissolves between end and end + margin");
+    check(withRange(0, 0, 400, 300, false) == withRange(0, 0, 400, 0, false), "without fade the margins do not fade");
+
+    //scripts, with Godot's names
+    Description scripted = base;
+    scripted.nodes[0].script = 0;
+    scripted.scripts.push_back({"res://range.jet", "extends Node3D\nfunc _ready():\n"
+        "\tvar cube: GeometryInstance3D = $Cube\n\tcube.visibility_range_end = 3.0\n"
+        "\tcube.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF\n"
+        "\tprint(cube.visibility_range_end, \" \", cube.visibility_range_fade_mode)\n", {}});
+    check(lit(playScene(scripted)) == 0, "scripts set the visibility range");
+    Description fogScript = base;
+    auto env = node(9, 0, NodeType::WorldEnvironment, "Env");
+    fogScript.nodes.push_back(env);
+    fogScript.nodes[0].script = 0;
+    fogScript.scripts.push_back({"res://fog.jet", "extends Node3D\nfunc _ready():\n"
+        "\t$Env.fog_enabled = true\n\t$Env.fog_depth_begin = 1.0\n\t$Env.fog_depth_end = 3.0\n", {}});
+    check(lit(playScene(fogScript)) == 0, "scripts turn the fog on");
+
+    //the package keeps them
+    Description saved = base;
+    saved.nodes[3].visibility_begin = 150; saved.nodes[3].visibility_end_margin = 65535; saved.nodes[3].visibility_fade = true;
+    auto savedEnv = node(9, 0, NodeType::WorldEnvironment, "Env");
+    savedEnv.extras().fog_enabled = true; savedEnv.extras().fog_begin = 12.5f; savedEnv.extras().fog_end = 80;
+    saved.nodes.push_back(savedEnv);
+    const auto bytes = encode_pack(saved, error);
+    Description back;
+    check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[3].visibility_begin == 150
+          && back.nodes[3].visibility_end_margin == 65535 && back.nodes[3].visibility_fade && back.nodes[4].more().fog_enabled
+          && back.nodes[4].more().fog_begin == 12.5f && back.nodes[4].more().fog_end == 80, "the package keeps fog and visibility range");
+    Description badFog = saved;
+    badFog.nodes[4].extras().fog_end = 5;
+    Runtime r;
+    check(!r.load(badFog, error), "fog_depth_end must be beyond fog_depth_begin");
+}
+
+int main(int argc, char** argv){
+    std::string error;
+    bytecodeTests();
+    materialTests();
+    modelTests();
+    physicsTests();
+    particleTests();
+    sceneTests();
+    spriteTests();
+    memoryTests();
+    instancingTests();
+    twodTests();
+    physics2dTests();
+    signalTests();
+    tweenTests();
+    animationPlayerTests();
+    environmentTests();
     Runtime runtime;
     const Description base = scene();
     check(runtime.load(base, error), "valid scene loads");
@@ -1905,29 +2140,31 @@ int main(int argc, char** argv) {
     check(runtime.triangles() > 0, "Jet rasterizes geometry");
     check(lit(initial) > 500, "cube appears in the editor view");
 
-    // Hierarchy: a child of a moved/rotated Node3D renders like the composed transform.
+    //hierarchy: a child of a moved/rotated Node3D renders like the composed transform.
     {
         Description nested = base, flat = base;
         auto pivot = node(5, 0, NodeType::Node3D, "Pivot");
         pivot.position = {1, 0, 0}; pivot.rotation = {0, 90, 0};
         nested.nodes.push_back(pivot);
-        nested.nodes[3].parent = 4; // the cube is now a child of Pivot (index 4)
-        std::swap(nested.nodes[3], nested.nodes[4]); // keep parents before children
+        //the cube is now a child of Pivot (index 4)
+        nested.nodes[3].parent = 4;
+        //keep parents before children
+        std::swap(nested.nodes[3], nested.nodes[4]);
         nested.nodes[3].parent = 0;
         nested.nodes[4].parent = 3;
         nested.nodes[4].position = {1, 0.5f, 0};
         flat.nodes[3].position = {1, 0.5f, -1};
         flat.nodes[3].rotation = {0, 90, 0};
-        check(render_scene(nested) == render_scene(flat), "child transform composes with parent (Godot conventions)");
+        check(renderScene(nested) == renderScene(flat), "child transform composes with parent (Godot conventions)");
         Description hidden = nested;
         hidden.nodes[3].visible = false;
-        check(lit(render_scene(hidden)) < lit(render_scene(nested)), "hiding a parent hides its children");
+        check(lit(renderScene(hidden)) < lit(renderScene(nested)), "hiding a parent hides its children");
         Description scaled = nested;
         scaled.nodes[3].scale = {2, 2, 2};
-        check(render_scene(scaled) != render_scene(nested), "parent scale affects children");
+        check(renderScene(scaled) != renderScene(nested), "parent scale affects children");
     }
 
-    // Validation.
+    //validation.
     {
         Description bad = base;
         bad.nodes.push_back(node(4, 0, NodeType::Node3D, "Other"));
@@ -1947,19 +2184,21 @@ int main(int argc, char** argv) {
         check(runtime.description().nodes.size() == base.nodes.size(), "failed load keeps the previous scene");
     }
 
-    // Picking returns the node id.
+    //picking returns the node id.
     {
         check(runtime.load(base, error), "reload");
         int id = -1;
         const auto pixels = frame(runtime);
-        for (int y = 0; y < Height && id < 0; y += 3)
-            for (int x = 0; x < Width && id < 0; x += 3)
-                if (pixels[y * Width + x] != rgb565(0x161c28)) id = runtime.pick(x, y);
+
+        for(int y = 0; y < Height && id < 0; y += 3)
+            for(int x = 0; x < Width && id < 0; x += 3)
+                if(pixels[y * Width + x] != rgb565(0x161c28)) id = runtime.pick(x, y);
+
         check(id == 4, "picking maps Jet geometry to the node id");
         check(runtime.pick(-1, 0) == -1, "reject pick outside the image");
     }
 
-    // Scripts: behaviour, exported overrides, stop restores the authored scene.
+    //scripts: behaviour, exported overrides, stop restores the authored scene.
     {
         Description d = base;
         d.scripts.push_back({"res://spin.jet", "extends Node3D\n@export var speed := 90.0\n\nfunc _ready():\n\tprint(\"ready \", name)\n\nfunc _process(delta):\n\trotation_degrees.y += speed * delta\n"});
@@ -1967,10 +2206,12 @@ int main(int argc, char** argv) {
         check(runtime.load(d, error), "scene with script loads");
         std::vector<ScriptDiagnostic> diagnostics;
         check(runtime.start(diagnostics), "scripts compile and start");
-        check(has_log(runtime, "ready Cube", false), "print() from _ready reaches the log");
+        check(hasLog(runtime, "ready Cube", false), "print() from _ready reaches the log");
         runtime.use_editor_camera(true);
         const auto before = frame(runtime);
-        for (int i = 0; i < 10; ++i) runtime.update(0.05f);
+
+        for(int i = 0; i < 10; ++i) runtime.update(0.05f);
+
         check(frame(runtime) != before, "_process rotates the cube");
         runtime.stop();
         check(frame(runtime) == initial, "stop restores the authored frame");
@@ -1978,38 +2219,40 @@ int main(int argc, char** argv) {
         check(runtime.load(d, error) && runtime.start(diagnostics), "override loads");
         runtime.use_editor_camera(true);
         const auto still = frame(runtime);
-        for (int i = 0; i < 10; ++i) runtime.update(0.05f);
+
+        for(int i = 0; i < 10; ++i) runtime.update(0.05f);
+
         check(frame(runtime) == still, "scene override of an exported variable (int to float)");
     }
 
-    // Scene camera is used while playing.
+    //scene camera is used while playing.
     {
         Description d = base;
-        check(play_scene(d) != render_scene(d), "play uses the Camera3D, edit uses the editor camera");
+        check(playScene(d) != renderScene(d), "play uses the Camera3D, edit uses the editor camera");
     }
 
-    // get_node, $ paths and value-type write-back.
+    //get_node, $ paths and value-type write-back.
     {
         Description d = base, moved = base;
         d.scripts.push_back({"res://root.jet", "extends Node3D\nfunc _ready():\n\t$Cube.position.x = 1.5\n\tget_node(\"Cube\").rotation_degrees.y = 30\n"});
         d.nodes[0].script = 0;
         moved.nodes[3].position.x = 1.5f;
         moved.nodes[3].rotation.y = 30;
-        check(play_scene(d) == play_scene(moved), "$Cube.position.x = ... writes the property back");
+        check(playScene(d) == playScene(moved), "$Cube.position.x = ... writes the property back");
     }
 
-    // Input actions.
+    //input actions.
     {
         Description d = base;
         d.scripts.push_back({"res://move.jet", "extends Node3D\nfunc _process(delta):\n\tposition.x += Input.get_axis(\"ui_left\", \"ui_right\") * 2.0 * delta\n"});
         d.nodes[3].script = 0;
-        check(play_scene(d, 0.5f, UiRight) != play_scene(d, 0.5f, 0), "Input.get_axis follows the pressed actions");
-        // The project's own actions (Input Map): bit i = actions[i].
+        check(playScene(d, 0.5f, UiRight) != playScene(d, 0.5f, 0), "Input.get_axis follows the pressed actions");
+        //the project's own actions (Input Map): bit i = actions[i].
         Description custom = base;
         custom.actions.push_back({"jump", {"J"}});
         custom.scripts.push_back({"res://jump.jet", "extends Node3D\nfunc _process(delta):\n\tif Input.is_action_pressed(\"jump\"):\n\t\tposition.y += 2.0 * delta\n"});
         custom.nodes[3].script = 0;
-        check(play_scene(custom, 0.5f, 1u << 6) != play_scene(custom, 0.5f, 0), "custom Input Map actions drive scripts");
+        check(playScene(custom, 0.5f, 1u << 6) != playScene(custom, 0.5f, 0), "custom Input Map actions drive scripts");
         Description unknown = custom;
         unknown.actions.pop_back();
         Runtime r;
@@ -2017,7 +2260,7 @@ int main(int argc, char** argv) {
         r.load(unknown, error);
         r.start(diagnostics);
         r.update(0.1f);
-        check(has_log(r, "The InputMap action \"jump\" doesn't exist.", true), "unknown actions report Godot's error");
+        check(hasLog(r, "The InputMap action \"jump\" does not exist.", true), "unknown actions report Godot's error");
         const auto bytes = encode_pack(custom, error);
         Description back;
         check(decode_pack(bytes.data(), bytes.size(), back, error) && back.actions.size() == 7 && back.actions[6].name == "jump"
@@ -2029,7 +2272,7 @@ int main(int argc, char** argv) {
         check(!r.load(bad, error) && !r.load(spaced, error), "duplicate or invalid action names are rejected");
     }
 
-    // A press counts once per physics tick sequence and once per frame, whatever the frame rate.
+    //a press counts once per physics tick sequence and once per frame, whatever the frame rate.
     {
         Description d = base;
         d.scripts.push_back({"res://press.jet", "extends Node3D\nfunc _physics_process(delta):\n"
@@ -2042,29 +2285,31 @@ int main(int argc, char** argv) {
         r.load(d, error);
         r.start(diagnostics);
         r.set_input(UiAccept);
-        r.update(0.034f); // two ticks in one frame
+        //two ticks in one frame
+        r.update(0.034f);
         r.node_state(d.nodes[3].id, cube);
         const float y = d.nodes[3].position.y;
         check(cube.position.x == 1 && cube.position.y == y + 1, "a press seen by two ticks of the same frame counts once");
         r.set_input(0);
         r.update(0.02f);
         r.set_input(UiAccept);
-        r.update(0.005f); // no tick in this frame
+        //no tick in this frame
+        r.update(0.005f);
         r.update(0.01f);
         r.node_state(d.nodes[3].id, cube);
         check(cube.position.x == 2 && cube.position.y == y + 2, "a press in a frame without ticks reaches the next tick");
     }
 
-    // queue_free removes the node (and its children) at the end of the frame.
+    //queue_free removes the node (and its children) at the end of the frame.
     {
         Description d = base, without = base;
         d.scripts.push_back({"res://free.jet", "extends Node3D\nfunc _ready():\n\t$Cube.queue_free()\n"});
         d.nodes[0].script = 0;
         without.nodes[3].visible = false;
-        check(play_scene(d) == play_scene(without), "queue_free hides the node");
+        check(playScene(d) == playScene(without), "queue_free hides the node");
     }
 
-    // Errors: compile diagnostics and runtime errors with location.
+    //errors: compile diagnostics and runtime errors with location.
     {
         Description d = base;
         d.scripts.push_back({"res://bad.jet", "extends Node3D\nfunc _process(delta):\n\tposition.x += undefined_name\n"});
@@ -2076,15 +2321,18 @@ int main(int argc, char** argv) {
         check(runtime.load(d, error) && runtime.start(diagnostics), "valid script starts");
         runtime.update(0.016f);
         bool located = false;
-        for (const auto& line : runtime.take_log()) located = located || (line.error && line.path == "res://bad.jet" && line.line == 4);
+
+        for(const auto& line : runtime.take_log()) located = located || (line.error && line.path == "res://bad.jet" && line.line == 4);
+
         check(located, "runtime error reports file and line");
-        runtime.update(0.016f); // the game keeps running after an error
+        //the game keeps running after an error
+        runtime.update(0.016f);
         d.scripts[0].source = "extends Camera3D\n";
         check(runtime.load(d, error) && runtime.start(diagnostics), "start with mismatched base still runs");
-        check(has_log(runtime, "Camera3D", true), "mismatched script base class is reported");
+        check(hasLog(runtime, "Camera3D", true), "mismatched script base class is reported");
     }
 
-    // Package round trip (version 3: scripts as bytecode) with overrides.
+    //package round trip (version 3: scripts as bytecode) with overrides.
     {
         Description d = base;
         d.scripts.push_back({"res://spin.jet", "extends Node3D\n@export var speed := 1.0\n", {}});
@@ -2096,7 +2344,7 @@ int main(int argc, char** argv) {
         check(!pack.empty() && decode_pack(pack.data(), pack.size(), decoded, error), "pack round trip");
         check(decoded.nodes.size() == d.nodes.size() && decoded.nodes[3].name == "Cube" && decoded.scripts[0].source.empty()
               && !decoded.scripts[0].bytecode.empty(), "pack keeps names and ships bytecode, not source");
-        check(decoded.nodes[3].overrides.size() == 2 && decoded.nodes[3].overrides[0].value.as_real() == 2.5f
+        check(decoded.nodes[3].overrides.size() == 2 && decoded.nodes[3].overrides[0].value.asReal() == 2.5f
               && decoded.nodes[3].overrides[1].value.type() == jetscript::Type::Color, "pack keeps typed overrides");
         check(!decode_pack(pack.data(), pack.size() - 1, decoded, error), "reject truncated pack");
         pack.push_back(0);
@@ -2109,34 +2357,38 @@ int main(int argc, char** argv) {
         check(encode_pack(broken, error).empty() && error.find("res://bad.jet:3") != std::string::npos, "export reports compile errors");
     }
 
-    // Scripts run from a package exactly as from source (coverage script and exported overrides).
+    //scripts run from a package exactly as from source (coverage script and exported overrides).
     {
         Description d = base;
-        d.scripts.push_back({"res://coverage.jet", coverage_script, {}});
+        d.scripts.push_back({"res://coverage.jet", coverageScript, {}});
         d.nodes[0].script = 0;
         d.nodes[0].overrides.push_back({"speed", jetscript::Value(4)});
-        Runtime from_source, from_pack;
+        Runtime fromSource, fromPack;
         std::vector<ScriptDiagnostic> diagnostics;
-        check(from_source.load(d, error) && from_source.start(diagnostics), "coverage script runs from source");
-        for (const auto& e : diagnostics) std::cerr << e.line << ": " << e.message << '\n';
+        check(fromSource.load(d, error) && fromSource.start(diagnostics), "coverage script runs from source");
+
+        for(const auto& e : diagnostics) std::cerr << e.line << ": " << e.message << '\n';
+
         const auto pack = encode_pack(d, error);
         Description decoded;
-        check(decode_pack(pack.data(), pack.size(), decoded, error) && from_pack.load(decoded, error) && from_pack.start(diagnostics),
+        check(decode_pack(pack.data(), pack.size(), decoded, error) && fromPack.load(decoded, error) && fromPack.start(diagnostics),
               "coverage script runs from bytecode");
-        const auto expected = run_log(from_source), actual = run_log(from_pack);
+        const auto expected = runLog(fromSource), actual = runLog(fromPack);
         check(!expected.empty() && expected[0] == "t 39 7.63 6 runother 9 6 true 4.0", "coverage script computes the expected values");
         check(!expected.empty() && expected == actual, "bytecode output matches source output");
-        if (expected != actual || expected.empty())
-            for (const auto& line : expected) std::cerr << "source: " << line << '\n';
-        from_source.update(0.1f); from_pack.update(0.1f);
-        check(frame(from_source) == frame(from_pack), "bytecode renders the same frame");
-        // Corrupted bytecode inside a package: start() reports it instead of running.
+
+        if(expected != actual || expected.empty())
+            for(const auto& line : expected) std::cerr << "source: " << line << '\n';
+
+        fromSource.update(0.1f); fromPack.update(0.1f);
+        check(frame(fromSource) == frame(fromPack), "bytecode renders the same frame");
+        //corrupted bytecode inside a package: start() reports it instead of running.
         decoded.scripts[0].bytecode[decoded.scripts[0].bytecode.size() / 2] ^= 0xff;
-        check(from_pack.load(decoded, error) && !from_pack.start(diagnostics) && !diagnostics.empty(), "corrupted bytecode is reported");
+        check(fromPack.load(decoded, error) && !fromPack.start(diagnostics) && !diagnostics.empty(), "corrupted bytecode is reported");
     }
 
-    // Package for the VM-only desktop player test (ctest "player").
-    if (argc > 1) {
+    //package for the VM-only desktop player test (ctest "player").
+    if(argc > 1){
         Description d = base;
         d.scripts.push_back({"res://sample.jet", "extends Node3D\nfunc _ready():\n\tprint(\"sample ready\")\nfunc _process(delta):\n\trotate_y(delta)\n", {}});
         d.nodes[3].script = 0;
@@ -2145,7 +2397,7 @@ int main(int argc, char** argv) {
         check(!pack.empty(), "sample package written");
     }
 
-    // Deleting meshes removes geometry.
+    //deleting meshes removes geometry.
     {
         Description d = base;
         d.nodes.pop_back();
@@ -2154,6 +2406,6 @@ int main(int argc, char** argv) {
         check(runtime.triangles() == 0, "no geometry without meshes");
     }
 
-    if (failures) { std::cerr << failures << " runtime test(s) failed\n"; return 1; }
+    if(failures){ std::cerr << failures << " runtime test(s) failed\n"; return 1; }
     std::cout << "PASS: hierarchy, Godot transforms, validation, picking, scripts, input, queue_free, errors, bytecode, textures, materials, sky, OBJ import, quantization, Quad/Torus, reflections, 2D nodes, draw order, resolution, physics, particles, input map, scenes, autoloads, Sprite3D, plain Control, slim nodes, RAM estimate, instantiate, 2D nodes, 2D physics, signals, Timer, scene connections, tweens, AnimationPlayer, pack v17\n";
 }

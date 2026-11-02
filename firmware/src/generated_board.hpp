@@ -5,63 +5,70 @@
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
 
-namespace Board {
-constexpr const char* name = "Arduino Nano ESP32 + ILI9341 2.4\"/2.8\" 240×320";
-constexpr int screenWidth = 320, screenHeight = 240, rotation = 1;
-constexpr int clock = 48, mosi = 38, dc = 9, cs = 21, reset = 12, backlight = -1;
-constexpr int spiMode = 0;
-constexpr int writeHz = 40000000;
+namespace Board{
+    constexpr const char* name = "Arduino Nano ESP32 + ILI9341 2.4\"/2.8\" 240×320";
+    constexpr int screenWidth = 320, screenHeight = 240, rotation = 1;
+    constexpr int clock = 48, mosi = 38, dc = 9, cs = 21, reset = 12, backlight = -1;
+    constexpr int spiMode = 0;
+    constexpr int writeHz = 40000000;
 }
 
-class LGFX : public lgfx::LGFX_Device {
-    lgfx::Panel_ILI9341 panel;
-    lgfx::Light_PWM light;
-    lgfx::Bus_SPI bus;
-public:
-    lgfx::Bus_SPI& panel_bus() { return bus; }
-    LGFX() {
-        auto b = bus.config();
-        b.spi_host = SPI2_HOST; // required by the queued DMA scanout
-        b.spi_mode = Board::spiMode;
-        b.freq_write = Board::writeHz;
-        b.freq_read = 16000000;
-        b.spi_3wire = false;
-        b.use_lock = true;
-        b.dma_channel = SPI_DMA_CH_AUTO;
-        b.pin_sclk = Board::clock;
-        b.pin_mosi = Board::mosi;
-        b.pin_miso = -1;
-        b.pin_dc = Board::dc;
-        bus.config(b);
-        panel.setBus(&bus);
-        auto c = panel.config();
-        c.pin_cs = Board::cs;
-        c.pin_rst = Board::reset;
-        c.pin_busy = -1;
-        c.panel_width = 240;
-        c.panel_height = 320;
-        c.memory_width = 240;
-        c.memory_height = 320;
-        c.offset_x = 0;
-        c.offset_y = 0;
-        c.offset_rotation = 0;
-        c.dummy_read_pixel = 8;
-        c.dummy_read_bits = 1;
-        c.readable = false;
-        c.invert = false;
-        c.rgb_order = false;
-        c.dlen_16bit = false;
-        c.bus_shared = false;
-        panel.config(c);
-        if (Board::backlight >= 0) {
-            auto l = light.config();
-            l.pin_bl = Board::backlight;
-            l.invert = false;
-            l.freq = 44100;
-            l.pwm_channel = 7;
-            light.config(l);
-            panel.setLight(&light);
+class LGFX : public lgfx::LGFX_Device{
+    public:
+        lgfx::Bus_SPI& panel_bus(){ return bus; }
+
+        LGFX(){
+            auto b = bus.config();
+            //required by the queued DMA scanout
+            b.spi_host = SPI2_HOST;
+            b.spi_mode = Board::spiMode;
+            b.freq_write = Board::writeHz;
+            b.freq_read = 16000000;
+            b.spi_3wire = false;
+            b.use_lock = true;
+            b.dma_channel = SPI_DMA_CH_AUTO;
+            b.pin_sclk = Board::clock;
+            b.pin_mosi = Board::mosi;
+            b.pin_miso = -1;
+            b.pin_dc = Board::dc;
+            bus.config(b);
+            panel.setBus(&bus);
+
+            auto c = panel.config();
+            c.pin_cs = Board::cs;
+            c.pin_rst = Board::reset;
+            c.pin_busy = -1;
+            c.panel_width = 240;
+            c.panel_height = 320;
+            c.memory_width = 240;
+            c.memory_height = 320;
+            c.offset_x = 0;
+            c.offset_y = 0;
+            c.offset_rotation = 0;
+            c.dummy_read_pixel = 8;
+            c.dummy_read_bits = 1;
+            c.readable = false;
+            c.invert = false;
+            c.rgb_order = false;
+            c.dlen_16bit = false;
+            c.bus_shared = false;
+            panel.config(c);
+
+            if(Board::backlight >= 0){
+                auto l = light.config();
+                l.pin_bl = Board::backlight;
+                l.invert = false;
+                l.freq = 44100;
+                l.pwm_channel = 7;
+                light.config(l);
+                panel.setLight(&light);
+            }
+
+            setPanel(&panel);
         }
-        setPanel(&panel);
-    }
+
+    private:
+        lgfx::Panel_ILI9341 panel;
+        lgfx::Light_PWM light;
+        lgfx::Bus_SPI bus;
 };

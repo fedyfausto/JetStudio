@@ -1,4 +1,13 @@
-# Jet Studio - prototype 0.6.0
+<!-- markdownlint-disable MD033 MD041 -->
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.png">
+    <img src="docs/logo-light.png" width="410" alt="Jet Studio">
+  </picture>
+</p>
+<!-- markdownlint-enable MD033 MD041 -->
+
+# Jet Studio - prototype 0.7.0
 
 A **Godot**-style 3D desktop editor, built with Godot's UI, with an **independent C++17** game
 runtime, the **Jet** renderer and the **JetScript** scripting language (GDScript syntax). The
@@ -6,6 +15,12 @@ same runtime runs in the editor, in the SDL2 desktop player and on the Arduino N
 firmware.
 
 ![The real editor with the Jet framebuffer](docs/editor-preview.png)
+
+## Powered by
+
+- [Jet Engine](https://github.com/CubeCoders/Jet): the real game changer, a 3D rendering engine written in C++ by [CubeCoders](https://github.com/CubeCoders). Go there and star the project! (these guys are crazy <3)
+- [Godot Engine](https://godotengine.org): Jet Studio is not a Godot modification but an application made entirely with Godot. Because its editor UI is so simple, I tried to recreate the same feel in Jet Studio.
+- [PlatformIO](https://platformio.org): under the hood there are two PlatformIO projects that build and flash the microcontrollers.
 
 ## Video Demo
 
@@ -62,34 +77,41 @@ otherwise make the Wayland driver terminate. The interface scale is changed from
 
 ## Nodes
 
+<!-- markdownlint-disable MD033 -->
+
 | Class | Use |
 | --- | --- |
-| `Node` | organization, global logic |
-| `Node3D` | transform (position, rotation in degrees YXZ, scale); children inherit it |
-| `MeshInstance3D` | Box, Sphere, Plane, Pyramid, Cylinder, Capsule, Quad, Torus primitives (Godot's default sizes) or a part of an OBJ model (`File`), and material (see below) |
-| `Sprite3D` | a PNG, or one frame of a sprite sheet (`hframes`, `vframes`, `frame`), as a quad in the world: unlit, double-sided, optional billboard, `flip_h`/`flip_v`, `pixel_size`, `modulate` |
-| `Camera3D` | vertical FOV, near/far, `current` |
-| `DirectionalLight3D` | color and energy; lights along its own −Z |
-| `WorldEnvironment` | background (color, sky/ground gradient, panorama) and ambient light |
-| `Node2D` | 2D position (canvas pixels, y down), rotation, scale and `z_index`; children follow it |
-| `Sprite2D` | a PNG or one frame of a sprite sheet in the 2D world: `centered`, `offset`, flips, `modulate`; rotated and scaled at full resolution |
-| `AnimatedSprite2D` | a sprite sheet with named animations (`idle 0-3 8, run 4-9 12`): `play()`, `stop()`, autoplay |
-| `Camera2D` | moves the 2D view (its position at the screen centre), `offset`, `zoom` |
-| `StaticBody2D`, `CharacterBody2D`, `RigidBody2D` | the 3D bodies' 2D versions, in pixels with y down (gravity 980 px/s²) |
-| `Area2D` | reports bodies and other areas that enter and exit (bullets, pickups, triggers) |
-| `CollisionShape2D` | Rectangle, Circle or Capsule shape of a 2D body or area; `one_way_collision` for jump-through platforms |
-| `Control` | groups 2D nodes (a HUD): children sit relative to it and are hidden and faded with it |
-| `Label` | 2D text over the scene, the runtime's 7×15 bitmap font (Latin with accents), integer scale |
-| `TextureRect` | 2D PNG image, integer scale or free size, transparent key color |
-| `ColorRect` | solid or semi-transparent rectangle (fades, bars, panels) |
-| `StaticBody3D` | collides and does not move on its own (scripts can move it: moving platforms) |
-| `CharacterBody3D` | character moved by the script with `move_and_slide()` |
-| `RigidBody3D` | body with gravity, mass, bounce, friction and impulses |
-| `Area3D` | reports bodies that enter and exit (coins, triggers, zones) |
-| `CollisionShape3D` | Box, Sphere or Capsule collision shape, child of a body or an area |
-| `CPUParticles3D` | particle emitter (sparks, splashes, fountains) using Jet's particle system |
-| `Timer` | counts down `wait_time` and emits `timeout`; `one_shot`, `autostart`, `start()`, `stop()`, `time_left` |
-| `AnimationPlayer` | Godot's animations: keyed values and method calls on the nodes under its parent, loops, autoplay |
+| <img src="docs/icons/Node.png" width="16" height="16" alt=""> `Node` | organization, global logic |
+| <img src="editor/icons/Node3D.png" width="16" height="16" alt=""> `Node3D` | transform (position, rotation in degrees YXZ, scale); children inherit it |
+| <img src="editor/icons/MeshInstance3D.png" width="16" height="16" alt=""> `MeshInstance3D` | Box, Sphere, Plane, Pyramid, Cylinder, Capsule, Quad, Torus primitives (Godot's default sizes) or a part of an OBJ model (`File`), and material (see below) |
+| (<img src="editor/icons/GeometryInstance3D.png" width="16" height="16" alt=""> `GeometryInstance3D`) | base of `MeshInstance3D` and `Sprite3D`: Visibility Range (`begin`, `end`, margins, fade mode Self) hides or fades a node by its distance from the camera; outside the range Jet skips it entirely |
+| <img src="editor/icons/Sprite3D.png" width="16" height="16" alt=""> `Sprite3D` | a PNG, or one frame of a sprite sheet (`hframes`, `vframes`, `frame`), as a quad in the world: unlit, double-sided, optional billboard, `flip_h`/`flip_v`, `pixel_size`, `modulate` |
+| <img src="editor/icons/Camera3D.png" width="16" height="16" alt=""> `Camera3D` | vertical FOV, near/far, `current` |
+| <img src="editor/icons/DirectionalLight3D.png" width="16" height="16" alt=""> `DirectionalLight3D` | color and energy; lights along its own −Z |
+| <img src="editor/icons/WorldEnvironment.png" width="16" height="16" alt=""> `WorldEnvironment` | background (color, sky/ground gradient, panorama), ambient light and depth fog (geometry fades into the background between Depth Begin and Depth End) |
+| <img src="editor/icons/StaticBody3D.png" width="16" height="16" alt=""> `StaticBody3D` | collides and does not move on its own (scripts can move it: moving platforms) |
+| <img src="editor/icons/CharacterBody3D.png" width="16" height="16" alt=""> `CharacterBody3D` | character moved by the script with `move_and_slide()` |
+| <img src="editor/icons/RigidBody3D.png" width="16" height="16" alt=""> `RigidBody3D` | body with gravity, mass, bounce, friction and impulses |
+| <img src="editor/icons/Area3D.png" width="16" height="16" alt=""> `Area3D` | reports bodies that enter and exit (coins, triggers, zones) |
+| <img src="editor/icons/CollisionShape3D.png" width="16" height="16" alt=""> `CollisionShape3D` | Box, Sphere or Capsule collision shape, child of a body or an area |
+| <img src="editor/icons/CPUParticles3D.png" width="16" height="16" alt=""> `CPUParticles3D` | particle emitter (sparks, splashes, fountains) using Jet's particle system |
+| <img src="editor/icons/Node2D.png" width="16" height="16" alt=""> `Node2D` | 2D position (canvas pixels, y down), rotation, scale and `z_index`; children follow it |
+| <img src="editor/icons/Sprite2D.png" width="16" height="16" alt=""> `Sprite2D` | a PNG or one frame of a sprite sheet in the 2D world: `centered`, `offset`, flips, `modulate`; rotated and scaled at full resolution |
+| <img src="editor/icons/AnimatedSprite2D.png" width="16" height="16" alt=""> `AnimatedSprite2D` | a sprite sheet with named animations (`idle 0-3 8, run 4-9 12`): `play()`, `stop()`, autoplay |
+| <img src="editor/icons/Camera2D.png" width="16" height="16" alt=""> `Camera2D` | moves the 2D view (its position at the screen centre), `offset`, `zoom` |
+| <img src="editor/icons/StaticBody2D.png" width="16" height="16" alt=""> `StaticBody2D` | collides and does not move on its own (scripts can move it: moving platforms) |
+| <img src="editor/icons/CharacterBody2D.png" width="16" height="16" alt=""> `CharacterBody2D` | character moved by the script with `move_and_slide()` |
+| <img src="editor/icons/RigidBody2D.png" width="16" height="16" alt=""> `RigidBody2D` | body with gravity (980 px/s²), mass, bounce, friction and impulses |
+| <img src="editor/icons/Area2D.png" width="16" height="16" alt=""> `Area2D` | reports bodies and other areas that enter and exit (bullets, pickups, triggers) |
+| <img src="editor/icons/CollisionShape2D.png" width="16" height="16" alt=""> `CollisionShape2D` | Rectangle, Circle or Capsule shape of a 2D body or area; `one_way_collision` for jump-through platforms |
+| <img src="editor/icons/Control.png" width="16" height="16" alt=""> `Control` | groups 2D nodes (a HUD): children sit relative to it and are hidden and faded with it |
+| <img src="editor/icons/Label.png" width="16" height="16" alt=""> `Label` | 2D text over the scene, the runtime's 7×15 bitmap font (Latin with accents), integer scale |
+| <img src="editor/icons/TextureRect.png" width="16" height="16" alt=""> `TextureRect` | 2D PNG image, integer scale or free size, transparent key color |
+| <img src="editor/icons/ColorRect.png" width="16" height="16" alt=""> `ColorRect` | solid or semi-transparent rectangle (fades, bars, panels) |
+| <img src="docs/icons/Timer.png" width="16" height="16" alt=""> `Timer` | counts down `wait_time` and emits `timeout`; `one_shot`, `autostart`, `start()`, `stop()`, `time_left` |
+| <img src="editor/icons/AnimationPlayer.png" width="16" height="16" alt=""> `AnimationPlayer` | Godot's animations: keyed values and method calls on the nodes under its parent, loops, autoplay |
+
+<!-- markdownlint-enable MD033 -->
 
 2D nodes (`Control`) use 320×240 screen pixels; the position is relative to the parent Control.
 They have opacity and visibility, are selected by clicking them in the viewport and are moved by
@@ -142,7 +164,7 @@ In the editor, the **Signals** tab next to the Inspector is Godot's Node dock (S
 signals (its script's first, then its classes'), each with its connections. *Connect...* (or a
 double-click on a signal) opens Godot's dialog: pick the receiving node, keep or change the
 proposed method (`_on_wave_timer_timeout`, `_on_body_entered` on itself), One Shot. A method the
-receiver's script doesn't have is added to it and the script opens there; a node without a script
+receiver's script does not have is added to it and the script opens there; a node without a script
 can receive the signal in one of its engine methods (`hide`, `queue_free`, `start`...). The Scene
 dock shows a signal icon on the nodes that have connections, the Script screen a slot icon next to
 the methods they call. The connections are saved in the `.jetscene`, follow undo, copies and
@@ -328,7 +350,7 @@ func shoot():
 `instantiate()` builds the scene's nodes outside the tree with their scripts set up; `add_child()`
 puts them in, and `_ready()` runs. `remove_child()` takes a subtree out without freeing it, and
 `queue_free()` releases the nodes and everything they hold at the end of the frame, so spawning
-and freeing for a whole game doesn't grow the memory.
+and freeing for a whole game does not grow the memory.
 
 **Autoloads** (`Project > Project Settings > Autoload`, as in Godot) keep state across scenes:
 pick a script and a name, and every script reaches it as a global or at `/root/<Name>`:
@@ -381,15 +403,16 @@ machine, without the compiler.
     textures, compiled scripts and the heaviest scene (nodes, meshes, triangle queues,
     particles). On boards with PSRAM it shows what goes to PSRAM and what stays in internal
     RAM; on boards without it says whether the game fits with both field buffers, with one
-    (slower), or not at all. What scripts create while playing (spawned scenes, arrays) isn't
+    (slower), or not at all. What scripts create while playing (spawned scenes, arrays) is not
     known in advance: on a Nucleo-F746ZG the estimate stays within ~10% of the measured heap.
 - **Serial** (bottom panel): monitor of the board's USB console. ESP-IDF level colors,
   clickable script errors (they open the line), device FPS and memory to the right of the tabs,
   "Restart" to restart the board over USB and see the log from boot. Crash and watchdog
   backtraces are translated into function and file:line (ELF of the Debug build).
   It reconnects by itself after a reset; during Flash it releases the port, and after a Debug
-  flash it opens by itself. Port access is required (`dialout` group on Linux); not available on
-  Windows yet.
+  flash it opens by itself. On Linux port access needs the `dialout` group. On Windows the ports
+  are `COMx`, listed with the name the board reports over USB ("Espressif USB JTAG/serial debug
+  unit", "STMicroelectronics ST-Link VCP Ctrl") rather than Windows' generic "USB Serial Device".
 
 From the terminal (export is equivalent to `Project > Export .jetpack`):
 
@@ -430,40 +453,26 @@ firmware configuration (`generated_board.hpp` and the board's PlatformIO environ
 | ESP32-S3-DevKitC-1 N8R8 | 8 MB flash, 8 MB octal PSRAM: the board of the JetExamples demos |
 | ESP32-S3-DevKitC-1 N16R8 | 16 MB flash, 8 MB octal PSRAM |
 | ESP32-S3-DevKitC-1 N8R2 | 8 MB flash, 2 MB quad PSRAM |
+| ESP32 DevKit, WROVER-E N8R8 | classic ESP32 (revision 3), 8 MB flash, 8 MB quad PSRAM (4 MB mapped). Runs (see below) |
+| ESP32-C6 SuperMini | ESP32-C6FH4, one RISC-V core at 160 MHz, 512 KB RAM, 4 MB flash, no PSRAM. Runs (see below) |
+| ESP32-C3 SuperMini | ESP32-C3FH4, one RISC-V core at 160 MHz, 400 KB RAM, 4 MB flash, no PSRAM. Runs (see below) |
 | ST Nucleo-F767ZI | STM32F767, Cortex-M7 216 MHz, 512 KB RAM, 2 MB flash |
 | ST Nucleo-F746ZG | STM32F746, Cortex-M7 216 MHz, 320 KB RAM, 1 MB flash. **Tested** (ILI9341 on SPI1 with DMA, 54 MHz) |
 | ST Nucleo-F722ZE | STM32F722, Cortex-M7 216 MHz, 256 KB RAM, 512 KB flash |
 | WeAct Black Pill F411CE | STM32F411, Cortex-M4 100 MHz, 128 KB RAM, 512 KB flash: small scenes only |
 
-**STM32**: Jet runs on any STM32; SPI displays go through LovyanGFX, which supports the
-F2/F4/F7 families (not the H7). The firmware is a separate PlatformIO project, `firmware_stm32/`
-(Arduino STM32 core), with the same runtime, the same scripts and the same device rendering
-profile (half-width interlaced fields, no z-buffer): the emulator applies to these boards too.
-It runs on a single core: every frame it updates the scene and draws a field, while the DMA sends
-the previous field to the display in the background (the DMA interrupt starts each row). Flashing
-goes through the ST-LINK (the Nucleo's USB), and the Debug serial log comes from the ST-LINK
-virtual port (Black Pill: USB-C) into the Serial panel. Pins are the board's (e.g. `D13 · PA5`).
-SCK and MOSI on SPI1 pins use the SPI peripheral and its DMA (marked `SPI1` in the editor); any
-other pin works through software SPI, which is much slower and can't send in the background. On
-the Nucleo F746ZG/F767ZI, D11 (PA7) is also wired to the Ethernet: remove jumper JP6 to use it as
-MOSI, or use D22 (PB5). The SPI clock is 27 or 54 MHz (APB2 / 4 or / 2): at 54 MHz a 320×240 field
-takes ~12 ms, and many ILI9341 modules take it even over jumper wires. The blue B1 USER button of
-the Nucleo-144 boards (PC13) can be an Input Map button.
-LovyanGFX's STM32 DMA hung on the F7 (no interrupt handler for SPI1's DMA stream, the data cache
-not written back): `tools/patches/LovyanGFX-stm32-dma.patch` fixes it, and `./jet-studio setup`
-applies it.
-Memory: the RAM is the internal RAM (no PSRAM), so the firmware keeps only the scene being played
-in RAM, reads palette textures straight from the package in flash, shares identical meshes and
-gives each node only the fields of its type. Nodes live in blocks of 8 (~4 KB), so a scene that
-spawns many of them never needs one big free piece of RAM. The second field buffer (38 KB at 320×240) is given
-up when the scene needs the RAM: drawing then waits for the DMA. Running out of RAM is reported in
-the log instead of crashing. Verified on a Nucleo-F746ZG with an ILI9341 at 54 MHz:
-`examples/textured_boxes` and `examples/first_world` run at ~12 ms per frame (83 fps) with
-~140 KB of RAM to spare, `examples/jet_blaster` at ~12 ms with 25-60 KB (the later waves have
-more enemies on screen), `examples/jetrun` at
-~25 ms with one field buffer. `examples/physics_demo` doesn't fit in 320 KB.
-The firmware takes ~425 KB of flash (Jet, runtime, VM and LovyanGFX): on the 512 KB boards
-~90 KB remain for the scene.
+**Classic ESP32** (WROVER-E modules): the same firmware as the ESP32-S3 boards, without the S3's DMA queue
+and with slower PSRAM. Jet Blaster runs at ~62 fps as on the Nano, the 3D neon car demo at about half the
+Nano's speed.
+
+**ESP32-C3 and ESP32-C6**: one core, no FPU and no PSRAM, so they suit 2D games and small 3D scenes.
+Jet Blaster runs at ~40 fps on the C6 and ~32 fps on the C3.
+
+**STM32**: F2, F4 and F7 boards (LovyanGFX does not support the H7), with their own firmware project,
+`firmware_stm32/`, running the same runtime and scripts. Flashing and the serial log go through the
+ST-LINK USB port. Display SCK and MOSI on SPI1 pins send through DMA; other pins work, but slower.
+Without PSRAM the scene has to fit in the internal RAM: on a Nucleo-F746ZG most examples run at
+~83 fps, while the physics demo does not fit in its 320 KB.
 
 | Display (`hardware/displays`, SPI RGB565) | Landscape resolution |
 | --- | --- |
@@ -501,16 +510,16 @@ package and the project have the same actions.
   (save them to update the file).
 - `.jet`: JetScript script.
 - `*.import`: import settings of a PNG or OBJ (JSON, next to the file).
-- `.jetpack`: binary package version 17 (resolution, Input Map, every scene of the project with its 3D and 2D nodes, animations and signal connections, autoloads, materials, converted textures, imported meshes, script bytecode, exported values)
+- `.jetpack`: binary package version 18 (resolution, Input Map, every scene of the project with its 3D and 2D nodes, animations and signal connections, autoloads, materials, converted textures, imported meshes, script bytecode, exported values)
   read by the runtime. The bytecode has a version, an instruction-set fingerprint and a CRC; on
   load every operand and jump is verified. A package must be re-exported when the JetScript version changes.
 
 ## Installing and building
 
 **Platforms**: Jet Studio runs on **Linux x86_64** (developed and tested on Ubuntu 24.04, X11 and
-Wayland). Windows and macOS are not supported yet: the editor's Godot template, the bridge
-library and the launcher are built for Linux only, and the serial port is POSIX. The firmware
-side (PlatformIO, ESP-IDF) is cross-platform.
+Wayland), and on **Windows 10/11 x86_64** from a package cross-built on Linux (step 5; tested on
+Windows 11 with the editor, the C++ tests, the editor smoke test and the Serial panel on both
+boards). macOS is not supported yet. The firmware side (PlatformIO, ESP-IDF) is cross-platform.
 
 **1. System packages** (Ubuntu/Debian):
 
@@ -575,7 +584,35 @@ The editor is embedded in `bin/jet-studio.x86_64` (Godot's `.pck` appended to th
 the bridge library next to it), so you can start that file directly or use `./jet-studio`, which
 also cleans the environment of snap terminals such as VS Code's. The target machine needs `python3` for the build tasks and
 `libsdl2-2.0-0` for the PC player and the device emulator, plus PlatformIO (step 2) for the boards.
-The `neon_car` example is left out because its car model can't be redistributed.
+The `neon_car` example is left out because its car model can not be redistributed.
+
+**5. Windows package** (optional, built on Linux):
+
+```sh
+sudo apt install mingw-w64
+./jet-studio release-windows -j 10
+```
+
+It cross-compiles the Godot template for Windows (20-30 minutes the first time), the bridge DLL and
+the players with MinGW-w64, downloads SDL2 for MinGW (checked against the SHA-256 in
+`dependencies.lock.json`), then writes `dist/jet-studio-<version>-windows-x86_64/` and its `.zip`.
+`jet-studio.exe` at the top of the folder is the editor, with `jet_bridge.dll` next to it; the players
+and `SDL2.dll` are in `build/`. Every binary is statically linked, so no MinGW DLLs are needed.
+With Wine installed, the C++ tests of `build-windows/` run through it (`ctest --test-dir build-windows`).
+
+**Using the Windows package**: extract the zip to a short path (like `C:\JetStudio`: ESP-IDF builds
+fail on paths over 260 characters) and start `jet-studio.exe`. The editor, Play, export and the
+Serial panel need nothing else. Build/Flash for the boards need Python 3 and PlatformIO Core, from
+a terminal:
+
+```bat
+winget install -e --id Python.Python.3.12 --scope user
+python -m pip install platformio
+```
+
+(or Python from python.org with "Add python.exe to PATH"). Open a new terminal or restart the
+editor afterwards so it finds `python` and `pio`. As on Linux, the first firmware build downloads
+the toolchains and ESP-IDF (a few GB, 15-30 minutes); later builds take a minute or two.
 
 ## Tests
 

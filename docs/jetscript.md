@@ -142,11 +142,11 @@ func _on_enemy_destroyed(enemy):
   always run when the signal is emitted.
 - The callables run in the order they were connected, with the signal's arguments. An error in
   one of them is reported and the others still run.
-- Connecting a signal twice to the same callable, connecting a signal the object doesn't have,
-  disconnecting what isn't connected or emitting an unknown signal are runtime errors.
+- Connecting a signal twice to the same callable, connecting a signal the object does not have,
+  disconnecting what is not connected or emitting an unknown signal are runtime errors.
 - Engine signals: `body_entered(body)`, `body_exited(body)`, `area_entered(area)`,
   `area_exited(area)` (Area3D, Area2D), `timeout()` (Timer), `animation_finished()`
-  (AnimatedSprite2D, at the end of an animation that doesn't loop), `finished()` (CPUParticles3D,
+  (AnimatedSprite2D, at the end of an animation that does not loop), `finished()` (CPUParticles3D,
   at the end of a one-shot cycle).
 - The connections belong to the VM, not to the nodes: they cost nothing until used, and a freed
   node's connections go with it.
@@ -288,20 +288,27 @@ The engine classes form this hierarchy. Properties use Godot names.
   `find_child(name)`, `queue_free()`, `get_tree()`, `add_child(node)`, `remove_child(node)`.
   `add_child()` puts a node made by `instantiate()` (or taken out with `remove_child()`) under this one;
   if this node is in the scene, the new subtree enters it and gets `_ready()`, children first. A sibling
-  with the same name gets a number (`Bullet`, `Bullet2`...). Nodes outside the scene don't run or show.
+  with the same name gets a number (`Bullet`, `Bullet2`...). Nodes outside the scene do not run or show.
   `queue_free()` releases the node and its children at the end of the frame.
 - **Node3D** (extends Node): `position`, `rotation` (radians), `rotation_degrees`,
   `scale`, `visible`, `global_position`, `translate(offset)`, `rotate_x(rad)`,
   `rotate_y(rad)`, `rotate_z(rad)`, `look_at(target)`, `show()`, `hide()`,
   `is_visible_in_tree()`.
-- **MeshInstance3D** (extends Node3D): `color`, `alpha`, `uv_offset`, `uv_scale`
+- **GeometryInstance3D** (extends Node3D; base of MeshInstance3D and Sprite3D): `visibility_range_begin`,
+  `visibility_range_begin_margin`, `visibility_range_end`, `visibility_range_end_margin` (metres, 0 = no limit,
+  up to 655), `visibility_range_fade_mode` (`VISIBILITY_RANGE_FADE_DISABLED` or `_SELF`; `_DEPENDENCIES` works as
+  `_SELF`). Outside the range the node is not drawn; with `_SELF` it dissolves from `end` to `end + end_margin` and
+  appears from `begin - begin_margin` to `begin`.
+- **MeshInstance3D** (extends GeometryInstance3D): `color`, `alpha`, `uv_offset`, `uv_scale`
   (Vector3, x and y used), `perspective_correct`, `texture_filter` (0 nearest, 1 linear).
-- **Sprite3D** (extends Node3D): `frame`, `hframes`, `vframes`, `flip_h`, `flip_v`, `pixel_size`,
+- **Sprite3D** (extends GeometryInstance3D): `frame`, `hframes`, `vframes`, `flip_h`, `flip_v`, `pixel_size`,
   `modulate`. One frame of its texture's sprite sheet (left to right, then top to bottom) as a quad,
   unlit and double-sided; setting `frame` animates it. Billboard is set in the Inspector.
 - **Camera3D** (extends Node3D): `fov`, `near`, `far`, `current`, `make_current()`.
 - **DirectionalLight3D** (extends Node3D): `light_color`, `light_energy`.
-- **WorldEnvironment** (extends Node): `background_color`, `ambient_color`.
+- **WorldEnvironment** (extends Node): `background_color`, `ambient_color`, `fog_enabled`, `fog_depth_begin`,
+  `fog_depth_end` (metres). Godot reaches these through `environment`; here they are on the node. The fog is
+  Jet's depth fog: geometry fades into the background between the two distances, with no fog color of its own.
 - **CollisionObject3D** (extends Node3D; bodies and areas): `collision_layer`,
   `collision_mask` (bit masks; two objects collide when either mask has a bit of
   the other's layer, as in Godot).
@@ -337,7 +344,7 @@ The engine classes form this hierarchy. Properties use Godot names.
 - **AnimatedSprite2D** (extends Node2D): `play(name = "")`, `stop()`, `is_playing()`, `animation`,
   `frame`, `speed_scale`, `flip_h`, `flip_v`, `centered`, `offset`. Its animations are frame ranges of
   one sprite sheet, written in the Inspector as `idle 0-3 8, run 4-9 12, die 10-14 10 once` (name,
-  frames, frames per second, `once` when it doesn't loop); with Autoplay the first (or the chosen) one
+  frames, frames per second, `once` when it does not loop); with Autoplay the first (or the chosen) one
   starts on its own.
 - **Camera2D** (extends Node2D): `offset`, `zoom` (Vector2), `enabled`, `make_current()`. The current
   Camera2D shows its position at the screen centre; without one the canvas origin is the top-left corner.

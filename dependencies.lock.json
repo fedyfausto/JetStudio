@@ -18,5 +18,9 @@
   "JetExamples": {
     "url": "https://github.com/CubeCoders/JetExamples.git",
     "revision": "57b05a240f5bcaa02a18d62a1206ce7053dc09dc"
+  },
+  "SDL2-mingw": {
+    "url": "https://github.com/libsdl-org/SDL/releases/download/release-2.32.10/SDL2-devel-2.32.10-mingw.tar.gz",
+    "sha256": "83a5d74012311edc3c0d40ea6faecbe57ad692aa033fa5dc273cc937e3938ff2"
   }
 }

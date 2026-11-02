@@ -15,7 +15,7 @@
 #define SORT_TRIANGLES 1
 #define SORT_SCENE_OBJECTS 0
 #define SORT_SCENE_REVERSE 0
-#define DEPTH_ALPHA_BLEND 0
+#define DEPTH_ALPHA_BLEND 1
 #define TEXTURE_MAPPING 1
 #define PERSPECTIVE_CORRECT_TEXTURES 1
 #define BILINEAR_FILTER 1
@@ -43,8 +43,10 @@
 #define zBrightNear 200
 #define zBrightFar 1600
 #define zBrightScale 48
-#define depthFogNear 6144
-#define depthFogFar 8192
+// Depth fog distances in Jet units: the runtime sets them from the WorldEnvironment (INT_MAX = no fog).
+extern int jetFogNear, jetFogFar;
+#define depthFogNear jetFogNear
+#define depthFogFar jetFogFar
 #define CHECKERBOARD_MODE 0
 #define CHECKERBOARD_RECONSTRUCTION 0
 #define MAX_PICK_QUERIES 1

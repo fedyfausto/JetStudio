@@ -1,0 +1,102 @@
+{
+  "name": "ESP32 DevKit, WROVER-E N8R8",
+  "short": "ESP32 WROVER",
+  "chip": "esp32",
+  "platformio_board": "esp32dev",
+  "flash": "8 MB",
+  "psram": "8 MB quad (4 MB mapped)",
+  "spi_host": "SPI3_HOST",
+  "sdkconfig": [
+    "CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y",
+    "CONFIG_ESPTOOLPY_FLASHMODE_DIO=y",
+    "CONFIG_ESPTOOLPY_FLASHFREQ_40M=y",
+    "CONFIG_ESP32_REV_MIN_3=y",
+    "CONFIG_SPIRAM=y",
+    "CONFIG_SPIRAM_SPEED_40M=y",
+    "CONFIG_SPIRAM_IGNORE_NOTFOUND=y"
+  ],
+  "pins": [
+    [
+      "IO0 (BOOT)",
+      0
+    ],
+    [
+      "IO2",
+      2
+    ],
+    [
+      "IO4",
+      4
+    ],
+    [
+      "IO5",
+      5
+    ],
+    [
+      "IO12",
+      12
+    ],
+    [
+      "IO13",
+      13
+    ],
+    [
+      "IO14",
+      14
+    ],
+    [
+      "IO15",
+      15
+    ],
+    [
+      "IO18",
+      18
+    ],
+    [
+      "IO19",
+      19
+    ],
+    [
+      "IO21",
+      21
+    ],
+    [
+      "IO22",
+      22
+    ],
+    [
+      "IO23",
+      23
+    ],
+    [
+      "IO25",
+      25
+    ],
+    [
+      "IO26",
+      26
+    ],
+    [
+      "IO27",
+      27
+    ],
+    [
+      "IO32",
+      32
+    ],
+    [
+      "IO33",
+      33
+    ]
+  ],
+  "display_pins": {
+    "sck": 18,
+    "mosi": 23,
+    "cs": 15,
+    "dc": 2,
+    "reset": 4,
+    "backlight": -1
+  },
+  "verified": false,
+  "notes": "Classic ESP32 (no GDMA): rows go out through LovyanGFX's DMA, one at a time. SCK 18 and MOSI 23 are VSPI's own pins. GPIO16 and GPIO17 are taken by the PSRAM on WROVER modules, GPIO34 to GPIO39 have no pull-ups. Revision 3 chips only (all WROVER-E modules), so the old PSRAM cache workaround is off."
+}

@@ -11,7 +11,8 @@ var _template: OptionButton
 var _path: LineEdit
 var _status: Label
 
-func _ready() -> void:
+
+func _ready():
 	cancel_button_text = "Cancel"
 	title = "Attach Node Script"
 	ok_button_text = "Create"
@@ -53,27 +54,31 @@ func _ready() -> void:
 		var path := _path.text.strip_edges()
 		script_chosen.emit(path, not project.exists(path), _base.text.strip_edges(), _template.selected == 0))
 
-func _field(grid: GridContainer, text: String) -> void:
+
+func _field(grid: GridContainer, text: String):
 	var label := Label.new()
 	label.text = text
 	label.theme_type_variation = "PropertyLabel"
 	grid.add_child(label)
 
-func open(base: String, suggested_path: String) -> void:
+
+func open(base: String, suggestedPath: String):
 	_base.text = base
-	_path.text = suggested_path
+	_path.text = suggestedPath
 	_template.select(0)
 	_validate()
 	popup_centered(Vector2i(540, 260))
 	_path.grab_focus()
-	var file := suggested_path.get_file()
-	var start := suggested_path.length() - file.length()
+	var file := suggestedPath.get_file()
+	var start := suggestedPath.length() - file.length()
 	_path.select(start, start + file.get_basename().length())
 
-func _validate() -> void:
+
+func _validate():
 	var path := _path.text.strip_edges()
 	var ok := true
 	var text := ""
+
 	if not path.begins_with("res://") or path.get_extension() != "jet" or not path.get_file().get_basename().is_valid_filename() or path.get_file().begins_with("."):
 		ok = false
 		text = "Invalid path: use res://folder/name.jet"
@@ -84,6 +89,7 @@ func _validate() -> void:
 		text = "File exists: the existing script will be attached."
 	else:
 		text = "A new script file will be created."
+
 	_status.text = text
 	_status.add_theme_color_override("font_color", Style.SUCCESS if ok else Style.ERROR)
 	ok_button_text = "Load" if ok and project.exists(path) else "Create"

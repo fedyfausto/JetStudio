@@ -7,58 +7,64 @@
 #define JET_SOFT_SPI 0
 #include <SPI.h>
 
-namespace Board {
-constexpr const char* name = "ST Nucleo-F746ZG + ILI9341 2.4\"/2.8\" 240×320";
-constexpr int screenWidth = 320, screenHeight = 240, rotation = 1;
-// Pins are STM32 PinName values (port * 16 + pin).
-constexpr int clock = 5, mosi = 7, dc = 63, cs = 62, reset = 92, backlight = -1;
-constexpr int spiMode = 0;
-constexpr int writeHz = 54000000;
-constexpr const char* port = "SPI1";
-inline SPI_TypeDef* spi() { return SPI1; }
-inline void begin_spi() {
-    SPI.setSCLK(PinName(clock));
-    SPI.setMOSI(PinName(mosi));
-    SPI.begin();
-}
+namespace Board{
+    constexpr const char* name = "ST Nucleo-F746ZG + ILI9341 2.4\"/2.8\" 240×320";
+    constexpr int screenWidth = 320, screenHeight = 240, rotation = 1;
+    // Pins are STM32 PinName values (port * 16 + pin).
+    constexpr int clock = 5, mosi = 7, dc = 63, cs = 62, reset = 92, backlight = -1;
+    constexpr int spiMode = 0;
+    constexpr int writeHz = 54000000;
+    constexpr const char* port = "SPI1";
+    inline SPI_TypeDef* spi(){ return SPI1; }
+
+    inline void begin_spi(){
+        SPI.setSCLK(PinName(clock));
+        SPI.setMOSI(PinName(mosi));
+        SPI.begin();
+    }
 }
 
-class LGFX : public lgfx::LGFX_Device {
-    lgfx::Panel_ILI9341 panel;
-    lgfx::Bus_SPI bus;
-public:
-    lgfx::Bus_SPI& panel_bus() { return bus; }
-    LGFX() {
-        auto b = bus.config();
-        b.spi_port = SPI1;
-        b.spi_mode = Board::spiMode;
-        b.freq_write = Board::writeHz;
-        b.freq_read = 8000000;
-        b.pin_sclk = Board::clock;
-        b.pin_mosi = Board::mosi;
-        b.pin_miso = -1;
-        b.pin_dc = Board::dc;
-        bus.config(b);
-        panel.setBus(&bus);
-        auto c = panel.config();
-        c.pin_cs = Board::cs;
-        c.pin_rst = Board::reset;
-        c.pin_busy = -1;
-        c.panel_width = 240;
-        c.panel_height = 320;
-        c.memory_width = 240;
-        c.memory_height = 320;
-        c.offset_x = 0;
-        c.offset_y = 0;
-        c.offset_rotation = 0;
-        c.dummy_read_pixel = 8;
-        c.dummy_read_bits = 1;
-        c.readable = false;
-        c.invert = false;
-        c.rgb_order = false;
-        c.dlen_16bit = false;
-        c.bus_shared = false;
-        panel.config(c);
-        setPanel(&panel);
-    }
+class LGFX : public lgfx::LGFX_Device{
+    public:
+        lgfx::Bus_SPI& panel_bus(){ return bus; }
+
+        LGFX(){
+            auto b = bus.config();
+            b.spi_port = SPI1;
+            b.spi_mode = Board::spiMode;
+            b.freq_write = Board::writeHz;
+            b.freq_read = 8000000;
+            b.pin_sclk = Board::clock;
+            b.pin_mosi = Board::mosi;
+            b.pin_miso = -1;
+            b.pin_dc = Board::dc;
+            bus.config(b);
+            panel.setBus(&bus);
+
+            auto c = panel.config();
+            c.pin_cs = Board::cs;
+            c.pin_rst = Board::reset;
+            c.pin_busy = -1;
+            c.panel_width = 240;
+            c.panel_height = 320;
+            c.memory_width = 240;
+            c.memory_height = 320;
+            c.offset_x = 0;
+            c.offset_y = 0;
+            c.offset_rotation = 0;
+            c.dummy_read_pixel = 8;
+            c.dummy_read_bits = 1;
+            c.readable = false;
+            c.invert = false;
+            c.rgb_order = false;
+            c.dlen_16bit = false;
+            c.bus_shared = false;
+            panel.config(c);
+
+            setPanel(&panel);
+        }
+
+    private:
+        lgfx::Panel_ILI9341 panel;
+        lgfx::Bus_SPI bus;
 };

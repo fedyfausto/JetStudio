@@ -9,7 +9,12 @@ var _count := 0
 
 
 func _init() -> void:
-	var out: String = OS.get_cmdline_user_args()[0]
+	var args := OS.get_cmdline_user_args()
+	if args.is_empty():
+		printerr("Usage: godot --headless --path editor --script tools/pack_editor.gd -- out.pck")
+		quit(1)
+		return
+	var out: String = args[0]
 	var packer := PCKPacker.new()
 	if packer.pck_start(out) != OK:
 		printerr("Cannot write " + out)

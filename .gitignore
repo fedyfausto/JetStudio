@@ -1,4 +1,5 @@
 build/
+build-windows/
 third_party/
 editor/.godot/
 editor/bin/*
@@ -11,6 +12,7 @@ firmware_stm32/.pio/
 firmware/components/LovyanGFX/
 firmware/sdkconfig.*
 !firmware/sdkconfig.defaults
+!firmware/sdkconfig.defaults.esp32s3
 !firmware/sdkconfig.release
 __pycache__/
 *.pyc

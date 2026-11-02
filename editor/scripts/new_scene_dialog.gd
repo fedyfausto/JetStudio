@@ -1,12 +1,14 @@
 extends ConfirmationDialog
-## Godot's "Create Root Node" for a new scene: 2D Scene, 3D Scene, User Interface, or Other Node (any type).
+# Godot's "Create Root Node" for a new scene: 2D Scene, 3D Scene, User Interface, or Other Node (any type).
 
-signal root_chosen(type: String) # "" for Other Node
+# "" for Other Node
+signal root_chosen(type: String)
 
 const Style := preload("res://scripts/theme.gd")
 const Icons := preload("res://scripts/icons.gd")
 
-func _ready() -> void:
+
+func _ready():
 	title = "New Scene"
 	cancel_button_text = "Cancel"
 	get_ok_button().visible = false
@@ -17,6 +19,7 @@ func _ready() -> void:
 	label.text = "Create Root Node:"
 	label.theme_type_variation = "PropertyLabel"
 	box.add_child(label)
+
 	for choice in [["2D Scene", "Node2D", "Node2D", "A 2D world in canvas pixels: sprites, 2D physics, Camera2D."],
 			["3D Scene", "Node3D", "Node3D", "A 3D world in metres, with a light and an environment."],
 			["User Interface", "Control", "Control", "Controls over the game: menus, HUD, title screens."],
@@ -33,5 +36,6 @@ func _ready() -> void:
 			root_chosen.emit(type))
 		box.add_child(button)
 
-func open() -> void:
+
+func open():
 	popup_centered(Vector2i(340, 0))

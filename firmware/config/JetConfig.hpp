@@ -16,7 +16,7 @@
 #define SORT_TRIANGLES 1
 #define SORT_SCENE_OBJECTS 0
 #define SORT_SCENE_REVERSE 0
-#define DEPTH_ALPHA_BLEND 0
+#define DEPTH_ALPHA_BLEND 1
 #define TEXTURE_MAPPING 1
 #define PERSPECTIVE_CORRECT_TEXTURES 1
 #define BILINEAR_FILTER 0
@@ -44,8 +44,16 @@
 #define zBrightNear 200
 #define zBrightFar 1600
 #define zBrightScale 48
-#define depthFogNear 6144
-#define depthFogFar 8192
+// Depth fog distances in Jet units: the runtime sets them from the WorldEnvironment (INT_MAX = no fog).
+extern int jetFogNear, jetFogFar;
+#define depthFogNear jetFogNear
+#define depthFogFar jetFogFar
+// Jet turns its fast spans off whenever DEPTH_ALPHA_BLEND is on, but with FAST_Z the fog is one alpha per triangle,
+// which those spans blend like any translucent material: the same conditions without that one.
+#define JET_FAST_SIMPLE_SPANS (HALF_WIDTH_BUFFERS && !Z_BUFFERING && FAST_Z && !Z_BRIGHTNESS && !NOISE_ALPHA && !DEBUG_OVERDRAW \
+    && !RENDER_TILE_BUFFER && MAX_PICK_QUERIES == 0)
+#define JET_FAST_OPAQUE_UNLIT_SPANS (HALF_WIDTH_BUFFERS && FAST_Z && !Z_BUFFERING && !Z_BRIGHTNESS && !NOISE_ALPHA && !DEBUG_OVERDRAW \
+    && !RENDER_TILE_BUFFER && MAX_PICK_QUERIES == 0 && !JET_FAST_SIMPLE_SPANS)
 #define CHECKERBOARD_MODE 0
 #define CHECKERBOARD_RECONSTRUCTION 0
 #define MAX_PICK_QUERIES 0

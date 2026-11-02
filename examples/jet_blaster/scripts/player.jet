@@ -36,7 +36,7 @@ func _process(delta: float) -> void:
 		bullet.position = position + Vector2(14, 1)
 		bullets.add_child(bullet)
 
-	# Blinks while it can't be hit.
+	# Blinks while it can not be hit.
 	if invincible > 0.0:
 		invincible -= delta
 		alpha = 0.3 if int(invincible * 12.0) % 2 == 0 else 1.0

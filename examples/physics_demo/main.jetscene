@@ -1,53 +1,39 @@
 {
 	"format": "jetscene",
+	"version": 2,
 	"root": {
+		"id": 1,
+		"name": "World",
+		"type": "Node3D",
 		"children": [
 			{
-				"ambient_color": 5595246,
-				"background_color": 1449000,
-				"background_mode": "Gradient",
-				"children": [],
-				"ground_bottom_color": 1712666,
-				"ground_horizon_color": 3820090,
 				"id": 2,
 				"name": "WorldEnvironment",
-				"sky_horizon_color": 8368352,
-				"sky_texture": "",
+				"type": "WorldEnvironment",
+				"background_mode": "Gradient",
 				"sky_top_color": 1784427,
-				"type": "WorldEnvironment"
+				"sky_horizon_color": 8368352,
+				"ground_horizon_color": 3820090,
+				"ground_bottom_color": 1712666,
+				"ambient_color": 5595246,
+				"children": []
 			},
 			{
-				"children": [],
 				"id": 3,
-				"light_color": 16777215,
-				"light_energy": 1.0,
 				"name": "Sun",
-				"position": [
-					0.0,
-					0.0,
-					0.0
-				],
+				"type": "DirectionalLight3D",
 				"rotation": [
 					-55.0,
 					-30.0,
 					0.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "DirectionalLight3D",
-				"visible": true
+				"light_energy": 1.0,
+				"children": []
 			},
 			{
-				"children": [],
-				"current": true,
-				"far": 100.0,
-				"fov": 60.0,
 				"id": 4,
 				"name": "Camera3D",
-				"near": 0.05,
+				"type": "Camera3D",
 				"position": [
 					0.0,
 					7.0,
@@ -58,106 +44,16 @@
 					0.0,
 					0.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
+				"fov": 60.0,
+				"current": true,
 				"script": "res://scripts/follow_camera.jet",
 				"script_properties": {},
-				"type": "Camera3D",
-				"visible": true
+				"children": []
 			},
 			{
-				"bounce": 0.0,
-				"children": [
-					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 5,
-						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"shape": "Box",
-						"size": [
-							20.0,
-							1.0,
-							20.0
-						],
-						"type": "CollisionShape3D",
-						"visible": true
-					},
-					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 4020797,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Background",
-						"id": 6,
-						"mesh": "Box",
-						"mesh_file": "",
-						"mesh_part": "",
-						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							20.0,
-							1.0,
-							20.0
-						],
-						"segments": 12,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
-					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"friction": 1.0,
 				"id": 7,
 				"name": "Floor",
+				"type": "StaticBody3D",
 				"position": [
 					0.0,
 					-0.5,
@@ -168,104 +64,39 @@
 					0.0,
 					0.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "StaticBody3D",
-				"visible": true
-			},
-			{
-				"bounce": 0.0,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 8,
+						"id": 5,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
+						"type": "CollisionShape3D",
 						"shape": "Box",
 						"size": [
 							20.0,
-							3.0,
-							1.0
+							1.0,
+							20.0
 						],
-						"type": "CollisionShape3D",
-						"visible": true
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 7035466,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 9,
-						"mesh": "Box",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 6,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
+						"type": "MeshInstance3D",
+						"mesh": "Box",
+						"color": 4020797,
 						"scale": [
 							20.0,
-							3.0,
-							1.0
-						],
-						"segments": 12,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
 							1.0,
-							1.0,
-							1.0
+							20.0
 						],
-						"visible": true
+						"draw_order": "Background",
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"friction": 1.0,
+				]
+			},
+			{
 				"id": 10,
 				"name": "WallNorth",
+				"type": "StaticBody3D",
 				"position": [
 					0.0,
 					1.0,
@@ -276,104 +107,38 @@
 					0.0,
 					0.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "StaticBody3D",
-				"visible": true
-			},
-			{
-				"bounce": 0.0,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 11,
+						"id": 8,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
+						"type": "CollisionShape3D",
 						"shape": "Box",
 						"size": [
-							1.0,
+							20.0,
 							3.0,
-							20.0
-						],
-						"type": "CollisionShape3D",
-						"visible": true
-					},
-					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 7035466,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 12,
-						"mesh": "Box",
-						"mesh_file": "",
-						"mesh_part": "",
-						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							3.0,
-							20.0
-						],
-						"segments": 12,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
-							1.0,
-							1.0,
 							1.0
 						],
-						"visible": true
+						"children": []
+					},
+					{
+						"id": 9,
+						"name": "Mesh",
+						"type": "MeshInstance3D",
+						"mesh": "Box",
+						"color": 7035466,
+						"scale": [
+							20.0,
+							3.0,
+							1.0
+						],
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"friction": 1.0,
+				]
+			},
+			{
 				"id": 13,
 				"name": "WallWest",
+				"type": "StaticBody3D",
 				"position": [
 					-10.0,
 					1.0,
@@ -384,104 +149,38 @@
 					0.0,
 					0.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "StaticBody3D",
-				"visible": true
-			},
-			{
-				"bounce": 0.0,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 14,
+						"id": 11,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
+						"type": "CollisionShape3D",
 						"shape": "Box",
 						"size": [
-							6.0,
-							0.4,
-							3.0
+							1.0,
+							3.0,
+							20.0
 						],
-						"type": "CollisionShape3D",
-						"visible": true
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 9075290,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 15,
-						"mesh": "Box",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 12,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							6.0,
-							0.4,
-							3.0
-						],
-						"segments": 12,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
 						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
+						"mesh": "Box",
+						"color": 7035466,
+						"scale": [
 							1.0,
-							1.0,
-							1.0
+							3.0,
+							20.0
 						],
-						"visible": true
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"friction": 1.0,
+				]
+			},
+			{
 				"id": 16,
 				"name": "Ramp",
+				"type": "StaticBody3D",
 				"position": [
 					6.0,
 					0.9,
@@ -492,104 +191,38 @@
 					0.0,
 					18.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "StaticBody3D",
-				"visible": true
-			},
-			{
-				"bounce": 0.0,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 17,
+						"id": 14,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
+						"type": "CollisionShape3D",
 						"shape": "Box",
 						"size": [
-							4.0,
+							6.0,
 							0.4,
 							3.0
 						],
-						"type": "CollisionShape3D",
-						"visible": true
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 9075290,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 18,
-						"mesh": "Box",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 15,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
+						"type": "MeshInstance3D",
+						"mesh": "Box",
+						"color": 9075290,
 						"scale": [
-							4.0,
+							6.0,
 							0.4,
 							3.0
 						],
-						"segments": 12,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"friction": 1.0,
+				]
+			},
+			{
 				"id": 19,
 				"name": "Ledge",
+				"type": "StaticBody3D",
 				"position": [
 					10.5,
 					1.8,
@@ -600,229 +233,77 @@
 					0.0,
 					0.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "StaticBody3D",
-				"visible": true
-			},
-			{
-				"bounce": 0.0,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 20,
+						"id": 17,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
+						"type": "CollisionShape3D",
 						"shape": "Box",
 						"size": [
-							3.0,
-							0.3,
+							4.0,
+							0.4,
 							3.0
 						],
-						"type": "CollisionShape3D",
-						"visible": true
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 4881072,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 21,
-						"mesh": "Box",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 18,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
+						"type": "MeshInstance3D",
+						"mesh": "Box",
+						"color": 9075290,
 						"scale": [
-							3.0,
-							0.3,
+							4.0,
+							0.4,
 							3.0
 						],
-						"segments": 12,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"friction": 1.0,
+				]
+			},
+			{
 				"id": 22,
 				"name": "Platform",
+				"type": "StaticBody3D",
 				"position": [
 					-3.0,
 					0.75,
 					-6.0
 				],
-				"rotation": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
 				"script": "res://scripts/platform.jet",
 				"script_properties": {},
-				"type": "StaticBody3D",
-				"visible": true
-			},
-			{
-				"angular_damp": 0.0,
-				"angular_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"bounce": 0.0,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 23,
+						"id": 20,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
+						"type": "CollisionShape3D",
 						"shape": "Box",
 						"size": [
-							1.0,
-							1.0,
-							1.0
+							3.0,
+							0.3,
+							3.0
 						],
-						"type": "CollisionShape3D",
-						"visible": true
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 11565626,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 24,
-						"mesh": "Box",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 21,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"segments": 12,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
 						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
+						"mesh": "Box",
+						"color": 4881072,
+						"scale": [
+							3.0,
+							0.3,
+							3.0
 						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"freeze": false,
-				"friction": 1.0,
-				"gravity_scale": 1.0,
+				]
+			},
+			{
 				"id": 25,
-				"linear_damp": 0.0,
-				"linear_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"mass": 2.0,
 				"name": "Crate1",
+				"type": "RigidBody3D",
 				"position": [
 					-3.0,
 					0.5,
@@ -833,119 +314,39 @@
 					0.0,
 					0.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "RigidBody3D",
-				"visible": true
-			},
-			{
-				"angular_damp": 0.0,
-				"angular_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"bounce": 0.0,
+				"mass": 2.0,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 26,
+						"id": 23,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
+						"type": "CollisionShape3D",
 						"shape": "Box",
 						"size": [
 							1.0,
 							1.0,
 							1.0
 						],
-						"type": "CollisionShape3D",
-						"visible": true
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 11565626,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 27,
-						"mesh": "Box",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 24,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
+						"type": "MeshInstance3D",
+						"mesh": "Box",
+						"color": 11565626,
 						"scale": [
 							1.0,
 							1.0,
 							1.0
 						],
-						"segments": 12,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"freeze": false,
-				"friction": 1.0,
-				"gravity_scale": 1.0,
+				]
+			},
+			{
 				"id": 28,
-				"linear_damp": 0.0,
-				"linear_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"mass": 2.0,
 				"name": "Crate2",
+				"type": "RigidBody3D",
 				"position": [
 					-3.0,
 					1.5,
@@ -956,119 +357,39 @@
 					0.0,
 					0.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "RigidBody3D",
-				"visible": true
-			},
-			{
-				"angular_damp": 0.0,
-				"angular_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"bounce": 0.0,
+				"mass": 2.0,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 29,
+						"id": 26,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
+						"type": "CollisionShape3D",
 						"shape": "Box",
 						"size": [
 							1.0,
 							1.0,
 							1.0
 						],
-						"type": "CollisionShape3D",
-						"visible": true
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 11565626,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 30,
-						"mesh": "Box",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 27,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
+						"type": "MeshInstance3D",
+						"mesh": "Box",
+						"color": 11565626,
 						"scale": [
 							1.0,
 							1.0,
 							1.0
 						],
-						"segments": 12,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"freeze": false,
-				"friction": 1.0,
-				"gravity_scale": 1.0,
+				]
+			},
+			{
 				"id": 31,
-				"linear_damp": 0.0,
-				"linear_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"mass": 2.0,
 				"name": "Crate3",
+				"type": "RigidBody3D",
 				"position": [
 					-1.9,
 					0.5,
@@ -1079,119 +400,39 @@
 					0.0,
 					0.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "RigidBody3D",
-				"visible": true
-			},
-			{
-				"angular_damp": 0.0,
-				"angular_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"bounce": 0.0,
+				"mass": 2.0,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 32,
+						"id": 29,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
+						"type": "CollisionShape3D",
 						"shape": "Box",
 						"size": [
 							1.0,
 							1.0,
 							1.0
 						],
-						"type": "CollisionShape3D",
-						"visible": true
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 11565626,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 33,
-						"mesh": "Box",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 30,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
+						"type": "MeshInstance3D",
+						"mesh": "Box",
+						"color": 11565626,
 						"scale": [
 							1.0,
 							1.0,
 							1.0
 						],
-						"segments": 12,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"freeze": false,
-				"friction": 1.0,
-				"gravity_scale": 1.0,
+				]
+			},
+			{
 				"id": 34,
-				"linear_damp": 0.0,
-				"linear_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"mass": 2.0,
 				"name": "Crate4",
+				"type": "RigidBody3D",
 				"position": [
 					-4.1,
 					0.5,
@@ -1202,1257 +443,496 @@
 					0.0,
 					0.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "RigidBody3D",
-				"visible": true
-			},
-			{
-				"angular_damp": 0.0,
-				"angular_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"bounce": 0.7,
+				"mass": 2.0,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 35,
+						"id": 32,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.4,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"shape": "Sphere",
+						"type": "CollisionShape3D",
+						"shape": "Box",
 						"size": [
 							1.0,
 							1.0,
 							1.0
 						],
-						"type": "CollisionShape3D",
-						"visible": true
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 14698568,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 36,
-						"mesh": "Sphere",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 33,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							0.8,
-							0.8,
-							0.8
-						],
-						"segments": 16,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
 						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
+						"mesh": "Box",
+						"color": 11565626,
+						"scale": [
 							1.0,
 							1.0,
 							1.0
 						],
-						"visible": true
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"freeze": false,
-				"friction": 1.0,
-				"gravity_scale": 1.0,
+				]
+			},
+			{
 				"id": 37,
-				"linear_damp": 0.0,
-				"linear_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"mass": 0.5,
 				"name": "Ball1",
+				"type": "RigidBody3D",
 				"position": [
 					2.0,
 					2.0,
 					3.0
 				],
-				"rotation": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "RigidBody3D",
-				"visible": true
-			},
-			{
-				"angular_damp": 0.0,
-				"angular_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
 				"bounce": 0.7,
+				"mass": 0.5,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 38,
+						"id": 35,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.4,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"shape": "Sphere",
-						"size": [
-							1.0,
-							1.0,
-							1.0
-						],
 						"type": "CollisionShape3D",
-						"visible": true
+						"shape": "Sphere",
+						"radius": 0.4,
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 4759776,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 39,
-						"mesh": "Sphere",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 36,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
+						"type": "MeshInstance3D",
+						"mesh": "Sphere",
+						"color": 14698568,
 						"scale": [
 							0.8,
 							0.8,
 							0.8
 						],
 						"segments": 16,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"freeze": false,
-				"friction": 1.0,
-				"gravity_scale": 1.0,
+				]
+			},
+			{
 				"id": 40,
-				"linear_damp": 0.0,
-				"linear_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"mass": 0.5,
 				"name": "Ball2",
+				"type": "RigidBody3D",
 				"position": [
 					3.0,
 					3.0,
 					1.0
 				],
-				"rotation": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "RigidBody3D",
-				"visible": true
-			},
-			{
-				"angular_damp": 0.0,
-				"angular_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
 				"bounce": 0.7,
+				"mass": 0.5,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 41,
+						"id": 38,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.4,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"shape": "Sphere",
-						"size": [
-							1.0,
-							1.0,
-							1.0
-						],
 						"type": "CollisionShape3D",
-						"visible": true
+						"shape": "Sphere",
+						"radius": 0.4,
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 14731336,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 42,
-						"mesh": "Sphere",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 39,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
+						"type": "MeshInstance3D",
+						"mesh": "Sphere",
+						"color": 4759776,
 						"scale": [
 							0.8,
 							0.8,
 							0.8
 						],
 						"segments": 16,
-						"shading": "Gouraud",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"freeze": false,
-				"friction": 1.0,
-				"gravity_scale": 1.0,
+				]
+			},
+			{
 				"id": 43,
-				"linear_damp": 0.0,
-				"linear_velocity": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"mass": 0.5,
 				"name": "Ball3",
+				"type": "RigidBody3D",
 				"position": [
 					1.0,
 					4.0,
 					0.0
 				],
-				"rotation": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"type": "RigidBody3D",
-				"visible": true
-			},
-			{
+				"bounce": 0.7,
+				"mass": 0.5,
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 44,
+						"id": 41,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"shape": "Sphere",
-						"size": [
-							1.0,
-							1.0,
-							1.0
-						],
 						"type": "CollisionShape3D",
-						"visible": true
+						"shape": "Sphere",
+						"radius": 0.4,
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 16764992,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 45,
-						"mesh": "Torus",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 42,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							90.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							0.45,
-							0.45,
-							0.45
-						],
-						"segments": 12,
-						"shading": "Phong",
-						"shininess": 32,
-						"specular": 0.9,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
 						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
+						"mesh": "Sphere",
+						"color": 14731336,
+						"scale": [
+							0.8,
+							0.8,
+							0.8
 						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"segments": 16,
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
+				]
+			},
+			{
 				"id": 46,
-				"monitoring": true,
 				"name": "Coin1",
+				"type": "Area3D",
 				"position": [
 					4.0,
 					0.8,
 					4.0
 				],
-				"rotation": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
 				"script": "res://scripts/coin.jet",
 				"script_properties": {},
-				"type": "Area3D",
-				"visible": true
-			},
-			{
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 47,
+						"id": 44,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"shape": "Sphere",
-						"size": [
-							1.0,
-							1.0,
-							1.0
-						],
 						"type": "CollisionShape3D",
-						"visible": true
+						"shape": "Sphere",
+						"radius": 0.5,
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 16764992,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 48,
-						"mesh": "Torus",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 45,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							90.0,
-							0.0,
-							0.0
-						],
+						"type": "MeshInstance3D",
+						"mesh": "Torus",
+						"color": 16764992,
 						"scale": [
 							0.45,
 							0.45,
 							0.45
 						],
-						"segments": 12,
-						"shading": "Phong",
-						"shininess": 32,
-						"specular": 0.9,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
+						"rotation": [
+							90.0,
 							0.0,
 							0.0
 						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"shading": "Phong",
+						"specular": 0.9,
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
+				]
+			},
+			{
 				"id": 49,
-				"monitoring": true,
 				"name": "Coin2",
+				"type": "Area3D",
 				"position": [
 					-6.0,
 					0.8,
 					-3.0
 				],
-				"rotation": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
 				"script": "res://scripts/coin.jet",
 				"script_properties": {},
-				"type": "Area3D",
-				"visible": true
-			},
-			{
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 50,
+						"id": 47,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"shape": "Sphere",
-						"size": [
-							1.0,
-							1.0,
-							1.0
-						],
 						"type": "CollisionShape3D",
-						"visible": true
+						"shape": "Sphere",
+						"radius": 0.5,
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 16764992,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 51,
-						"mesh": "Torus",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 48,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							90.0,
-							0.0,
-							0.0
-						],
+						"type": "MeshInstance3D",
+						"mesh": "Torus",
+						"color": 16764992,
 						"scale": [
 							0.45,
 							0.45,
 							0.45
 						],
-						"segments": 12,
-						"shading": "Phong",
-						"shininess": 32,
-						"specular": 0.9,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
+						"rotation": [
+							90.0,
 							0.0,
 							0.0
 						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"shading": "Phong",
+						"specular": 0.9,
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
+				]
+			},
+			{
 				"id": 52,
-				"monitoring": true,
 				"name": "Coin3",
+				"type": "Area3D",
 				"position": [
 					10.5,
 					2.8,
 					-2.0
 				],
-				"rotation": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
 				"script": "res://scripts/coin.jet",
 				"script_properties": {},
-				"type": "Area3D",
-				"visible": true
-			},
-			{
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 53,
+						"id": 50,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"shape": "Sphere",
-						"size": [
-							1.0,
-							1.0,
-							1.0
-						],
 						"type": "CollisionShape3D",
-						"visible": true
+						"shape": "Sphere",
+						"radius": 0.5,
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 16764992,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 54,
-						"mesh": "Torus",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 51,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							90.0,
-							0.0,
-							0.0
-						],
+						"type": "MeshInstance3D",
+						"mesh": "Torus",
+						"color": 16764992,
 						"scale": [
 							0.45,
 							0.45,
 							0.45
 						],
-						"segments": 12,
-						"shading": "Phong",
-						"shininess": 32,
-						"specular": 0.9,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
+						"rotation": [
+							90.0,
 							0.0,
 							0.0
 						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"shading": "Phong",
+						"specular": 0.9,
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
+				]
+			},
+			{
 				"id": 55,
-				"monitoring": true,
 				"name": "Coin4",
+				"type": "Area3D",
 				"position": [
 					-3.0,
 					3.5,
 					-6.0
 				],
-				"rotation": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
 				"script": "res://scripts/coin.jet",
 				"script_properties": {},
-				"type": "Area3D",
-				"visible": true
-			},
-			{
 				"children": [
 					{
-						"children": [],
-						"disabled": false,
-						"height": 2.0,
-						"id": 56,
+						"id": 53,
 						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.5,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"shape": "Sphere",
-						"size": [
-							1.0,
-							1.0,
-							1.0
-						],
 						"type": "CollisionShape3D",
-						"visible": true
+						"shape": "Sphere",
+						"radius": 0.5,
+						"children": []
 					},
 					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 16764992,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 57,
-						"mesh": "Torus",
-						"mesh_file": "",
-						"mesh_part": "",
+						"id": 54,
 						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							90.0,
-							0.0,
-							0.0
-						],
+						"type": "MeshInstance3D",
+						"mesh": "Torus",
+						"color": 16764992,
 						"scale": [
 							0.45,
 							0.45,
 							0.45
 						],
-						"segments": 12,
-						"shading": "Phong",
-						"shininess": 32,
-						"specular": 0.9,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
+						"rotation": [
+							90.0,
 							0.0,
 							0.0
 						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
+						"shading": "Phong",
+						"specular": 0.9,
+						"children": []
 					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
+				]
+			},
+			{
 				"id": 58,
-				"monitoring": true,
 				"name": "Coin5",
+				"type": "Area3D",
 				"position": [
 					7.0,
 					0.8,
 					6.0
 				],
-				"rotation": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
 				"script": "res://scripts/coin.jet",
 				"script_properties": {},
-				"type": "Area3D",
-				"visible": true
+				"children": [
+					{
+						"id": 56,
+						"name": "CollisionShape3D",
+						"type": "CollisionShape3D",
+						"shape": "Sphere",
+						"radius": 0.5,
+						"children": []
+					},
+					{
+						"id": 57,
+						"name": "Mesh",
+						"type": "MeshInstance3D",
+						"mesh": "Torus",
+						"color": 16764992,
+						"scale": [
+							0.45,
+							0.45,
+							0.45
+						],
+						"rotation": [
+							90.0,
+							0.0,
+							0.0
+						],
+						"shading": "Phong",
+						"specular": 0.9,
+						"children": []
+					}
+				]
 			},
 			{
-				"additive": true,
-				"alpha": 0.9,
-				"amount": 80,
-				"children": [],
-				"color": 11065599,
-				"color_end": 3832789,
-				"damping_max": 0.0,
-				"damping_min": 0.0,
-				"direction": [
-					0.0,
-					1.0,
-					0.0
-				],
-				"emission_box_extents": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"emission_shape": "Sphere",
-				"emission_sphere_radius": 0.15,
-				"emitting": true,
-				"explosiveness": 0.0,
-				"gravity": [
-					0.0,
-					-9.8,
-					0.0
-				],
 				"id": 59,
-				"initial_velocity_max": 5.5,
-				"initial_velocity_min": 4.5,
-				"lifetime": 1.2,
-				"lifetime_randomness": 0.3,
 				"name": "Fountain",
-				"no_depth_test": true,
-				"one_shot": false,
-				"particle_style": "Puff",
+				"type": "CPUParticles3D",
 				"position": [
 					2.5,
 					0.2,
 					-6.5
 				],
-				"puff_size": 0.3,
-				"puff_size_end": 0.2,
-				"rotation": [
+				"amount": 80,
+				"lifetime": 1.2,
+				"direction": [
 					0.0,
-					0.0,
+					1.0,
 					0.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
 				"spread": 10.0,
-				"type": "CPUParticles3D",
-				"visible": false
+				"initial_velocity_min": 4.5,
+				"initial_velocity_max": 5.5,
+				"lifetime_randomness": 0.3,
+				"particle_style": "Puff",
+				"color": 11065599,
+				"color_end": 3832789,
+				"alpha": 0.9,
+				"puff_size": 0.3,
+				"puff_size_end": 0.2,
+				"emission_shape": "Sphere",
+				"emission_sphere_radius": 0.15,
+				"children": []
 			},
 			{
-				"albedo_texture": "",
-				"alpha": 1.0,
-				"billboard": false,
-				"children": [],
-				"color": 7043722,
-				"cull_mode": "Back",
-				"diffuse": 1.0,
-				"draw_order": "Default",
 				"id": 60,
-				"mesh": "Cylinder",
-				"mesh_file": "",
-				"mesh_part": "",
 				"name": "FountainBase",
-				"perspective_correct": true,
+				"type": "MeshInstance3D",
 				"position": [
 					2.5,
 					0.1,
 					-6.5
 				],
-				"reflection": false,
-				"rotation": [
-					0.0,
-					0.0,
-					0.0
-				],
+				"mesh": "Cylinder",
+				"color": 7043722,
 				"scale": [
 					1.2,
 					0.2,
 					1.2
 				],
-				"segments": 12,
-				"shading": "Gouraud",
-				"shininess": 32,
-				"specular": 0.5,
-				"texture_filter": "Nearest",
-				"texture_repeat": true,
-				"type": "MeshInstance3D",
-				"uv_offset": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"uv_scale": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"visible": true
+				"children": []
 			},
 			{
-				"additive": true,
-				"alpha": 0.6,
-				"amount": 40,
-				"children": [],
-				"color": 14211288,
-				"color_end": 4210752,
-				"damping_max": 0.0,
-				"damping_min": 0.0,
-				"direction": [
-					0.0,
-					1.0,
-					0.0
-				],
-				"emission_box_extents": [
-					1.0,
-					1.0,
-					1.0
-				],
-				"emission_shape": "Point",
-				"emission_sphere_radius": 1.0,
-				"emitting": false,
-				"explosiveness": 1.0,
-				"gravity": [
-					0.0,
-					-6.0,
-					0.0
-				],
 				"id": 61,
-				"initial_velocity_max": 4.0,
-				"initial_velocity_min": 2.0,
-				"lifetime": 0.6,
-				"lifetime_randomness": 0.0,
 				"name": "PickupSparks",
-				"no_depth_test": true,
-				"one_shot": true,
-				"particle_style": "Sparks",
+				"type": "CPUParticles3D",
 				"position": [
 					0.0,
 					-5.0,
 					0.0
 				],
-				"puff_size": 0.2,
-				"puff_size_end": 0.6,
-				"rotation": [
+				"emitting": false,
+				"one_shot": true,
+				"amount": 40,
+				"lifetime": 0.6,
+				"explosiveness": 1.0,
+				"direction": [
 					0.0,
-					0.0,
+					1.0,
 					0.0
 				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
 				"spread": 180.0,
-				"type": "CPUParticles3D",
-				"visible": true
+				"initial_velocity_min": 2.0,
+				"initial_velocity_max": 4.0,
+				"gravity": [
+					0.0,
+					-6.0,
+					0.0
+				],
+				"particle_style": "Sparks",
+				"additive": true,
+				"children": []
 			},
 			{
-				"children": [
-					{
-						"children": [],
-						"disabled": false,
-						"height": 1.6,
-						"id": 62,
-						"name": "CollisionShape3D",
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"radius": 0.4,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"shape": "Capsule",
-						"size": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"type": "CollisionShape3D",
-						"visible": true
-					},
-					{
-						"albedo_texture": "",
-						"alpha": 1.0,
-						"billboard": false,
-						"children": [],
-						"color": 15790320,
-						"cull_mode": "Back",
-						"diffuse": 1.0,
-						"draw_order": "Default",
-						"id": 63,
-						"mesh": "Capsule",
-						"mesh_file": "",
-						"mesh_part": "",
-						"name": "Mesh",
-						"perspective_correct": true,
-						"position": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"reflection": false,
-						"rotation": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"scale": [
-							0.8,
-							0.8,
-							0.8
-						],
-						"segments": 12,
-						"shading": "Phong",
-						"shininess": 32,
-						"specular": 0.5,
-						"texture_filter": "Nearest",
-						"texture_repeat": true,
-						"type": "MeshInstance3D",
-						"uv_offset": [
-							0.0,
-							0.0,
-							0.0
-						],
-						"uv_scale": [
-							1.0,
-							1.0,
-							1.0
-						],
-						"visible": true
-					}
-				],
-				"collision_layer": 1,
-				"collision_mask": 1,
-				"floor_max_angle": 45.0,
 				"id": 64,
 				"name": "Player",
+				"type": "CharacterBody3D",
 				"position": [
 					0.0,
 					2.0,
 					4.0
 				],
-				"rotation": [
-					0.0,
-					0.0,
-					0.0
-				],
-				"scale": [
-					1.0,
-					1.0,
-					1.0
-				],
 				"script": "res://scripts/player.jet",
 				"script_properties": {},
-				"type": "CharacterBody3D",
-				"visible": true
+				"children": [
+					{
+						"id": 62,
+						"name": "CollisionShape3D",
+						"type": "CollisionShape3D",
+						"shape": "Capsule",
+						"radius": 0.4,
+						"height": 1.6,
+						"children": []
+					},
+					{
+						"id": 63,
+						"name": "Mesh",
+						"type": "MeshInstance3D",
+						"mesh": "Capsule",
+						"color": 15790320,
+						"scale": [
+							0.8,
+							0.8,
+							0.8
+						],
+						"shading": "Phong",
+						"children": []
+					}
+				]
 			},
 			{
-				"alpha": 1.0,
-				"children": [],
-				"color": 16777215,
 				"id": 65,
 				"name": "HUD",
+				"type": "Label",
 				"position": [
 					8.0,
 					6.0
 				],
+				"text": "COINS 0/5",
+				"color": 16777215,
+				"text_scale": 2,
 				"script": "res://scripts/hud.jet",
 				"script_properties": {},
-				"text": "COINS 0/5",
-				"text_scale": 2,
-				"type": "Label",
-				"visible": true
+				"children": []
 			},
 			{
-				"alpha": 1.0,
-				"children": [],
-				"color": 13162728,
 				"id": 66,
 				"name": "Help",
+				"type": "Label",
 				"position": [
 					8.0,
 					220.0
 				],
-				"script": "res://scripts/help.jet",
-				"script_properties": {},
-				"text": "Change Action: btn2  Action: jump",
-				"text_scale": 1,
-				"type": "Label",
-				"visible": true
+				"text": "Arrows/WASD: move  Space: jump",
+				"color": 13162728,
+				"children": []
 			}
-		],
-		"id": 1,
-		"name": "World",
-		"position": [
-			0.0,
-			0.0,
-			0.0
-		],
-		"rotation": [
-			0.0,
-			0.0,
-			0.0
-		],
-		"scale": [
-			1.0,
-			1.0,
-			1.0
-		],
-		"type": "Node3D",
-		"visible": true
-	},
-	"version": 2
+		]
+	}
 }

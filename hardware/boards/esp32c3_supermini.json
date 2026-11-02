@@ -1,0 +1,70 @@
+{
+  "name": "ESP32-C3 SuperMini",
+  "short": "C3 SuperMini",
+  "chip": "esp32c3",
+  "platformio_board": "esp32-c3-devkitm-1",
+  "flash": "4 MB (in the chip)",
+  "psram": "none",
+  "sdkconfig": [
+    "CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y",
+    "CONFIG_ESPTOOLPY_FLASHMODE_DIO=y",
+    "CONFIG_ESPTOOLPY_FLASHFREQ_80M=y",
+    "CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y"
+  ],
+  "pins": [
+    [
+      "IO0",
+      0
+    ],
+    [
+      "IO1",
+      1
+    ],
+    [
+      "IO3",
+      3
+    ],
+    [
+      "IO4",
+      4
+    ],
+    [
+      "IO5",
+      5
+    ],
+    [
+      "IO6",
+      6
+    ],
+    [
+      "IO7",
+      7
+    ],
+    [
+      "IO9 (BOOT)",
+      9
+    ],
+    [
+      "IO10",
+      10
+    ],
+    [
+      "IO20",
+      20
+    ],
+    [
+      "IO21",
+      21
+    ]
+  ],
+  "display_pins": {
+    "sck": 6,
+    "mosi": 7,
+    "cs": 10,
+    "dc": 3,
+    "reset": 4,
+    "backlight": -1
+  },
+  "verified": false,
+  "notes": "One RISC-V core at 160 MHz without an FPU and no PSRAM: 2D games and small scenes. Native USB only. SCK 6 and MOSI 7 are SPI2's own pins. GPIO2 and GPIO8 are strapping pins (GPIO8 also drives the LED), GPIO18 and GPIO19 are the USB."
+}

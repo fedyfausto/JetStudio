@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 3.22)
-project(JetStudio VERSION 0.1.0 LANGUAGES CXX)
+project(JetStudio VERSION 0.7.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(JET_STUDIO_EXTENSION "Build the Godot UI bridge" ON)
 option(JET_STUDIO_RUNNER "Build the SDL desktop player" ON)
+if(MINGW)
+  # Each Windows binary stands alone, without the MinGW runtime DLLs.
+  add_link_options(-static)
+endif()
 
 include(cmake/JetSources.cmake)
 add_library(jet_renderer STATIC ${JET_SOURCES})
@@ -34,7 +38,9 @@ target_include_directories(jet_renderer_device PUBLIC firmware/config third_part
 add_library(jet_runtime_device_vm STATIC ${JET_RUNTIME_SOURCES})
 target_include_directories(jet_runtime_device_vm PUBLIC runtime)
 target_link_libraries(jet_runtime_device_vm PUBLIC jet_renderer_device jet_script_vm)
-target_compile_options(jet_runtime PRIVATE -Wall -Wextra -Wpedantic)
+foreach(target jet_runtime jet_runtime_vm jet_runtime_device_vm)
+  target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+endforeach()
 
 if(JET_STUDIO_EXTENSION)
   set(GODOTCPP_API_VERSION "4.8" CACHE STRING "Godot API used by the bridge")
@@ -42,6 +48,10 @@ if(JET_STUDIO_EXTENSION)
   add_subdirectory(third_party/godot-cpp EXCLUDE_FROM_ALL)
   add_library(jet_bridge SHARED native/jet_bridge.cpp native/jet_serial.cpp native/serial_port.cpp native/register_types.cpp)
   target_link_libraries(jet_bridge PRIVATE jet_runtime godot::cpp)
+  if(WIN32)
+    set_target_properties(jet_bridge PROPERTIES PREFIX "")
+    target_link_libraries(jet_bridge PRIVATE setupapi)
+  endif()
   set_target_properties(jet_bridge PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/editor/bin"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/editor/bin")
@@ -49,12 +59,21 @@ endif()
 
 if(JET_STUDIO_RUNNER)
   find_package(SDL2 REQUIRED)
+  set(JET_SDL SDL2::SDL2)
+  if(WIN32 AND TARGET SDL2::SDL2main)
+    set(JET_SDL SDL2::SDL2main SDL2::SDL2) # SDL's main() wrapper
+  endif()
   add_executable(jet_player desktop/main.cpp)
   # VM only like the firmware, it just runs exported packages.
-  target_link_libraries(jet_player PRIVATE jet_runtime_vm SDL2::SDL2)
+  target_link_libraries(jet_player PRIVATE jet_runtime_vm ${JET_SDL})
   # Nano ESP32 emulator: the same player with the firmware's rendering profile.
   add_executable(jet_player_device desktop/main.cpp)
-  target_link_libraries(jet_player_device PRIVATE jet_runtime_device_vm SDL2::SDL2)
+  target_link_libraries(jet_player_device PRIVATE jet_runtime_device_vm ${JET_SDL})
+  if(WIN32)
+    # Console programs, so their messages show (SDL2main asks for a GUI one).
+    target_link_options(jet_player PRIVATE -mconsole)
+    target_link_options(jet_player_device PRIVATE -mconsole)
+  endif()
 endif()
 
 include(CTest)
