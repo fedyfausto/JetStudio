@@ -208,7 +208,9 @@ func _beginRename():
 	if item == null: return
 
 	item.set_editable(0, true)
-	tree.edit_selected(true)
+	#deferred: item_activated arrives in the middle of the Tree's own double-click
+	#handling; creating the LineEdit editor right there crashes the Windows build.
+	tree.edit_selected.call_deferred(true)
 
 
 func _onEdited():
@@ -219,7 +221,9 @@ func _onEdited():
 	item.set_editable(0, false)
 	var id := int(item.get_metadata(0))
 	var text := item.get_text(0).strip_edges()
-	rename_requested.emit(id, text)
+	#deferred: the rename handler rebuilds the tree, which must not happen while
+	#the Tree is still finishing its own item_edited bookkeeping (Windows crash).
+	rename_requested.emit.call_deferred(id, text)
 
 
 func _onButton(item: TreeItem, _column: int, id: int, _mouse: int):
