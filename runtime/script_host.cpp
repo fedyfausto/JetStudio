@@ -22,7 +22,8 @@ namespace jetstudio{
             Frame, Hframes, Vframes, FlipH, FlipV, PixelSize, Modulate, ZIndex, Centered, Offset, AnimationName, SpeedScale, Zoom, Enabled,
             OneWayCollision, WaitTime, Autostart, Paused, TimeLeft, CurrentAnimation, CurrentAnimationPosition, CurrentAnimationLength,
             Autoplay, VisibilityRangeBegin, VisibilityRangeBeginMargin, VisibilityRangeEnd, VisibilityRangeEndMargin,
-            VisibilityRangeFadeMode, FogEnabled, FogDepthBegin, FogDepthEnd, PropertyCount
+            VisibilityRangeFadeMode, FogEnabled, FogDepthBegin, FogDepthEnd, LensFlare, CrtScanlines, CrtIntensity, CelShading,
+            CelShadingBands, Fxaa, Bloom, Pixelate, ChromaticAberration, MotionBlur, BlendMode, MeshShading, PropertyCount
         };
         const char* const property_names[PropertyCount] = {
             "name", "position", "rotation", "rotation_degrees", "scale", "visible", "global_position",
@@ -36,7 +37,8 @@ namespace jetstudio{
             "speed_scale", "zoom", "enabled", "one_way_collision", "wait_time", "autostart", "paused", "time_left", "current_animation",
             "current_animation_position", "current_animation_length", "autoplay", "visibility_range_begin",
             "visibility_range_begin_margin", "visibility_range_end", "visibility_range_end_margin", "visibility_range_fade_mode",
-            "fog_enabled", "fog_depth_begin", "fog_depth_end"};
+            "fog_enabled", "fog_depth_begin", "fog_depth_end", "lens_flare", "crt_scanlines", "crt_intensity", "cel_shading",
+            "cel_shading_bands", "fxaa", "bloom", "pixelate", "chromatic_aberration", "motion_blur", "blend_mode", "shading"};
 
         enum Method : int{
             GetNode, GetNodeOrNull, GetParent, GetChildren, GetChild, GetChildCount, FindChild, QueueFree,
@@ -48,7 +50,7 @@ namespace jetstudio{
             Start, IsStopped,
             CreateTween, TweenProperty, TweenInterval, TweenCallback, TweenMethod, SetLoops, SetParallel, Parallel, Chain, SetTrans,
             SetEase, SetSpeedScale, Kill, Pause, IsRunning, IsValid, BindNode, GetTotalElapsedTime, From, FromCurrent, AsRelative,
-            SetDelay, PlayBackwards, Seek, HasAnimation, GetAnimationList,
+            SetDelay, PlayBackwards, Seek, HasAnimation, GetAnimationList, UnprojectPosition, IsPositionBehind,
             MethodCount
         };
         const char* const methodNames[MethodCount] = {
@@ -62,7 +64,7 @@ namespace jetstudio{
             "create_tween", "tween_property", "tween_interval", "tween_callback", "tween_method", "set_loops", "set_parallel", "parallel",
             "chain", "set_trans", "set_ease", "set_speed_scale", "kill", "pause", "is_running", "is_valid", "bind_node",
             "get_total_elapsed_time", "from", "from_current", "as_relative", "set_delay", "play_backwards", "seek", "has_animation",
-            "get_animation_list"};
+            "get_animation_list", "unproject_position", "is_position_behind"};
 
         const std::vector<ClassInfo>& classList(){
             static const std::vector<ClassInfo> classes = [] {
@@ -94,15 +96,20 @@ namespace jetstudio{
                 c.back().constants = {{"VISIBILITY_RANGE_FADE_DISABLED", 0}, {"VISIBILITY_RANGE_FADE_SELF", 1},
                                       {"VISIBILITY_RANGE_FADE_DEPENDENCIES", 2}};
                 add("MeshInstance3D", "GeometryInstance3D", {{"color", Type::Color}, {"alpha", Type::Float}, {"uv_offset", Type::Vector3},
-                    {"uv_scale", Type::Vector3}, {"perspective_correct", Type::Bool}, {"texture_filter", Type::Int}}, {});
+                    {"uv_scale", Type::Vector3}, {"perspective_correct", Type::Bool}, {"texture_filter", Type::Int}, {"shading", Type::Int}}, {});
+                //the Inspector's Shading, in its order
+                c.back().constants = {{"SHADING_GOURAUD", 0}, {"SHADING_FLAT", 1}, {"SHADING_UNLIT", 2}, {"SHADING_PHONG", 3},
+                                      {"SHADING_ADDITIVE", 4}, {"SHADING_WATER", 5}, {"SHADING_SUBTRACT", 6}, {"SHADING_MULTIPLY", 7}};
                 add("Camera3D", "Node3D", {{"fov", Type::Float}, {"near", Type::Float}, {"far", Type::Float}, {"current", Type::Bool}},
-                    {{"make_current", 0, 0}});
-                add("DirectionalLight3D", "Node3D", {{"light_color", Type::Color}, {"light_energy", Type::Float}}, {});
+                    {{"make_current", 0, 0}, {"unproject_position", 1, 1, Type::Vector2}, {"is_position_behind", 1, 1, Type::Bool}});
+                add("DirectionalLight3D", "Node3D", {{"light_color", Type::Color}, {"light_energy", Type::Float}, {"lens_flare", Type::Bool}}, {});
                 add("WorldEnvironment", "Node", {{"background_color", Type::Color}, {"ambient_color", Type::Color}, {"fog_enabled", Type::Bool},
-                    {"fog_depth_begin", Type::Float}, {"fog_depth_end", Type::Float}}, {});
+                    {"fog_depth_begin", Type::Float}, {"fog_depth_end", Type::Float}, {"crt_scanlines", Type::Bool}, {"crt_intensity", Type::Float},
+                    {"cel_shading", Type::Bool}, {"cel_shading_bands", Type::Int}, {"fxaa", Type::Bool}, {"bloom", Type::Bool},
+                    {"pixelate", Type::Bool}, {"chromatic_aberration", Type::Bool}, {"motion_blur", Type::Bool}}, {});
                 //controls: position and size are screen pixels (x, y)
-                add("Control", "Node", {{"position", Type::Vector2}, {"size", Type::Vector2}, {"visible", Type::Bool}, {"alpha", Type::Float}},
-                    {{"show", 0, 0}, {"hide", 0, 0}});
+                add("Control", "Node", {{"position", Type::Vector2}, {"size", Type::Vector2}, {"visible", Type::Bool}, {"alpha", Type::Float},
+                    {"blend_mode", Type::Int}}, {{"show", 0, 0}, {"hide", 0, 0}});
                 add("Label", "Control", {{"text", Type::String}, {"color", Type::Color}}, {});
                 add("TextureRect", "Control", {{"color", Type::Color}}, {});
                 add("ColorRect", "Control", {{"color", Type::Color}}, {});
@@ -132,11 +139,14 @@ namespace jetstudio{
                     {{"frame", Type::Int}, {"hframes", Type::Int}, {"vframes", Type::Int}, {"flip_h", Type::Bool}, {"flip_v", Type::Bool},
                      {"pixel_size", Type::Float}, {"modulate", Type::Color}}, {});
                 add("PackedScene", "", {}, {{"instantiate", 0, 0, Type::Object}});
+                //Godot sets blend_mode on the node's CanvasItemMaterial; here it is the node's own property
+                add("CanvasItemMaterial", "", {}, {});
+                c.back().constants = {{"BLEND_MODE_MIX", 0}, {"BLEND_MODE_ADD", 1}, {"BLEND_MODE_SUB", 2}, {"BLEND_MODE_MUL", 3}};
                 //2D, Godot's classes: positions in canvas pixels (y down), rotation in radians, clockwise.
                 add("Node2D", "Node",
                     {{"position", Type::Vector2}, {"rotation", Type::Float}, {"rotation_degrees", Type::Float}, {"scale", Type::Vector2},
                      {"global_position", Type::Vector2}, {"visible", Type::Bool}, {"z_index", Type::Int}, {"modulate", Type::Color},
-                     {"alpha", Type::Float}},
+                     {"alpha", Type::Float}, {"blend_mode", Type::Int}},
                     {{"translate", 1, 1}, {"rotate", 1, 1}, {"look_at", 1, 1}, {"show", 0, 0}, {"hide", 0, 0},
                      {"is_visible_in_tree", 0, 0, Type::Bool}});
                 add("Sprite2D", "Node2D",
@@ -228,12 +238,15 @@ namespace jetstudio{
                 case CurrentAnimation: case CurrentAnimationPosition: case CurrentAnimationLength: case Autoplay:
                     return type == NodeType::AnimationPlayer;
                 case Zoom: case Enabled: return type == NodeType::Camera2D;
-                case UvOffset: case UvScale: case PerspectiveCorrect: case TextureFilter: return type == NodeType::MeshInstance3D;
+                case UvOffset: case UvScale: case PerspectiveCorrect: case TextureFilter: case MeshShading: return type == NodeType::MeshInstance3D;
+                case BlendMode: return isNode2d(type) || is_control(type);
                 case Text: return type == NodeType::Label;
                 case Size: return is_control(type);
                 case Fov: case Near: case Far: case Current: return type == NodeType::Camera3D;
-                case LightColor: case LightEnergy: return type == NodeType::DirectionalLight3D;
-                case BackgroundColor: case AmbientColor: case FogEnabled: case FogDepthBegin: case FogDepthEnd:
+                case LightColor: case LightEnergy: case LensFlare: return type == NodeType::DirectionalLight3D;
+                case BackgroundColor: case AmbientColor: case FogEnabled: case FogDepthBegin: case FogDepthEnd: case CrtScanlines:
+                case CrtIntensity: case CelShading: case CelShadingBands: case Fxaa: case Bloom: case Pixelate: case ChromaticAberration:
+                case MotionBlur:
                     return type == NodeType::WorldEnvironment;
                 case VisibilityRangeBegin: case VisibilityRangeBeginMargin: case VisibilityRangeEnd: case VisibilityRangeEndMargin:
                 case VisibilityRangeFadeMode:
@@ -269,6 +282,8 @@ namespace jetstudio{
             if(m <= IsVisibleInTree) return isNode3d(type);
 
             if(m == MakeCurrent) return type == NodeType::Camera3D || type == NodeType::Camera2D;
+
+            if(m == UnprojectPosition || m == IsPositionBehind) return type == NodeType::Camera3D;
 
             if(m == Play || m == IsPlaying) return type == NodeType::AnimatedSprite2D || type == NodeType::AnimationPlayer;
 
@@ -587,11 +602,22 @@ namespace jetstudio{
             case Current: out = Value(d.more().current); break;
             case LightColor: out = Value(toColor(d.more().light_color)); break;
             case LightEnergy: out = Value(d.more().energy); break;
+            case LensFlare: out = Value(d.more().lens_flare); break;
             case BackgroundColor: out = Value(toColor(d.more().background)); break;
             case AmbientColor: out = Value(toColor(d.more().ambient)); break;
             case FogEnabled: out = Value(d.more().fog_enabled); break;
             case FogDepthBegin: out = Value(d.more().fog_begin); break;
             case FogDepthEnd: out = Value(d.more().fog_end); break;
+            case CrtScanlines: out = Value(d.more().crt); break;
+            case CrtIntensity: out = Value(d.more().crt_intensity / 255.0f); break;
+            case CelShading: out = Value(d.more().cel_shading); break;
+            //cel_bits 3..6 drop that many low lighting bits: 32 to 4 bands
+            case CelShadingBands: out = Value(jetscript::Int(256 >> d.more().cel_bits)); break;
+            case Fxaa: out = Value(d.more().fxaa); break;
+            case Bloom: out = Value(d.more().bloom); break;
+            case Pixelate: out = Value(d.more().pixelate); break;
+            case ChromaticAberration: out = Value(d.more().chromatic); break;
+            case MotionBlur: out = Value(d.more().motion_blur); break;
             //stored in cm
             case VisibilityRangeBegin: out = Value(d.visibility_begin / 100.0f); break;
             case VisibilityRangeBeginMargin: out = Value(d.visibility_begin_margin / 100.0f); break;
@@ -604,6 +630,8 @@ namespace jetstudio{
             case PerspectiveCorrect: out = Value(d.perspective); break;
             //Godot: 0 nearest, 1 linear
             case TextureFilter: out = Value(jetscript::Int(d.bilinear ? 1 : 0)); break;
+            case MeshShading: out = Value(jetscript::Int(d.shading)); break;
+            case BlendMode: out = Value(jetscript::Int(d.blend_mode)); break;
             case Text: out = Value(d.more().text); break;
             case Size: out = Value(to2(d.more().size)); break;
             case Frame: out = Value(jetscript::Int(d.frame)); break;
@@ -913,11 +941,41 @@ namespace jetstudio{
                 break;
             case LightColor: ok = expect(Type::Color); if(ok) d.extras().light_color = fromColor(v.asColor()); break;
             case LightEnergy: ok = number(d.extras().energy, 0, 16); break;
+            case LensFlare: ok = expect(Type::Bool); if(ok) d.extras().lens_flare = v.truthy(); break;
             case BackgroundColor: ok = expect(Type::Color); if(ok) d.extras().background = fromColor(v.asColor()); break;
             case AmbientColor: ok = expect(Type::Color); if(ok) d.extras().ambient = fromColor(v.asColor()); break;
             case FogEnabled: ok = expect(Type::Bool); if(ok) d.extras().fog_enabled = v.truthy(); break;
             case FogDepthBegin: ok = number(d.extras().fog_begin, 0, 6000); break;
             case FogDepthEnd: ok = number(d.extras().fog_end, 0.01f, 6000); break;
+            case CrtScanlines: case CelShading: case Fxaa: case Bloom: case Pixelate: case ChromaticAberration: case MotionBlur:{
+                ok = expect(Type::Bool);
+                bool* target[] = {&d.extras().crt, nullptr, &d.extras().cel_shading, nullptr, &d.extras().fxaa, &d.extras().bloom,
+                                  &d.extras().pixelate, &d.extras().chromatic, &d.extras().motion_blur};
+
+                if(ok) *target[p - CrtScanlines] = v.truthy();
+
+                break;
+            }
+            case CrtIntensity:{
+                float intensity = 0;
+                ok = number(intensity, 0, 1);
+
+                if(ok) d.extras().crt_intensity = uint8_t(std::lround(intensity * 255));
+
+                break;
+            }
+            case CelShadingBands:{
+                const jetscript::Int bands = v.type() == Type::Int ? v.asInt() : 0;
+
+                if(bands != 4 && bands != 8 && bands != 16 && bands != 32){
+                    error = "'cel_shading_bands' must be 4, 8, 16 or 32.";
+                    return Status::Error;
+                }
+
+                //4 bands drop 6 bits, 32 drop 3
+                d.extras().cel_bits = uint8_t(bands == 4 ? 6 : bands == 8 ? 5 : bands == 16 ? 4 : 3);
+                break;
+            }
             case VisibilityRangeBegin: case VisibilityRangeBeginMargin: case VisibilityRangeEnd: case VisibilityRangeEndMargin:{
                 //cm in 16 bits: up to 655 m, beyond the camera's far limit anyway
                 float metres = 0;
@@ -971,6 +1029,18 @@ namespace jetstudio{
 
                 if(!ok) error = "texture_filter must be 0 (nearest) or 1 (linear).";
                 else d.bilinear = v.asInt() == 1;
+                break;
+            case MeshShading:
+                ok = v.type() == Type::Int && v.asInt() >= 0 && v.asInt() <= jetscript::Int(Shading::Multiply);
+
+                if(!ok) error = "'shading' must be one of the MeshInstance3D.SHADING_* constants.";
+                else d.shading = Shading(v.asInt());
+                break;
+            case BlendMode:
+                ok = v.type() == Type::Int && v.asInt() >= 0 && v.asInt() <= jetscript::Int(CanvasBlend::Multiply);
+
+                if(!ok) error = "'blend_mode' must be CanvasItemMaterial.BLEND_MODE_MIX, _ADD, _SUB or _MUL (premultiplied alpha is not supported).";
+                else d.blend_mode = CanvasBlend(v.asInt());
                 break;
             case Frame:{
                 const jetscript::Int frames = jetscript::Int(d.hframes) * d.vframes;
@@ -1428,6 +1498,26 @@ namespace jetstudio{
                 for(int i = index; i >= 0 && isNode3d(nodes[i].d.type); i = nodes[i].parent) visible = visible && nodes[i].d.visible;
 
                 result = Value(visible);
+                return Status::Ok;
+            }
+            case UnprojectPosition: case IsPositionBehind:{
+                if(count < 1 || args[0].type() != Type::Vector3){
+                    error = std::string("Invalid argument for '") + methodNames[m] + "': expected Vector3.";
+                    return Status::Error;
+                }
+
+                //this camera's view, as the game draws it: vertical FOV, display pixels
+                const Transform global = globalOf(nodes, index);
+                const Vec3 v = global.basis.orthonormalized().transposed().xform(toVec(args[0].asVector3()) - global.origin);
+
+                if(m == IsPositionBehind){
+                    result = Value(-v.z < node.d.more().near);
+                    return Status::Ok;
+                }
+
+                const float focal = runtime_->height() * 0.5f / std::tan(radians(node.d.more().fov) * 0.5f);
+                const float depth = std::abs(v.z) > 1e-6f ? -v.z : 1e-6f;
+                result = Value(jetscript::Vector2{runtime_->width() * 0.5f + v.x / depth * focal, runtime_->height() * 0.5f - v.y / depth * focal});
                 return Status::Ok;
             }
             case MakeCurrent:

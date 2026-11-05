@@ -28,7 +28,9 @@
 #define HALF_WIDTH_BUFFERS 1
 #define FIELD_BUFFERS 1
 #define SSR_FIELD_REFLECT 1
-#define POSTFX_CRT 0
+// CRT scanlines work on the half-width fields; the buffered passes need full frames (PC only).
+// Cel shading, even when off, slows the raster loop by about 5% (Nano, JetRun), so it is PC only too.
+#define POSTFX_CRT 1
 #define POSTFX_CELLSHADING 0
 #define POSTFX_ANTIALIASING 0
 #define POSTFX_BLOOM 0

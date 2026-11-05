@@ -372,6 +372,8 @@ namespace{
             const int64_t start = esp_timer_get_time();
             const int parity = runtime.nextField();
             runtime.set_framebuffer(fields[parity]);
+            //two buffers: Water reflects the field being sent, already complete
+            runtime.set_reflect_buffer(buffers == 2 ? fields[1 - parity] : nullptr);
             runtime.set_input(readButtons());
             runtime.update(float(start - previous) / 1000000.0f);
             const int64_t updated = esp_timer_get_time();

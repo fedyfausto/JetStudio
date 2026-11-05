@@ -37,7 +37,9 @@ namespace jetstudio{
     enum class CollisionKind : uint8_t{ Box, Sphere, Capsule };
     // Primitives use Godot's default mesh sizes (BoxMesh 1 m, SphereMesh r 0.5...). Mesh is an imported model part.
     enum class Shape : uint8_t{ Box, Sphere, Plane, Pyramid, Cylinder, Capsule, Quad, Torus, Mesh };
-    enum class Shading : uint8_t{ Gouraud, Flat, Unlit, Phong, Additive, Water };
+    enum class Shading : uint8_t{ Gouraud, Flat, Unlit, Phong, Additive, Water, Subtract, Multiply };
+    // Godot's CanvasItemMaterial blend_mode for the 2D nodes, without premultiplied alpha.
+    enum class CanvasBlend : uint8_t{ Mix, Add, Subtract, Multiply };
     // Sparks and Water are Jet's own looks. Puff is ours: soft discs that grow and fade (smoke, dust, steam).
     enum class ParticleStyle : uint8_t{ Sparks, Water, Puff };
     enum class EmissionShape : uint8_t{ Point, Sphere, Box };
@@ -63,6 +65,9 @@ namespace jetstudio{
         bool has_alpha = false;
         // colour key of transparent pixels
         uint16_t alphaColor = 0;
+        // palette cycling: entries per second (0 = still, opaque palette textures only) and the current step
+        uint8_t palette_fps = 0;
+        uint16_t paletteOffset = 0;
         const uint8_t* indexData() const{ return packedIndices ? packedIndices : indices.data(); }
         size_t bytes() const{
             return pixels.size() * 2 + (packedIndices ? size_t(width) * height : indices.size()) + palette.size() * 2;
@@ -70,9 +75,9 @@ namespace jetstudio{
     };
     // Quantize forces the palette by reducing to 256 colours (median cut).
     enum class PaletteMode : uint8_t{ Auto, Quantize, Rgb565 };
-    // alpha < 128 counts as transparent.
+    // alpha < 128 counts as transparent. paletteFps > 0 cycles the palette, sorted from dark to light so gradients flow.
     bool makeTexture(std::string path, int width, int height, const uint8_t* rgba, TextureAsset& out, std::string& error,
-                      PaletteMode mode = PaletteMode::Auto);
+                      PaletteMode mode = PaletteMode::Auto, uint8_t paletteFps = 0);
 
     const char* nodeTypeName(NodeType);
     bool isNode3d(NodeType);
@@ -121,8 +126,13 @@ namespace jetstudio{
         // (16.16 fixed point, at pixel centres): u = ux * x + uy * y + u0, v = vx * x + vy * y + v0.
         int frameX = 0, frameY = 0, frameW = 0, frameH = 0;
         bool flip_h = false, flip_v = false, affine = false;
+        // Sprite2D: frameW/frameH include the mirrored copy
+        bool mirror_h = false, mirror_v = false;
+        CanvasBlend blend = CanvasBlend::Mix;
         int32_t ux = 0, uy = 0, vx = 0, vy = 0;
         int64_t u0 = 0, v0 = 0;
+        // lens flare element (type DirectionalLight3D, a disc of diameter w added to the image): a ring instead
+        bool ring = false;
     };
     // swapped: the row holds big-endian pixels, as sent to the panel.
     void composeOverlayRow(const std::vector<OverlayItem>& items, uint16_t* row, int y, int width, bool swapped);
@@ -290,9 +300,10 @@ namespace jetstudio{
         // Camera3D (vertical FOV in degrees, as in Godot)
         float fov = 75, near = 0.05f, far = 100;
         bool current = false;
-        // DirectionalLight3D
+        // DirectionalLight3D; lens_flare is Jet's flare chain towards the screen centre
         uint32_t light_color = 0xffffff;
         float energy = 1;
+        bool lens_flare = false;
         // WorldEnvironment
         uint32_t background = 0x161c28, ambient = 0x4e586e;
         Background background_mode = Background::Color;
@@ -302,6 +313,10 @@ namespace jetstudio{
         // Godot's depth fog distances (m): Jet fades the geometry into the background between them, it has no fog color
         bool fog_enabled = false;
         float fog_begin = 10, fog_end = 100;
+        // Jet's PostFX: CRT scanlines and cel shading everywhere, FXAA, bloom, pixelate, chromatic aberration and motion
+        // blur on the PC only. crt_intensity 0..255; cel_bits are the low lighting bits dropped (3..6: 32 to 4 bands).
+        bool crt = false, cel_shading = false, fxaa = false, bloom = false, pixelate = false, chromatic = false, motion_blur = false;
+        uint8_t crt_intensity = 48, cel_bits = 4;
         // Physics (arcade, see physics.hpp); 2D bodies and shapes use the same fields, in pixels
         CollisionKind collision = CollisionKind::Box;
         Vec3 boxSize{1, 1, 1};
@@ -394,6 +409,8 @@ namespace jetstudio{
             int32_t texture = -1;
             float uv_scale[2] = {1, 1}, uv_offset[2] = {0, 0};
             bool bilinear = false, repeat = true, perspective = true;
+            // texture_repeat off: black outside the UVs (Jet's ZERO addressing) instead of the edge texels
+            bool black_border = false;
             // 0..1
             float alpha = 1;
             // Phong highlight / water ripple strength, 0..1
@@ -409,6 +426,10 @@ namespace jetstudio{
             // Sprite3D, as in Godot: frame `frame` of an hframes × vframes sheet, `pixel_size` metres per texel.
             uint16_t hframes = 1, vframes = 1, frame = 0;
             bool flip_h = false, flip_v = false;
+            // Sprite2D: Jet's MIRROR_X/Y, a flipped copy appended to each frame (a symmetric image stored in half)
+            bool mirror_h = false, mirror_v = false;
+            // 2D nodes
+            CanvasBlend blend_mode = CanvasBlend::Mix;
             float pixel_size = 0.01f;
             // 2D nodes (Godot's Node2D/Sprite2D): the rotation is rotation.z in degrees, clockwise as y grows downwards.
             int16_t z_index = 0;
@@ -419,6 +440,8 @@ namespace jetstudio{
             float diffuse = 1;
             // albedo texture used as environment panorama (chrome, glass)
             bool reflection = false;
+            // Water: reflections mirror around the water's far edge on the screen instead of the horizon (Jet's waterYBias)
+            bool water_far_edge = false;
             // Shape::Mesh: index in Description::meshes
             int32_t mesh = -1;
             // index in Description::scripts
@@ -576,10 +599,15 @@ namespace jetstudio{
             int bufferRows() const{ return height_ / BufferRowStep; }
             // Devices render straight into their DMA buffers. nullptr goes back to the internal one.
             void set_framebuffer(uint16_t* buffer);
+            // The previous field, being sent while this one is drawn: Water reads its reflections there, so they never
+            // depend on the drawing order or on rows another core has not drawn yet. nullptr: the field being drawn.
+            void set_reflect_buffer(const uint16_t* buffer){ reflect_ = buffer; }
             // Row parity (0 even, 1 odd) the next render() fills with FIELD_BUFFERS, else 0.
             int nextField() const{ return FIELD_BUFFERS ? (scene_.frameCounter % 2 == 0 ? 1 : 0) : 0; }
             // 2D nodes of the last render(), for composeOverlayRow().
             const std::vector<OverlayItem>& overlay() const{ return overlay_; }
+            // the editor's View > Display Wireframe: triangle edges instead of shaded meshes, with the editor camera
+            void set_wireframe(bool on){ wireframe_ = on; }
             // Editor viewpoint (Godot coordinates, rotation in radians, vertical FOV).
             void set_editor_camera(Vec3 position, Vec3 rotation, float fov);
             // Use the editor viewpoint even while playing or when the scene has a camera.
@@ -629,11 +657,12 @@ namespace jetstudio{
                 CullMode cull = CullMode::Back;
                 float uv_scale[2] = {1, 1}, uv_offset[2] = {0, 0};
                 uint16_t visibility[4] = {0, 0, 0, 0};
-                bool visibility_fade = false;
+                bool visibility_fade = false, black_border = false, water_far_edge = false;
                 static Applied of(const NodeDesc& d){
                     return {d.color, d.shading, d.alpha, d.specular, d.diffuse, d.shininess, d.bilinear, d.repeat, d.perspective,
                             d.billboard, d.cull, {d.uv_scale[0], d.uv_scale[1]}, {d.uv_offset[0], d.uv_offset[1]},
-                            {d.visibility_begin, d.visibility_begin_margin, d.visibility_end, d.visibility_end_margin}, d.visibility_fade};
+                            {d.visibility_begin, d.visibility_begin_margin, d.visibility_end, d.visibility_end_margin}, d.visibility_fade,
+                            d.black_border, d.water_far_edge};
                 }
             };
 
@@ -723,6 +752,13 @@ namespace jetstudio{
             void updateTransforms(bool sync = true);
             // Physics (physics.cpp)
             void physicsTick(float dt);
+            void cyclePalettes();
+            void addLensFlare();
+            // a ray from the camera towards the flare's light meets an opaque mesh or a sprite's opaque texel
+            bool sunHidden() const;
+            // Water with water_far_edge: Jet's waterYBias and waterReflectionMaxY from the water's far edge on the screen
+            void aimWaterReflections();
+            void drawWireframe();
             void physicsBegin();
             void physicsStep(float dt);
             void updateAreas();
@@ -834,11 +870,24 @@ namespace jetstudio{
             std::vector<uint16_t> gradient_;
             std::vector<int32_t> skyColumns_, skyRows_;
             Basis viewBasis_;
+            Vec3 viewOrigin_{};
             float viewFov_ = 70;
+            // the editor's Display Wireframe
+            bool wireframe_ = false;
+            const uint16_t* reflect_ = nullptr;
             Renderer::Scene scene_;
             Renderer::Scene::RasterExecutor executor_ = nullptr;
             std::unique_ptr<physics::World> physics_;
             float physicsTime_ = 0, physicsDelta_ = 1.0f / 60.0f;
+            // seconds of play, the clock of palette cycling
+            double paletteTime_ = 0;
+            // the lens flare's light: direction towards it (world) and colour, from applyEnvironment()
+            bool flare_ = false;
+            Vec3 sunToward_{0, 1, 0};
+            uint32_t flareColor_ = 0xffffff;
+            // 0 hidden by geometry .. 1 in view, fading as Jet's LensFlare does (-1: not looked at yet);
+            // flareDelta_: seconds of play since it was last looked at
+            float flareVisibility_ = -1, flareDelta_ = 0;
             // the scene has collision shapes in bodies or areas
             bool hasPhysics_ = false;
             // CollisionShape3D node -> its body or area

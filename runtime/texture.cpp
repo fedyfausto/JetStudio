@@ -84,7 +84,8 @@ namespace jetstudio{
 
     }
 
-    bool makeTexture(std::string path, int width, int height, const uint8_t* rgba, TextureAsset& out, std::string& error, PaletteMode mode){
+    bool makeTexture(std::string path, int width, int height, const uint8_t* rgba, TextureAsset& out, std::string& error, PaletteMode mode,
+                     uint8_t paletteFps){
         if(width < 1 || height < 1 || width > MaxTextureSide || height > MaxTextureSide || !rgba){
             error = "Texture " + path + ": unsupported size (1.." + std::to_string(MaxTextureSide) + " pixels per side).";
             return false;
@@ -129,6 +130,15 @@ namespace jetstudio{
 
             for(size_t i = 0; i < count; ++i)
                 if(rgba[i * 4 + 3] < 128) colors[i] = t.alphaColor;
+        }
+
+        //cycling needs a palette and moves every entry, the transparent key too
+        if(paletteFps > 0){
+            if(transparent){ error = "Texture " + t.path + ": palette animation needs an image without transparent pixels."; return false; }
+
+            if(mode == PaletteMode::Rgb565){ error = "Texture " + t.path + ": palette animation needs the Auto or Quantize palette."; return false; }
+
+            mode = PaletteMode::Quantize;
         }
 
         if(mode == PaletteMode::Quantize){
@@ -177,6 +187,29 @@ namespace jetstudio{
             t.indices.resize(count);
 
             for(size_t i = 0; i < count; ++i) t.indices[i] = index[colors[i]];
+
+            if(paletteFps > 0){
+                //dark to light: cycling then moves each gradient along
+                auto luma = [](uint16_t c){ return (c >> 11) * 2 * 299 + ((c >> 5) & 63) * 587 + (c & 31) * 2 * 114; };
+                std::vector<uint8_t> order(t.palette.size());
+
+                for(size_t i = 0; i < order.size(); ++i) order[i] = uint8_t(i);
+
+                std::stable_sort(order.begin(), order.end(), [&](uint8_t a, uint8_t b){ return luma(t.palette[a]) < luma(t.palette[b]); });
+                std::vector<uint16_t> sorted(order.size());
+                uint8_t remap[256] = {};
+
+                for(size_t i = 0; i < order.size(); ++i){
+                    sorted[i] = t.palette[order[i]];
+                    remap[order[i]] = uint8_t(i);
+                }
+
+                t.palette = std::move(sorted);
+
+                for(auto& i : t.indices) i = remap[i];
+
+                t.palette_fps = std::min<uint8_t>(paletteFps, 127);
+            }
         } else {
             t.pixels = std::move(colors);
         }

@@ -126,6 +126,11 @@ int main(){
     Description on_top = pair;
     on_top.nodes[3].draw_order = DrawOrder::OnTop;
     check(centre(on_top) == rgb565(0x0000ff), "On Top geometry covers nearer geometry");
+    Description blended = pair;
+    blended.nodes[2].shading = Shading::Subtract; blended.nodes[2].color = 0x000080;
+    check(centre(blended) == 15, "Subtract darkens the farther object");
+    blended.nodes[2].shading = Shading::Multiply; blended.nodes[2].color = 0x808080;
+    check(centre(blended) == 16, "Multiply darkens the farther object");
 
     //depth fog: one alpha per triangle (FAST_Z), blended by the fast spans; the cube's front is ~3 m away.
     auto fog = [&](float begin, float end){
@@ -144,6 +149,56 @@ int main(){
     Description ranged = scene();
     ranged.nodes[2].visibility_end = 300;
     check(centre(ranged) == rgb565(0x161c28), "visibility range: the cube beyond its end is not drawn");
+
+    //lens flare composited while the rows are sent, like the 2D nodes.
+    Description flare = scene();
+    auto sun = node(8, 0, NodeType::DirectionalLight3D, "Sun");
+    sun.rotation = {0, 180, 0};
+    flare.nodes.push_back(sun);
+    const uint16_t dark = centre(flare);
+    flare.nodes.back().extras().lens_flare = true;
+    flare.nodes[2].visible = false;
+    Description noCube = flare;
+    noCube.nodes.back().extras().lens_flare = false;
+    check((centre(flare) & 31) > (centre(noCube) & 31) && dark != 0, "lens flare: the sun's glow is added in the scanout");
+
+    //Water reads its reflection from the previous field when the firmware passes it (here all green)
+    {
+        Description lake = scene();
+        auto water = node(10, 0, NodeType::MeshInstance3D, "Water");
+        water.shape = Shape::Plane; water.shading = Shading::Water; water.alpha = 0.8f; water.color = 0x000000; water.scale = {20, 1, 20};
+        lake.nodes.push_back(water);
+        auto green = [&](bool previous){
+            Runtime r;
+
+            if(!r.load(lake, error) || !r.start(diagnostics)) return size_t(0);
+
+            const size_t size = size_t(r.bufferWidth()) * r.bufferRows();
+            std::vector<uint16_t> drawn(size), sent(size, rgb565(0x00ff00));
+            r.set_framebuffer(drawn.data());
+            r.set_reflect_buffer(previous ? sent.data() : nullptr);
+            r.render();
+            size_t count = 0;
+
+            for(size_t i = size * 3 / 4; i < size; ++i) count += ((drawn[i] >> 5) & 63) > 20 && (drawn[i] >> 11) < 6;
+
+            return count;
+        };
+        check(green(true) > 500 && green(false) == 0, "Water reflects the previous field when the firmware passes it");
+    }
+
+    //CRT scanlines on the half-width fields: one row of each pair darker, as on the PC.
+    Description crt = scene();
+    auto crtEnv = node(9, 0, NodeType::WorldEnvironment, "Env");
+    crtEnv.extras().crt = true;
+    crtEnv.extras().crt_intensity = 128;
+    crt.nodes.push_back(crtEnv);
+    Runtime scan;
+    check(scan.load(crt, error) && scan.start(diagnostics), "CRT scene starts");
+    Device rows;
+    rows.frame(scan);
+    rows.frame(scan);
+    check(rows.at(Width / 2, Height / 2) != rows.at(Width / 2, Height / 2 + 1), "CRT: alternate rows differ on the device fields");
 
     //panorama sky into the half-width field layout.
     Description sky = scene();
@@ -257,5 +312,5 @@ int main(){
     check(!runtime.load(wrong, error) && error.find("321") != std::string::npos, "odd or out-of-range resolutions are rejected");
 
     if(failures){ std::cerr << failures << " device test(s) failed\n"; return 1; }
-    std::cout << "PASS: device profile (half-width fields, no z-buffer): layout, parity, HUD rows, draw bands, panorama, resolutions, puffs\n";
+    std::cout << "PASS: device profile (half-width fields, no z-buffer): layout, parity, HUD rows, draw bands, fog, visibility range, lens flare, CRT, panorama, resolutions, puffs\n";
 }

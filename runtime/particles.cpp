@@ -335,7 +335,9 @@ namespace jetstudio{
         for(const auto& n : nodes_){
             if(!n.object || n.freed || !n.worldVisible || n.d.type != NodeType::MeshInstance3D) continue;
 
-            if(n.d.draw_order == DrawOrder::Background || n.d.alpha < 0.99f || n.d.shading == Shading::Additive) continue;
+            const bool seeThrough = n.d.shading == Shading::Additive || n.d.shading == Shading::Subtract || n.d.shading == Shading::Multiply;
+
+            if(n.d.draw_order == DrawOrder::Background || n.d.alpha < 0.99f || seeThrough) continue;
 
             const float ox = n.world.origin.x * JetUnits, oy = n.world.origin.y * JetUnits, oz = -n.world.origin.z * JetUnits;
             float c[3];

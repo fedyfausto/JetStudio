@@ -300,15 +300,22 @@ The engine classes form this hierarchy. Properties use Godot names.
   `_SELF`). Outside the range the node is not drawn; with `_SELF` it dissolves from `end` to `end + end_margin` and
   appears from `begin - begin_margin` to `begin`.
 - **MeshInstance3D** (extends GeometryInstance3D): `color`, `alpha`, `uv_offset`, `uv_scale`
-  (Vector3, x and y used), `perspective_correct`, `texture_filter` (0 nearest, 1 linear).
+  (Vector3, x and y used), `perspective_correct`, `texture_filter` (0 nearest, 1 linear), `shading` (the Inspector's
+  Shading: `MeshInstance3D.SHADING_GOURAUD`, `_FLAT`, `_UNLIT`, `_PHONG`, `_ADDITIVE`, `_WATER`, `_SUBTRACT`, `_MULTIPLY`).
 - **Sprite3D** (extends GeometryInstance3D): `frame`, `hframes`, `vframes`, `flip_h`, `flip_v`, `pixel_size`,
   `modulate`. One frame of its texture's sprite sheet (left to right, then top to bottom) as a quad,
   unlit and double-sided; setting `frame` animates it. Billboard is set in the Inspector.
-- **Camera3D** (extends Node3D): `fov`, `near`, `far`, `current`, `make_current()`.
-- **DirectionalLight3D** (extends Node3D): `light_color`, `light_energy`.
+- **Camera3D** (extends Node3D): `fov`, `near`, `far`, `current`, `make_current()`, `unproject_position(world)` (the
+  screen pixel, Vector2, where this camera shows a 3D point: a 2D halo or label can follow a 3D object),
+  `is_position_behind(world)`.
+- **DirectionalLight3D** (extends Node3D): `light_color`, `light_energy`, `lens_flare` (Jet's lens flare, drawn when the
+  light's direction is in view; opaque meshes and sprites in front of the light hide it).
 - **WorldEnvironment** (extends Node): `background_color`, `ambient_color`, `fog_enabled`, `fog_depth_begin`,
   `fog_depth_end` (metres). Godot reaches these through `environment`; here they are on the node. The fog is
   Jet's depth fog: geometry fades into the background between the two distances, with no fog color of its own.
+  Post-processing: `crt_scanlines`, `crt_intensity` (0 to 1, how dark the lines are), `cel_shading`,
+  `cel_shading_bands` (4, 8, 16 or 32), `fxaa`, `bloom`, `pixelate`, `chromatic_aberration`, `motion_blur`.
+  On the boards only the CRT scanlines are drawn; the other effects are for the PC player.
 - **CollisionObject3D** (extends Node3D; bodies and areas): `collision_layer`,
   `collision_mask` (bit masks; two objects collide when either mask has a bit of
   the other's layer, as in Godot).
@@ -336,7 +343,8 @@ The engine classes form this hierarchy. Properties use Godot names.
 - **Node2D** (extends Node; drawn over the 3D scene and under the Controls, in canvas pixels with y
   growing downwards): `position`, `global_position`, `scale` (Vector2), `rotation` (radians, clockwise),
   `rotation_degrees`, `z_index`, `visible`, `modulate`, `alpha` (Godot's `modulate.a`, inherited by the
-  2D children), `translate(v)`, `rotate(radians)`, `look_at(point)`, `show()`, `hide()`,
+  2D children), `blend_mode` (`CanvasItemMaterial.BLEND_MODE_MIX`, `_ADD`, `_SUB`, `_MUL`: Godot sets it on the node's
+  CanvasItemMaterial, here it is on the node; premultiplied alpha is not supported), `translate(v)`, `rotate(radians)`, `look_at(point)`, `show()`, `hide()`,
   `is_visible_in_tree()`. A 2D node under a 2D parent moves, turns and hides with it. Higher `z_index`
   (added to the parent's) is drawn in front; with the same z, the later node in the tree.
 - **Sprite2D** (extends Node2D): `frame`, `hframes`, `vframes`, `flip_h`, `flip_v`, `centered`,
@@ -396,7 +404,7 @@ The engine classes form this hierarchy. Properties use Godot names.
   with the other deferred calls. Blending and the RESET animation are not supported.
 - **Control** (extends Node; 2D nodes drawn over the 3D scene, in screen pixels
   of the display, 320×240 unless the project hardware sets another resolution): `position` and `size` (Vector2, a Vector3
-  is accepted too; position is relative to a parent Control), `visible`, `alpha`, `show()`, `hide()`. A plain Control draws
+  is accepted too; position is relative to a parent Control), `visible`, `alpha`, `blend_mode` (as Node2D's), `show()`, `hide()`. A plain Control draws
   nothing: it groups other 2D nodes (a HUD), which are hidden with it and inherit its `alpha`.
 - **Label** (extends Control): `text`, `color`. Built-in 7×15 bitmap font
   (ASCII and Latin-1 accented letters), `\n` starts a new line.

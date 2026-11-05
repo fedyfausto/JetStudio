@@ -1,0 +1,126 @@
+diff --git a/src/PostFX.hpp b/src/PostFX.hpp
+--- a/src/PostFX.hpp
++++ b/src/PostFX.hpp
+@@ -69,6 +69,9 @@
+     // Layout: 4 * screenWidth int16s, indexed [x*4 + {0=r,1=g,2=b,3=lum}].
+     int16_t* fxaaTopRow;
+     #endif
++    #if POSTFX_CHROMATIC
++    uint16_t* chromaticRow;  ///< One row of scratch for the channel shift.
++    #endif
+ };
+ 
+ } // namespace Renderer
+diff --git a/src/PostFX.cpp b/src/PostFX.cpp
+--- a/src/PostFX.cpp
++++ b/src/PostFX.cpp
+@@ -117,9 +117,16 @@
+     // framebuffer pixel is unpacked exactly once per FXAA pass.
+     fxaaTopRow = new int16_t[screenWidth * 4];
+     #endif
++    #if POSTFX_CHROMATIC
++    chromaticRow = new uint16_t[screenWidth];
++    #endif
+ }
+ 
+ PostFX::~PostFX() {
++    #if POSTFX_CHROMATIC
++    delete[] chromaticRow;
++    chromaticRow = nullptr;
++    #endif
+     #if POSTFX_BLOOM
+     if (bloomBuffer) {
+         delete[] bloomBuffer;
+@@ -444,29 +451,18 @@
+ 
+ void PostFX::applyChromatic(uint16_t* framebuffer) {
+     #if POSTFX_CHROMATIC
+-    // We'll need a temporary buffer to avoid artifacts
+-    uint16_t* temp = new uint16_t[screenWidth * screenHeight];
+-    memcpy(temp, framebuffer, screenWidth * screenHeight * sizeof(uint16_t));
+-    
++    // Red is taken CHROMATIC_OFFSET pixels to the left and blue as far to the right (clamped at the edges),
++    // green stays: one row of scratch instead of a whole frame allocated per call.
+     for (int y = 0; y < screenHeight; y++) {
++        uint16_t* line = framebuffer + y * screenWidth;
++        memcpy(chromaticRow, line, screenWidth * sizeof(uint16_t));
++
+         for (int x = 0; x < screenWidth; x++) {
+-            uint16_t pixel = temp[y * screenWidth + x];
+-            int r = (pixel >> 11) & 0x1F;
+-            int g = (pixel >> 5) & 0x3F;
+-            int b = pixel & 0x1F;
+-            
+-            // Offset red and blue channels
+-            int rx = x + CHROMATIC_OFFSET;
+-            int bx = x - CHROMATIC_OFFSET;
+-            
+-            if (rx < screenWidth)
+-                framebuffer[y * screenWidth + x] = ((r << 11) | (g << 5) | b);
+-            if (bx >= 0)
+-                framebuffer[y * screenWidth + x] |= b;
+-        }
+-    }
+-    
+-    delete[] temp;
++            const int rx = std::max(0, x - CHROMATIC_OFFSET);
++            const int bx = std::min(screenWidth - 1, x + CHROMATIC_OFFSET);
++            line[x] = (uint16_t)((chromaticRow[rx] & 0xF800) | (chromaticRow[x] & 0x07E0) | (chromaticRow[bx] & 0x001F));
++        }
++    }
+     #endif
+ }
+ 
+diff --git a/src/Scene.hpp b/src/Scene.hpp
+--- a/src/Scene.hpp
++++ b/src/Scene.hpp
+@@ -39,6 +39,8 @@
+     bool crtEnabled = true;
+     uint8_t crtIntensity = CRT_SCANLINE_INTENSITY;
+     #endif
++    /// Runtime switches for the buffered PostFX passes; each still needs its POSTFX_* flag compiled in.
++    bool fxaaEnabled = true, bloomEnabled = true, pixelateEnabled = true, chromaticEnabled = true, motionBlurEnabled = true;
+ 
+     int   frameCounter = 0;       ///< Incremented once per render(); useful for animations and dither parity.
+     float waterTime    = 0.0f;    ///< Accumulated wall-clock seconds; set each frame by the caller before render/prepareFrame.
+diff --git a/src/Scene.cpp b/src/Scene.cpp
+--- a/src/Scene.cpp
++++ b/src/Scene.cpp
+@@ -939,11 +939,13 @@
+     #endif
+ 
+     #if POSTFX_ANTIALIASING
+-    postFX->applyFXAA(framebuffer);
++    if (fxaaEnabled)
++        postFX->applyFXAA(framebuffer);
+     #endif
+ 
+     #if POSTFX_BLOOM
+-    postFX->applyBloom(framebuffer);
++    if (bloomEnabled)
++        postFX->applyBloom(framebuffer);
+     #endif
+ 
+     #if POSTFX_CRT
+@@ -953,15 +955,18 @@
+     #endif
+ 
+     #if POSTFX_PIXELATE
+-    postFX->applyPixelate(framebuffer);
++    if (pixelateEnabled)
++        postFX->applyPixelate(framebuffer);
+     #endif
+ 
+     #if POSTFX_CHROMATIC
+-    postFX->applyChromatic(framebuffer);
++    if (chromaticEnabled)
++        postFX->applyChromatic(framebuffer);
+     #endif
+ 
+     #if POSTFX_MOTION_BLUR
+-    postFX->applyMotionBlur(framebuffer);
++    if (motionBlurEnabled)
++        postFX->applyMotionBlur(framebuffer);
+     #endif
+ 
+     drawSprites();

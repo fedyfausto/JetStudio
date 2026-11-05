@@ -1,0 +1,124 @@
+diff --git a/src/Material.hpp b/src/Material.hpp
+--- a/src/Material.hpp
++++ b/src/Material.hpp
+@@ -22,6 +22,10 @@
+                    ///<   is added to the destination channel and clamped at the channel maximum.
+                    ///<   Use for neon signs, lamp coronas, explosion halos, and faked dynamic lights.
+                    ///<   Lighting is always bypassed (fully emissive); material->color is the glow tint.
++    SUBTRACT,      ///< Saturating-subtract blend: the source (scaled by material->alpha/255) is taken
++                   ///<   away from the destination. Unlit, like ADDITIVE. Use for fake shadows and dark decals.
++    MULTIPLY,      ///< Multiply blend: the destination is multiplied by the source, faded toward white
++                   ///<   by material->alpha/255. Unlit, like ADDITIVE. Use for tinted glass and stains.
+ };
+ 
+ /// @brief Surface description: base colour, optional texture/shader and lighting parameters.
+diff --git a/src/Renderer.cpp b/src/Renderer.cpp
+--- a/src/Renderer.cpp
++++ b/src/Renderer.cpp
+@@ -97,6 +97,31 @@
+     return (uint16_t)((r << 11) | (g << 5) | b);
+ }
+ 
++// Saturating-subtract blend in RGB565: the source, scaled as in
++// addBlendRGB565, is taken away from the destination and clamped at zero.
++static inline uint16_t subBlendRGB565(uint16_t dst, uint16_t src, uint8_t alpha)
++{
++    const uint32_t a  = (uint32_t)alpha + 1u;
++    const int32_t r = (int32_t)((dst >> 11) & 0x1Fu) - (int32_t)((((src >> 11) & 0x1Fu) * a) >> 8);
++    const int32_t g = (int32_t)((dst >>  5) & 0x3Fu) - (int32_t)((((src >>  5) & 0x3Fu) * a) >> 8);
++    const int32_t b = (int32_t)( dst        & 0x1Fu) - (int32_t)(((( src       & 0x1Fu)) * a) >> 8);
++    return (uint16_t)(((r > 0 ? r : 0) << 11) | ((g > 0 ? g : 0) << 5) | (b > 0 ? b : 0));
++}
++
++// Multiply blend in RGB565. Lower alpha fades the source toward white, so
++// alpha=0 leaves the destination unchanged.
++static inline uint16_t mulBlendRGB565(uint16_t dst, uint16_t src, uint8_t alpha)
++{
++    const uint32_t a  = (uint32_t)alpha + 1u;
++    const uint32_t sr = 0x1Fu - (((0x1Fu - ((src >> 11) & 0x1Fu)) * a) >> 8);
++    const uint32_t sg = 0x3Fu - (((0x3Fu - ((src >>  5) & 0x3Fu)) * a) >> 8);
++    const uint32_t sb = 0x1Fu - (((0x1Fu - ( src        & 0x1Fu)) * a) >> 8);
++    const uint32_t r = (((dst >> 11) & 0x1Fu) * sr + 15u) / 0x1Fu;
++    const uint32_t g = (((dst >>  5) & 0x3Fu) * sg + 31u) / 0x3Fu;
++    const uint32_t b = (( dst        & 0x1Fu) * sb + 15u) / 0x1Fu;
++    return (uint16_t)((r << 11) | (g << 5) | b);
++}
++
+ static inline void fillRGB565Span(uint16_t* framebuffer, int32_t bufferIndex, int32_t count, uint16_t color)
+ {
+     if (count <= 0) return;
+@@ -433,6 +458,9 @@
+ #endif
+         const bool isWaterReflect = (material->shadingMode == ShadingMode::WATER_REFLECT);
+         const bool isAdditive     = (material->shadingMode == ShadingMode::ADDITIVE);
++        // SUBTRACT and MULTIPLY only run on the general per-pixel path.
++        const bool isSubtract     = (material->shadingMode == ShadingMode::SUBTRACT);
++        const bool isMultiply     = (material->shadingMode == ShadingMode::MULTIPLY);
+         // Parallel-band ordering guards (see Renderer.hpp skipWaterReflect /
+         // waterReflectOnly).  skipWaterReflect is set on all parallel-band
+         // copies so SSR-reading triangles are deferred; waterReflectOnly is
+@@ -444,11 +472,12 @@
+         bool emissive = material->emissive
+                      || (material->shadingMode == ShadingMode::UNLIT)
+                      || isWaterReflect
+-                     || isAdditive;  // additive glows never receive directional light
++                     || isAdditive  // additive glows never receive directional light
++                     || isSubtract || isMultiply;
+ #endif
+ 
+ #if JET_FAST_SIMPLE_SPANS
+-        const bool simpleMaterial = !material->shader
++        const bool simpleMaterial = !material->shader && !isSubtract && !isMultiply
+     #if LIGHTING
+             && emissive
+     #endif
+@@ -917,7 +946,7 @@
+         }
+ #endif
+ 
+-        const bool plainOpaqueReplace = (alpha == 255 && !isWaterReflect && !isAdditive);
++        const bool plainOpaqueReplace = (alpha == 255 && !isWaterReflect && !isAdditive && !isSubtract && !isMultiply);
+ #if JET_FAST_OPAQUE_UNLIT_SPANS
+         const bool fastOpaqueUnlit = alpha == 255 && !material->shader &&
+             material->shadingMode == ShadingMode::UNLIT
+@@ -2187,6 +2216,17 @@
+                     color    = addBlendRGB565(framebuffer[bufferIndex], color, pixAlpha);
+                     pixAlpha = 255;
+                 }
++                else if (isSubtract || isMultiply)
++                {
++#if TEXTURE_MAPPING
++                    if (!diffuseMap && !material->shader) color = baseColor;
++#else
++                    if (!material->shader) color = baseColor;
++#endif
++                    color    = isSubtract ? subBlendRGB565(framebuffer[bufferIndex], color, pixAlpha)
++                                          : mulBlendRGB565(framebuffer[bufferIndex], color, pixAlpha);
++                    pixAlpha = 255;
++                }
+ 
+     #if !DEBUG_OVERDRAW
+     #if SCREEN_DOOR_ALPHA
+diff --git a/src/Scene.cpp b/src/Scene.cpp
+--- a/src/Scene.cpp
++++ b/src/Scene.cpp
+@@ -1296,7 +1296,9 @@
+         if (!m || m->shader || (!m->emissive &&
+             m->shadingMode != ShadingMode::UNLIT &&
+             m->shadingMode != ShadingMode::WATER_REFLECT &&
+-            m->shadingMode != ShadingMode::ADDITIVE)) {
++            m->shadingMode != ShadingMode::ADDITIVE &&
++            m->shadingMode != ShadingMode::SUBTRACT &&
++            m->shadingMode != ShadingMode::MULTIPLY)) {
+             unlitObject = false; break;
+         }
+     }
+@@ -1722,6 +1724,8 @@
+                 const bool opaque = renderer->isDepthTestingEnabled() && !DEPTH_ALPHA_BLEND && mat && mat->alpha == 255
+                     && objAlpha == 255 && !mat->shader
+                     && mat->shadingMode != ShadingMode::ADDITIVE
++                    && mat->shadingMode != ShadingMode::SUBTRACT
++                    && mat->shadingMode != ShadingMode::MULTIPLY
+                     && mat->shadingMode != ShadingMode::WATER_REFLECT
+                     && mat->shadingMode != ShadingMode::WIREFRAME;
+                 bucket = static_cast<uint8_t>(opaque ? 1 + b : K + K - b);

@@ -25,11 +25,11 @@ def generateScene(pack, firmware):
 
     if version < 18:
         #the editor exports with the bridge it loaded at startup, so an old version means a stale editor.
-        raise RuntimeError(f"The package is version {version}, the firmware reads version 18: Jet Studio was updated "
+        raise RuntimeError(f"The package is version {version}, the firmware reads versions 18 to 20: Jet Studio was updated "
                            "while it was running. Restart Jet Studio and build again")
 
-    if version != 18:
-        raise RuntimeError(f"Unknown .jetpack version {version} (expected 18): update Jet Studio")
+    if version > 20:
+        raise RuntimeError(f"Unknown .jetpack version {version} (expected 18 to 20): update Jet Studio")
 
     if len(data) > 1024 * 1024:
         raise RuntimeError("Scene package larger than 1 MiB")

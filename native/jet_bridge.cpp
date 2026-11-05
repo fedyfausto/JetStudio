@@ -240,11 +240,16 @@ namespace{
 
             Variant value = images.get(path, Variant());
             int mode = 0;
+            uint32_t paletteFps = 0;
 
             if(value.get_type() == Variant::DICTIONARY){
                 const Dictionary entry = value;
 
-                if(!choice(entry, "palette", mode, {"Auto", "Quantize", "RGB565"})){ error = "Invalid palette mode: " + path; return -2; }
+                if(!choice(entry, "palette", mode, {"Auto", "Quantize", "RGB565"}) || !integer(entry, "palette_fps", paletteFps, 127)){
+                    error = "Invalid import options: " + path;
+                    return -2;
+                }
+
                 value = entry.get("image", Variant());
             }
 
@@ -254,7 +259,7 @@ namespace{
 
             auto& entry = (*textures)[p];
 
-            if(entry.image != image->get_instance_id() || entry.mode != mode){
+            if(entry.image != image->get_instance_id() || entry.mode != mode || entry.paletteFps != paletteFps){
                 const Ref<Image> rgba = rgba8(image);
 
                 if(rgba.is_null()){
@@ -267,7 +272,7 @@ namespace{
                 std::string message;
 
                 if(!jetstudio::makeTexture(p, rgba->get_width(), rgba->get_height(), bytes.ptr(), entry.asset, message,
-                                             jetstudio::PaletteMode(mode))){
+                                             jetstudio::PaletteMode(mode), uint8_t(paletteFps))){
                     textures->erase(p);
                     error = gd(message);
                     return -2;
@@ -275,6 +280,7 @@ namespace{
 
                 entry.image = image->get_instance_id();
                 entry.mode = mode;
+                entry.paletteFps = paletteFps;
             }
 
             d.textures.push_back(entry.asset);
@@ -367,14 +373,17 @@ namespace{
                     && flag(node, "visible", n.visible)
                     && choice(node, "mesh", n.shape, {"Box", "Sphere", "Plane", "Pyramid", "Cylinder", "Capsule", "Quad", "Torus", "File"})
                     && integer(node, "color", n.color, 0xffffff)
-                    && choice(node, "shading", n.shading, {"Gouraud", "Flat", "Unlit", "Phong", "Additive", "Water"})
+                    && choice(node, "shading", n.shading, {"Gouraud", "Flat", "Unlit", "Phong", "Additive", "Water", "Subtract", "Multiply"})
                     && vec(node, "uv_scale", uv_scale) && vec(node, "uv_offset", uv_offset)
                     && choice(node, "texture_filter", filter, {"Nearest", "Linear"})
                     && flag(node, "texture_repeat", n.repeat) && flag(node, "perspective_correct", n.perspective)
+                    && choice(node, "texture_border", n.black_border, {"Clamp", "Black"})
                     && real(node, "alpha", n.alpha) && real(node, "specular", n.specular) && integer(node, "shininess", shininess, 255)
                     && choice(node, "cull_mode", n.cull, {"Back", "Front", "Disabled"}) && flag(node, "billboard", n.billboard)
                     && choice(node, "draw_order", n.draw_order, {"Default", "Background", "On Top"})
                     && real(node, "diffuse", n.diffuse) && flag(node, "reflection", n.reflection)
+                    && flag(node, "water_far_edge", n.water_far_edge)
+                    && choice(node, "blend_mode", n.blend_mode, {"Mix", "Add", "Subtract", "Multiply"})
                     && vec(node, "size", n.extras().size)
                     && choice(node, "background_mode", n.extras().background_mode, {"Color", "Gradient", "Panorama"})
                     && integer(node, "sky_top_color", n.extras().skyTop, 0xffffff) && integer(node, "sky_horizon_color", n.extras().skyHorizon, 0xffffff)
@@ -382,9 +391,19 @@ namespace{
                     && integer(node, "ground_bottom_color", n.extras().groundBottom, 0xffffff)
                     && real(node, "fov", n.extras().fov) && real(node, "near", n.extras().near) && real(node, "far", n.extras().far) && flag(node, "current", n.extras().current)
                     && integer(node, "light_color", n.extras().light_color, 0xffffff) && real(node, "light_energy", n.extras().energy)
+                    && flag(node, "lens_flare", n.extras().lens_flare)
                     && integer(node, "background_color", n.extras().background, 0xffffff) && integer(node, "ambient_color", n.extras().ambient, 0xffffff)
                     && flag(node, "fog_enabled", n.extras().fog_enabled) && real(node, "fog_depth_begin", n.extras().fog_begin)
                     && real(node, "fog_depth_end", n.extras().fog_end);
+                //post-processing: CRT intensity 0..1 in the scene, cel shading bands 4..32 (low lighting bits dropped 6..3)
+                float crtIntensity = n.more().crt_intensity / 255.0f;
+                int bands = 6 - n.more().cel_bits;
+                ok = ok && flag(node, "crt_scanlines", n.extras().crt) && real(node, "crt_intensity", crtIntensity)
+                    && flag(node, "cel_shading", n.extras().cel_shading) && choice(node, "cel_shading_bands", bands, {"4", "8", "16", "32"})
+                    && flag(node, "fxaa", n.extras().fxaa) && flag(node, "bloom", n.extras().bloom) && flag(node, "pixelate", n.extras().pixelate)
+                    && flag(node, "chromatic_aberration", n.extras().chromatic) && flag(node, "motion_blur", n.extras().motion_blur);
+                n.extras().crt_intensity = uint8_t(std::clamp(std::round(crtIntensity * 255), 0.0f, 255.0f));
+                n.extras().cel_bits = uint8_t(6 - bands);
                 //GeometryInstance3D visibility range, metres in the scene and cm in the runtime
                 float range[4] = {0, 0, 0, 0};
                 ok = ok && real(node, "visibility_range_begin", range[0]) && real(node, "visibility_range_begin_margin", range[1])
@@ -446,7 +465,8 @@ namespace{
                 //Sprite3D, Godot's names; modulate is the colour that tints the texture.
                 uint32_t hframes = n.hframes, vframes = n.vframes, frame = n.frame;
                 ok = ok && integer(node, "hframes", hframes, 256) && integer(node, "vframes", vframes, 256) && integer(node, "frame", frame, 65535)
-                    && flag(node, "flip_h", n.flip_h) && flag(node, "flip_v", n.flip_v) && real(node, "pixel_size", n.pixel_size);
+                    && flag(node, "flip_h", n.flip_h) && flag(node, "flip_v", n.flip_v) && real(node, "pixel_size", n.pixel_size)
+                    && flag(node, "mirror_h", n.mirror_h) && flag(node, "mirror_v", n.mirror_v);
                 n.hframes = uint16_t(std::max<uint32_t>(1, hframes));
                 n.vframes = uint16_t(std::max<uint32_t>(1, vframes));
                 n.frame = uint16_t(frame);
@@ -563,6 +583,7 @@ void JetBridge::_bind_methods(){
     ClassDB::bind_method(D_METHOD("texture_info", "image", "palette"), &JetBridge::texture_info);
     ClassDB::bind_method(D_METHOD("set_editor_camera", "position", "rotation", "fov"), &JetBridge::set_editor_camera);
     ClassDB::bind_method(D_METHOD("use_editor_camera", "enabled"), &JetBridge::use_editor_camera);
+    ClassDB::bind_method(D_METHOD("set_wireframe", "enabled"), &JetBridge::set_wireframe);
     ClassDB::bind_method(D_METHOD("set_editor_canvas", "enabled", "zoom", "origin"), &JetBridge::set_editor_canvas);
     ClassDB::bind_method(D_METHOD("preview_animation", "player", "name", "time"), &JetBridge::preview_animation);
     ClassDB::bind_method(D_METHOD("update", "delta"), &JetBridge::update);
@@ -777,6 +798,7 @@ void JetBridge::set_editor_camera(const godot::Vector3& p, const godot::Vector3&
     runtime_.set_editor_camera({float(p.x), float(p.y), float(p.z)}, {float(r.x), float(r.y), float(r.z)}, float(fov));
 }
 void JetBridge::use_editor_camera(bool enabled){ runtime_.use_editor_camera(enabled); }
+void JetBridge::set_wireframe(bool enabled){ runtime_.set_wireframe(enabled); }
 bool JetBridge::preview_animation(int player, const String& name, double time){
     return runtime_.preview_animation(uint32_t(player), utf8(name), float(time));
 }

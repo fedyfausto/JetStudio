@@ -6,7 +6,7 @@
 // Scripts travel as bytecode so devices only need the VM. Everything is validated again after decoding.
 namespace jetstudio{
     namespace{
-        constexpr uint32_t Magic = 0x5054454a, Version = 18;
+        constexpr uint32_t Magic = 0x5054454a, Version = 20;
 
         struct Writer{
             std::vector<uint8_t> out;
@@ -50,6 +50,8 @@ namespace jetstudio{
             const uint8_t* p;
             size_t remaining;
             bool ok = true;
+            // the package's format: 18 has no post-processing fields
+            uint32_t version = Version;
             bool take(size_t n){
                 if(!ok || remaining < n){ ok = false; return false; }
                 return true;
@@ -154,7 +156,8 @@ namespace jetstudio{
         w.u32(uint32_t(d.textures.size()));
 
         for(const auto& t : d.textures){
-            w.str(t.path); w.u16(t.width); w.u16(t.height); w.u8(t.has_alpha ? 1 : 0); w.u16(t.alphaColor);
+            //bit 0 colour key, bits 1-7 palette cycling speed
+            w.str(t.path); w.u16(t.width); w.u16(t.height); w.u8(uint8_t((t.has_alpha ? 1 : 0) | (t.palette_fps << 1))); w.u16(t.alphaColor);
             w.u16(uint16_t(t.palette.size()));
 
             for(uint16_t c : t.palette) w.u16(c);
@@ -185,7 +188,8 @@ namespace jetstudio{
                 w.f32(n.more().fov); w.f32(n.more().near); w.f32(n.more().far); w.u8(n.more().current ? 1 : 0);
                 w.u32(n.more().light_color); w.f32(n.more().energy); w.u32(n.more().background); w.u32(n.more().ambient);
                 w.u32(uint32_t(n.texture)); w.f32(n.uv_scale[0]); w.f32(n.uv_scale[1]); w.f32(n.uv_offset[0]); w.f32(n.uv_offset[1]);
-                w.u8(uint8_t((n.bilinear ? 1 : 0) | (n.repeat ? 2 : 0) | (n.perspective ? 4 : 0) | (n.billboard ? 8 : 0) | (n.reflection ? 16 : 0)));
+                w.u8(uint8_t((n.bilinear ? 1 : 0) | (n.repeat ? 2 : 0) | (n.perspective ? 4 : 0) | (n.billboard ? 8 : 0) | (n.reflection ? 16 : 0)
+                             | (n.black_border ? 32 : 0) | (n.water_far_edge ? 64 : 0)));
                 w.f32(n.alpha); w.f32(n.specular); w.u8(n.shininess); w.u8(uint8_t(n.cull)); w.u8(uint8_t(n.draw_order));
                 w.u8(uint8_t(n.more().background_mode)); w.u32(n.more().skyTop); w.u32(n.more().skyHorizon); w.u32(n.more().groundHorizon); w.u32(n.more().groundBottom);
                 w.u32(uint32_t(n.more().sky_texture));
@@ -200,12 +204,18 @@ namespace jetstudio{
                 w.f32(n.more().velocityMin); w.f32(n.more().velocityMax); w.f32(n.more().damping_min); w.f32(n.more().damping_max); w.vec(n.more().gravity);
                 w.u8(uint8_t(n.more().particle_style)); w.u8(uint8_t(n.more().emission_shape)); w.f32(n.more().emissionRadius); w.vec(n.more().emissionBox);
                 w.u32(n.more().color_end); w.f32(n.more().puff_size); w.f32(n.more().puff_size_end);
-                w.u16(n.hframes); w.u16(n.vframes); w.u16(n.frame); w.u8(uint8_t((n.flip_h ? 1 : 0) | (n.flip_v ? 2 : 0))); w.f32(n.pixel_size);
+                w.u16(n.hframes); w.u16(n.vframes); w.u16(n.frame); w.u8(uint8_t((n.flip_h ? 1 : 0) | (n.flip_v ? 2 : 0) | (n.mirror_h ? 4 : 0) | (n.mirror_v ? 8 : 0) | uint8_t(n.blend_mode) << 4));
+                w.f32(n.pixel_size);
                 w.u16(uint16_t(n.z_index)); w.u8(n.centered ? 1 : 0); w.f32(n.offset[0]); w.f32(n.offset[1]);
                 w.str(n.more().animations); w.str(n.more().animation); w.f32(n.more().speed_scale); w.u8(n.more().autoplay ? 1 : 0);
                 w.f32(n.more().zoom[0]); w.f32(n.more().zoom[1]);
                 w.u16(n.visibility_begin); w.u16(n.visibility_begin_margin); w.u16(n.visibility_end); w.u16(n.visibility_end_margin);
-                w.u8(uint8_t((n.visibility_fade ? 1 : 0) | (n.more().fog_enabled ? 2 : 0))); w.f32(n.more().fog_begin); w.f32(n.more().fog_end);
+                w.u8(uint8_t((n.visibility_fade ? 1 : 0) | (n.more().fog_enabled ? 2 : 0) | (n.more().lens_flare ? 4 : 0)));
+                w.f32(n.more().fog_begin); w.f32(n.more().fog_end);
+                const auto& e = n.more();
+                w.u8(uint8_t((e.crt ? 1 : 0) | (e.cel_shading ? 2 : 0) | (e.fxaa ? 4 : 0) | (e.bloom ? 8 : 0) | (e.pixelate ? 16 : 0)
+                             | (e.chromatic ? 32 : 0) | (e.motion_blur ? 64 : 0)));
+                w.u8(e.crt_intensity); w.u8(e.cel_bits);
                 //AnimationPlayer
                 w.u16(uint16_t(n.more().playerAnimations.size()));
 
@@ -325,13 +335,15 @@ namespace jetstudio{
             if(particleFlags > 15 || style > uint8_t(ParticleStyle::Puff) || emission > uint8_t(EmissionShape::Box)) r.ok = false;
 
             e.particle_style = ParticleStyle(style); e.emission_shape = EmissionShape(emission);
-            n.reflection = (flags & 16) != 0;
+            n.reflection = (flags & 16) != 0; n.black_border = (flags & 32) != 0; n.water_far_edge = (flags & 64) != 0;
             n.hframes = r.u16(); n.vframes = r.u16(); n.frame = r.u16();
             const uint8_t spriteFlags = r.u8();
-            n.flip_h = spriteFlags & 1; n.flip_v = (spriteFlags & 2) != 0;
+            //version 20: mirroring (bits 2-3) and the 2D blend mode (bits 4-5)
+            n.flip_h = spriteFlags & 1; n.flip_v = (spriteFlags & 2) != 0; n.mirror_h = (spriteFlags & 4) != 0; n.mirror_v = (spriteFlags & 8) != 0;
+            n.blend_mode = CanvasBlend((spriteFlags >> 4) & 3);
             n.pixel_size = r.f32();
 
-            if(spriteFlags > 3) r.ok = false;
+            if(spriteFlags > 63) r.ok = false;
 
             n.z_index = int16_t(r.u16());
             const uint8_t centered = r.u8();
@@ -343,10 +355,21 @@ namespace jetstudio{
             e.zoom[0] = r.f32(); e.zoom[1] = r.f32();
             n.visibility_begin = r.u16(); n.visibility_begin_margin = r.u16(); n.visibility_end = r.u16(); n.visibility_end_margin = r.u16();
             const uint8_t rangeFlags = r.u8();
-            n.visibility_fade = rangeFlags & 1; e.fog_enabled = (rangeFlags & 2) != 0;
+            n.visibility_fade = rangeFlags & 1; e.fog_enabled = (rangeFlags & 2) != 0; e.lens_flare = (rangeFlags & 4) != 0;
             e.fog_begin = r.f32(); e.fog_end = r.f32();
+            uint8_t postFlags = 0;
 
-            if(centered > 1 || autoplay > 1 || rangeFlags > 3) r.ok = false;
+            if(r.version >= 19){
+                postFlags = r.u8();
+                e.crt_intensity = r.u8(); e.cel_bits = r.u8();
+            }
+
+            e.crt = postFlags & 1; e.cel_shading = (postFlags & 2) != 0; e.fxaa = (postFlags & 4) != 0; e.bloom = (postFlags & 8) != 0;
+            e.pixelate = (postFlags & 16) != 0; e.chromatic = (postFlags & 32) != 0; e.motion_blur = (postFlags & 64) != 0;
+
+            if(postFlags > 127 || e.cel_bits < 3 || e.cel_bits > 6) r.ok = false;
+
+            if(centered > 1 || autoplay > 1 || rangeFlags > 7) r.ok = false;
 
             const uint16_t animations = r.u16();
 
@@ -388,9 +411,9 @@ namespace jetstudio{
             n.script = int32_t(r.u32());
             const uint32_t overrides = r.u32();
 
-            if(type > uint8_t(NodeType::AnimationPlayer) || shape > uint8_t(Shape::Mesh) || shading > uint8_t(Shading::Water)
+            if(type > uint8_t(NodeType::AnimationPlayer) || shape > uint8_t(Shape::Mesh) || shading > uint8_t(Shading::Multiply)
                 || cull > uint8_t(CullMode::Disabled) || draw_order > uint8_t(DrawOrder::OnTop)
-                || background > uint8_t(Background::Panorama) || flags > 31
+                || background > uint8_t(Background::Panorama) || flags > 127
                 || visible > 1 || current > 1 || overrides > 256){ error = "Invalid node in the package."; return false; }
             n.type = NodeType(type); n.shape = Shape(shape); n.shading = Shading(shading);
             n.cull = CullMode(cull); n.draw_order = DrawOrder(draw_order); e.background_mode = Background(background);
@@ -431,7 +454,15 @@ namespace jetstudio{
         if(!data || size < 12){ error = "Truncated package."; return false; }
         Reader r{data, size};
 
-        if(r.u32() != Magic || r.u32() != Version){ error = "Unsupported JETP format (expected version 18): export the project again."; return false; }
+        if(r.u32() != Magic){ error = "Not a JETP package."; return false; }
+
+        r.version = r.u32();
+
+        if(r.version < 18 || r.version > Version){
+            error = "Unsupported JETP format (version " + std::to_string(r.version) + ", this Jet Studio reads 18 to 20): export the project again.";
+            return false;
+        }
+
         Description d;
         d.name = r.str(256);
         d.width = r.u16();
@@ -483,9 +514,11 @@ namespace jetstudio{
             const size_t count = size_t(t.width) * t.height;
             textureBytes += count * (colors ? 1 : 2);
 
-            if(alpha > 1 || colors > 256 || !t.width || !t.height || t.width > MaxTextureSide || t.height > MaxTextureSide
-                || textureBytes > MaxTextureBytes){ error = "Invalid texture in the package."; return false; }
-            t.has_alpha = alpha == 1;
+            t.has_alpha = alpha & 1;
+            t.palette_fps = uint8_t(alpha >> 1);
+
+            if(colors > 256 || !t.width || !t.height || t.width > MaxTextureSide || t.height > MaxTextureSide || textureBytes > MaxTextureBytes
+                || (t.palette_fps && (!colors || t.has_alpha))){ error = "Invalid texture in the package."; return false; }
 
             for(uint16_t k = 0; k < colors && r.ok; ++k) t.palette.push_back(r.u16());
 
@@ -573,7 +606,11 @@ namespace jetstudio{
 
         Reader r{data, size};
 
-        if(r.u32() != Magic || r.u32() != Version) return false;
+        if(r.u32() != Magic) return false;
+
+        const uint32_t version = r.u32();
+
+        if(version < 18 || version > Version) return false;
 
         r.str(256);
         width = r.u16();
@@ -586,8 +623,10 @@ namespace jetstudio{
         error.clear();
         nodes.clear();
 
-        if(!data || offset >= size){ error = "Truncated package."; return false; }
+        if(!data || size < 12 || offset >= size){ error = "Truncated package."; return false; }
         Reader r{data + offset, size - offset};
+        //the scene's nodes follow the format in the header
+        r.version = uint32_t(data[4]) | uint32_t(data[5]) << 8 | uint32_t(data[6]) << 16 | uint32_t(data[7]) << 24;
 
         if(!readNodes(r, nodes, connections, error)) return false;
 

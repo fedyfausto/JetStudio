@@ -55,7 +55,7 @@ const DESCRIPTIONS := {
 const MESHES := ["Box", "Sphere", "Plane", "Pyramid", "Cylinder", "Capsule", "Quad", "Torus", "File"]
 const MESH_ICONS := {"Box": "BoxMesh", "Sphere": "SphereMesh", "Plane": "PlaneMesh", "Pyramid": "PrismMesh",
 	"Cylinder": "CylinderMesh", "Capsule": "CapsuleMesh", "Quad": "QuadMesh", "Torus": "TorusMesh", "File": "ArrayMesh"}
-const SHADING := ["Gouraud", "Flat", "Unlit", "Phong", "Additive", "Water"]
+const SHADING := ["Gouraud", "Flat", "Unlit", "Phong", "Additive", "Water", "Subtract", "Multiply"]
 const IMAGE_EXTENSIONS := ["png"]
 const MODEL_EXTENSIONS := ["obj"]
 # Bitmap font cell of the runtime (runtime/font_data.hpp), for 2D gizmos.
@@ -82,6 +82,8 @@ const IMPORT_OPTIONS := {
 			"tooltip": "Auto: 8-bit palette if the image already has at most 256 colors, otherwise RGB565.\nQuantize: always reduces to 256 colors (half the memory, small loss).\nRGB565: always 16 bits per pixel."},
 		{"key": "flip_v", "label": "Flip V", "type": "bool", "default": false,
 			"tooltip": "Flips the image vertically (some model textures are saved upside down)."},
+		{"key": "palette_fps", "label": "Palette FPS", "type": "int", "default": 0, "min": 0, "max": 127,
+			"tooltip": "Palette cycling (Jet's palette animation): the colors, sorted from dark to light, shift by this many steps per second\nwhile the game runs, so gradients flow (water, lava, neon). 0 = still. Only for images without transparent pixels."},
 	],
 	"model": [
 		{"key": "scale", "type": "float", "default": 1.0, "min": 0.0001, "max": 1000.0, "step": 0.0001,
@@ -156,6 +158,9 @@ const PROPERTIES := {
 		{"key": "texture_filter", "label": "Filter", "type": "enum", "default": "Nearest", "options": ["Nearest", "Linear"], "group": "Material",
 			"visible_if": {"albedo_texture": "*"}, "tooltip": "Linear = bilinear: smoother, four reads per pixel."},
 		{"key": "texture_repeat", "label": "Repeat", "type": "bool", "default": true, "group": "Material", "visible_if": {"albedo_texture": "*"}},
+		{"key": "texture_border", "label": "Outside UV", "type": "enum", "default": "Clamp", "options": ["Clamp", "Black"], "group": "Material",
+			"visible_if": {"albedo_texture": "*", "texture_repeat": ["false"]},
+			"tooltip": "Without Repeat, what lies outside the texture: its edge pixels stretched (Clamp) or black (Jet's ZERO addressing)."},
 		{"key": "uv_scale", "label": "UV Scale", "type": "vector3", "default": [1.0, 1.0, 1.0], "group": "Material", "step": 0.01,
 			"visible_if": {"albedo_texture": "*"}, "tooltip": "Texture repetitions (x, y)."},
 		{"key": "uv_offset", "label": "UV Offset", "type": "vector3", "default": [0.0, 0.0, 0.0], "group": "Material", "step": 0.01,
@@ -163,7 +168,7 @@ const PROPERTIES := {
 		{"key": "perspective_correct", "label": "Perspective UV", "type": "bool", "default": true, "group": "Material",
 			"visible_if": {"albedo_texture": "*"}, "tooltip": "Off = affine mapping: faster, but the texture warps on slanted faces."},
 		{"key": "shading", "type": "enum", "default": "Gouraud", "options": SHADING, "group": "Material",
-			"tooltip": "Gouraud: per-vertex lighting. Flat: per face. Unlit: no lighting. Phong: per pixel, with highlights.\nAdditive: glow that adds up (neon, beams). Water: sky reflection with ripples."},
+			"tooltip": "Gouraud: per-vertex lighting. Flat: per face. Unlit: no lighting. Phong: per pixel, with highlights.\nAdditive: glow that adds up (neon, beams). Water: sky reflection with ripples.\nSubtract: darkens what is behind (fake shadows). Multiply: tints what is behind (stained glass)."},
 		{"key": "diffuse", "type": "float", "default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01, "group": "Material",
 			"visible_if": {"shading": ["Gouraud", "Flat", "Phong"]}, "tooltip": "How much diffuse light the surface reflects (lower = darker and glossier)."},
 		{"key": "reflection", "label": "Reflection", "type": "bool", "default": false, "group": "Material",
@@ -173,6 +178,9 @@ const PROPERTIES := {
 			"tooltip": "Opacity (1 = opaque). Below 1, the surface does not hide what is behind it."},
 		{"key": "specular", "type": "float", "default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01, "group": "Material",
 			"visible_if": {"shading": ["Phong", "Water"]}, "tooltip": "Phong: highlight intensity. Water: ripple amplitude."},
+		{"key": "water_far_edge", "label": "Mirror at Far Edge", "type": "bool", "default": false, "group": "Material",
+			"visible_if": {"shading": ["Water"]},
+			"tooltip": "Reflections mirror around the water's far edge on the screen instead of the horizon,\nso what stands on the far shore of a lake is reflected right below it (Jet's waterYBias)."},
 		{"key": "shininess", "type": "int", "default": 32, "min": 0, "max": 255, "group": "Material", "visible_if": {"shading": ["Phong"]},
 			"tooltip": "Size of the Phong highlight (higher = smaller and sharper)."},
 		{"key": "cull_mode", "type": "enum", "default": "Back", "options": ["Back", "Front", "Disabled"], "group": "Geometry",
@@ -193,6 +201,8 @@ const PROPERTIES := {
 	"DirectionalLight3D": [
 		{"key": "light_color", "label": "Color", "type": "color", "default": 0xffffff, "group": "Light"},
 		{"key": "light_energy", "label": "Energy", "type": "float", "default": 1.0, "min": 0.0, "max": 16.0, "step": 0.01, "group": "Light"},
+		{"key": "lens_flare", "label": "Lens Flare", "type": "bool", "default": false, "group": "Light",
+			"tooltip": "Jet's lens flare: a glow on the sun and reflections towards the screen centre when the light's direction\nis in view, in the light's color. Opaque meshes and sprites in front of the light hide it (it fades out);\nBackground geometry and see-through materials do not."},
 	],
 	"WorldEnvironment": [
 		{"key": "background_mode", "label": "Mode", "type": "enum", "default": "Color", "options": ["Color", "Gradient", "Panorama"], "group": "Background",
@@ -211,6 +221,24 @@ const PROPERTIES := {
 			"group": "Fog", "visible_if": {"fog_enabled": ["true"]}, "tooltip": "Distance where the fading starts."},
 		{"key": "fog_depth_end", "label": "Depth End", "type": "float", "default": 100.0, "min": 0.01, "max": 6000.0, "step": 0.1, "suffix": "m",
 			"group": "Fog", "visible_if": {"fog_enabled": ["true"]}, "tooltip": "Distance where the geometry is gone."},
+		{"key": "crt_scanlines", "label": "CRT Scanlines", "type": "bool", "default": false, "group": "Post-Processing",
+			"tooltip": "Jet's CRT effect: every other row is darker, like an old monitor. On the PC and the boards."},
+		{"key": "crt_intensity", "label": "CRT Intensity", "type": "float", "default": 0.19, "min": 0.0, "max": 1.0, "step": 0.01,
+			"group": "Post-Processing", "visible_if": {"crt_scanlines": ["true"]}, "tooltip": "How dark the scanlines are (1 = black)."},
+		{"key": "cel_shading", "label": "Cel Shading (PC)", "type": "bool", "default": false, "group": "Post-Processing",
+			"tooltip": "Lighting in flat bands, like a cartoon. PC player and editor only."},
+		{"key": "cel_shading_bands", "label": "Bands", "type": "enum", "default": "16", "options": ["4", "8", "16", "32"],
+			"group": "Post-Processing", "visible_if": {"cel_shading": ["true"]}, "tooltip": "Number of brightness steps."},
+		{"key": "fxaa", "label": "FXAA (PC)", "type": "bool", "default": false, "group": "Post-Processing",
+			"tooltip": "Smooths jagged edges. PC player and editor only: the boards draw half-width fields."},
+		{"key": "bloom", "label": "Bloom (PC)", "type": "bool", "default": false, "group": "Post-Processing",
+			"tooltip": "Bright areas glow (like Godot's Glow). PC player and editor only."},
+		{"key": "pixelate", "label": "Pixelate (PC)", "type": "bool", "default": false, "group": "Post-Processing",
+			"tooltip": "Big square pixels (mosaic). PC player and editor only."},
+		{"key": "chromatic_aberration", "label": "Chromatic Aberration (PC)", "type": "bool", "default": false, "group": "Post-Processing",
+			"tooltip": "Red and blue shifted apart, like a cheap lens. PC player and editor only."},
+		{"key": "motion_blur", "label": "Motion Blur (PC)", "type": "bool", "default": false, "group": "Post-Processing",
+			"tooltip": "Blends each frame with the previous one. PC player and editor only."},
 	],
 	"CollisionObject3D": [
 		{"key": "collision_layer", "label": "Layer", "type": "int", "default": 1, "min": 0, "max": 2147483647, "group": "Collision",
@@ -355,6 +383,8 @@ const PROPERTIES := {
 		{"key": "modulate", "type": "color", "default": 0xffffff, "group": "Visibility", "tooltip": "Color that multiplies the texture."},
 		{"key": "alpha", "label": "Opacity", "type": "float", "default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01, "group": "Visibility",
 			"tooltip": "Opacity, inherited by the 2D children (Godot's modulate.a)."},
+		{"key": "blend_mode", "label": "Blend Mode", "type": "enum", "default": "Mix", "options": ["Mix", "Add", "Subtract", "Multiply"], "group": "Material",
+			"tooltip": "Godot's CanvasItemMaterial blend mode. Add: glows and halos. Subtract: shadows. Multiply: tints what is behind."},
 	],
 	"Sprite2D": [
 		{"key": "texture", "type": "texture", "default": "", "group": "Sprite",
@@ -363,6 +393,10 @@ const PROPERTIES := {
 		{"key": "offset", "type": "vector2", "default": [0.0, 0.0], "step": 1.0, "suffix": "px", "group": "Sprite"},
 		{"key": "flip_h", "label": "Flip H", "type": "bool", "default": false, "group": "Sprite"},
 		{"key": "flip_v", "label": "Flip V", "type": "bool", "default": false, "group": "Sprite"},
+		{"key": "mirror_h", "label": "Mirror H", "type": "bool", "default": false, "group": "Sprite",
+			"tooltip": "Jet's mirroring: a flipped copy is added on the right, so a symmetric image is stored in half (less memory)."},
+		{"key": "mirror_v", "label": "Mirror V", "type": "bool", "default": false, "group": "Sprite",
+			"tooltip": "Jet's mirroring: a flipped copy is added below, so a symmetric image is stored in half (less memory)."},
 		{"key": "hframes", "type": "int", "default": 1, "min": 1, "max": 256, "group": "Animation", "tooltip": "Columns of the sprite sheet."},
 		{"key": "vframes", "type": "int", "default": 1, "min": 1, "max": 256, "group": "Animation", "tooltip": "Rows of the sprite sheet."},
 		{"key": "frame", "type": "int", "default": 0, "min": 0, "max": 65535, "group": "Animation",
@@ -382,6 +416,10 @@ const PROPERTIES := {
 		{"key": "offset", "type": "vector2", "default": [0.0, 0.0], "step": 1.0, "suffix": "px", "group": "Offset"},
 		{"key": "flip_h", "label": "Flip H", "type": "bool", "default": false, "group": "Offset"},
 		{"key": "flip_v", "label": "Flip V", "type": "bool", "default": false, "group": "Offset"},
+		{"key": "mirror_h", "label": "Mirror H", "type": "bool", "default": false, "group": "Offset",
+			"tooltip": "Jet's mirroring: a flipped copy is added on the right, so a symmetric image is stored in half (less memory)."},
+		{"key": "mirror_v", "label": "Mirror V", "type": "bool", "default": false, "group": "Offset",
+			"tooltip": "Jet's mirroring: a flipped copy is added below, so a symmetric image is stored in half (less memory)."},
 	],
 	"Camera2D": [
 		{"key": "enabled", "type": "bool", "default": true, "tooltip": "The first enabled Camera2D in the tree is the current one."},
@@ -394,6 +432,8 @@ const PROPERTIES := {
 		{"key": "visible", "type": "bool", "default": true, "group": "Visibility"},
 		{"key": "alpha", "label": "Opacity", "type": "float", "default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01, "group": "Visibility",
 			"tooltip": "Opacity of the node (like modulate.a in Godot)."},
+		{"key": "blend_mode", "label": "Blend Mode", "type": "enum", "default": "Mix", "options": ["Mix", "Add", "Subtract", "Multiply"], "group": "Material",
+			"tooltip": "Godot's CanvasItemMaterial blend mode. Add: glows and halos. Subtract: shadows. Multiply: tints what is behind."},
 	],
 	"Label": [
 		{"key": "text", "type": "text", "default": "Label",

@@ -453,7 +453,7 @@ namespace jetstudio{
                 if(n.type == NodeType::MeshInstance3D){
                     if(++meshes > MaxMeshes) return fail("At most 128 meshes per scene.");
 
-                    if(uint8_t(n.shape) > uint8_t(Shape::Mesh) || uint8_t(n.shading) > uint8_t(Shading::Water)
+                    if(uint8_t(n.shape) > uint8_t(Shape::Mesh) || uint8_t(n.shading) > uint8_t(Shading::Multiply)
                         || n.color > 0xffffff || n.segments < 3 || n.segments > 48) return fail("Invalid mesh in " + n.name + ".");
                     //mesh -1: no model assigned yet, the node draws nothing
                     if(n.shape == Shape::Mesh && (n.mesh < -1 || (n.mesh >= 0 && size_t(n.mesh) >= d.meshes.size())))
@@ -490,7 +490,7 @@ namespace jetstudio{
                     || uint8_t(n.more().background_mode) > uint8_t(Background::Panorama) || n.more().skyTop > 0xffffff || n.more().skyHorizon > 0xffffff
                     || n.more().groundHorizon > 0xffffff || n.more().groundBottom > 0xffffff || !textureOk(n.more().sky_texture)
                     || !std::isfinite(n.more().fog_begin) || !std::isfinite(n.more().fog_end) || n.more().fog_begin < 0
-                    || n.more().fog_end <= n.more().fog_begin))
+                    || n.more().fog_end <= n.more().fog_begin || n.more().cel_bits < 3 || n.more().cel_bits > 6))
                     return fail("Invalid environment in " + n.name + ".");
 
                 if(n.script < -1 || (n.script >= 0 && size_t(n.script) >= d.scripts.size())) return fail("Missing script for " + n.name + ".");
@@ -596,7 +596,14 @@ namespace jetstudio{
         switch(d.shape){
             case Shape::Box: return Primitives::createCube(100, 100, 100, material);
             case Shape::Sphere: return Primitives::createSphere(50, d.segments, material);
-            case Shape::Plane: return Primitives::createPlane(200, 200, material);
+            case Shape::Plane:{
+                //Jet's plane faces down: turned up like Godot's PlaneMesh, so back-face culling keeps it seen from above
+                Renderer::Object* mesh = Primitives::createPlane(200, 200, material);
+
+                for(auto& t : mesh->triangles) std::swap(t.v2, t.v3);
+
+                return mesh;
+            }
             case Shape::Pyramid:{
                 Renderer::Object* mesh = Primitives::createPyramid(100, 100, material);
 
@@ -775,6 +782,9 @@ namespace jetstudio{
                                  : const_cast<uint16_t*>(asset.pixels.data());
             auto texture = std::make_unique<Renderer::Texture>(asset.width, asset.height, data, asset.has_alpha, asset.alphaColor,
                 false, Renderer::WRAP, indexed ? const_cast<uint16_t*>(asset.palette.data()) : nullptr);
+            //Jet adds paletteOffset to every index of a palette that has a size
+            if(asset.palette_fps) texture->paletteSize = int(asset.palette.size());
+
             n.texture = texture.get();
             material->diffuseMap = n.texture;
             textures_.push_back(std::move(texture));
@@ -948,7 +958,8 @@ namespace jetstudio{
                 && a.diffuse == b.diffuse
                 && a.bilinear == b.bilinear && a.repeat == b.repeat && a.perspective == b.perspective && a.cull == b.cull && a.billboard == b.billboard
                 && a.visibility_begin == b.visibility[0] && a.visibility_begin_margin == b.visibility[1] && a.visibility_end == b.visibility[2]
-                && a.visibility_end_margin == b.visibility[3] && a.visibility_fade == b.visibility_fade;
+                && a.visibility_end_margin == b.visibility[3] && a.visibility_fade == b.visibility_fade && a.black_border == b.black_border
+                && a.water_far_edge == b.water_far_edge;
         }
         bool sameUv(const NodeDesc& a, const Runtime::Applied& b){
             return a.uv_scale[0] == b.uv_scale[0] && a.uv_scale[1] == b.uv_scale[1] && a.uv_offset[0] == b.uv_offset[0] && a.uv_offset[1] == b.uv_offset[1];
@@ -957,7 +968,8 @@ namespace jetstudio{
 
     void Runtime::applyMaterial(Live& n){
         static const Renderer::ShadingMode modes[] = {Renderer::ShadingMode::GOURAUD, Renderer::ShadingMode::FLAT, Renderer::ShadingMode::UNLIT,
-            Renderer::ShadingMode::PHONG, Renderer::ShadingMode::ADDITIVE, Renderer::ShadingMode::WATER_REFLECT};
+            Renderer::ShadingMode::PHONG, Renderer::ShadingMode::ADDITIVE, Renderer::ShadingMode::WATER_REFLECT, Renderer::ShadingMode::SUBTRACT,
+            Renderer::ShadingMode::MULTIPLY};
         const NodeDesc& d = n.d;
         auto& m = *n.material;
         m.shadingMode = modes[uint8_t(d.shading)];
@@ -967,6 +979,9 @@ namespace jetstudio{
         m.diffuse = uint8_t(std::lround(std::clamp(d.diffuse, 0.0f, 1.0f) * 255));
         m.perspectiveCorrect = d.perspective;
         m.color = rgb565(d.color);
+        //aimWaterReflections() sets them every frame
+        m.waterYBias = 0;
+        m.waterReflectionMaxY = -1;
 
         if(n.texture){
             //albedo multiplies the texture, as in Godot. Palette textures are tinted through the palette, which is cheap.
@@ -1008,7 +1023,7 @@ namespace jetstudio{
             }
 
             n.texture->bilinear = d.bilinear;
-            n.texture->addressMode = d.repeat ? Renderer::WRAP : Renderer::CLAMP;
+            n.texture->addressMode = d.repeat ? Renderer::WRAP : d.black_border ? Renderer::ZERO : Renderer::CLAMP;
             m.color = 0xffff;
         }
 
@@ -1147,10 +1162,30 @@ namespace jetstudio{
         jetFogNear = fog ? int(fogBegin) : std::numeric_limits<int>::max();
         jetFogFar = fog ? std::max(jetFogNear + 1, int(std::clamp(environment->d.more().fog_end * JetUnits, 0.0f, 1e9f)))
                         : std::numeric_limits<int>::max();
+        //post-processing: Jet's passes switched by the scene (a board build compiles only CRT and cel shading)
+        static const NodeExtras none;
+        const NodeExtras& post = environment ? environment->d.more() : none;
+#if POSTFX_CRT
+        scene_.crtEnabled = post.crt;
+        scene_.crtIntensity = post.crt_intensity;
+#endif
+#if POSTFX_CELLSHADING
+        scene_.getRenderer()->celShadingEnabled = post.cel_shading;
+        scene_.getRenderer()->celShadingBits = post.cel_bits;
+#endif
+        scene_.fxaaEnabled = post.fxaa;
+        scene_.bloomEnabled = post.bloom;
+        scene_.pixelateEnabled = post.pixelate;
+        scene_.chromaticEnabled = post.chromatic;
+        scene_.motionBlurEnabled = post.motion_blur;
+
+        flare_ = light && light->d.more().lens_flare;
 
         if(!light){ scene_.setDirectionalLight(nullptr); return; }
         //Godot lights shine along -Z; Jet wants the direction towards the light.
         const Vec3 toward = light->world.basis.orthonormalized().column(2).normalized();
+        sunToward_ = toward;
+        flareColor_ = light->d.more().light_color;
         sun_.worldLightDir = {int32_t(std::lround(toward.x * FIXED_POINT_SCALE)), int32_t(std::lround(toward.y * FIXED_POINT_SCALE)),
                               int32_t(std::lround(-toward.z * FIXED_POINT_SCALE))};
         sun_.lightDir = sun_.worldLightDir;
@@ -1182,6 +1217,7 @@ namespace jetstudio{
         }
 
         viewBasis_ = basis;
+        viewOrigin_ = position;
         viewFov_ = fov;
         //Jet's camera basis is Ry * Rx * Rz in its own (mirrored) space.
         const Vec3 e = basis.mirroredZ().euler();
@@ -1283,6 +1319,7 @@ namespace jetstudio{
         errors.clear();
         std::string error;
         playing_ = false;
+        flareVisibility_ = -1;
         vm_->clear();
         vm_->takeErrors();
         killTweens(false);
@@ -1969,11 +2006,31 @@ namespace jetstudio{
         collectPhysics();
     }
 
+    // One clock for every cycling palette, used by the 3D materials and by the 2D nodes (composeOverlayRow).
+    void Runtime::cyclePalettes(){
+        bool any = false;
+
+        for(auto& t : description_.textures){
+            if(!t.palette_fps || t.palette.empty()) continue;
+
+            t.paletteOffset = uint16_t(uint64_t(paletteTime_ * t.palette_fps) % t.palette.size());
+            any = true;
+        }
+
+        if(!any) return;
+
+        for(auto& n : nodes_)
+            if(n.texture && n.texture->paletteSize > 0 && n.d.texture >= 0) n.texture->paletteOffset = description_.textures[size_t(n.d.texture)].paletteOffset;
+    }
+
     void Runtime::update(float delta){
         const float dt = std::isfinite(delta) ? std::clamp(delta, 0.0f, 0.1f) : 0.0f;
 
         if(playing_){
             scene_.waterTime += dt;
+            paletteTime_ += dt;
+            flareDelta_ += dt;
+            cyclePalettes();
             //fixed 60 Hz physics ticks (at most 4 per frame), before _process as in Godot.
             physicsTime_ += dt;
             int ticks = 0;
@@ -2236,23 +2293,28 @@ namespace jetstudio{
             for(int p = n.parent; p >= 0 && isNode2d(nodes_[p].d.type); p = nodes_[p].parent) alpha *= std::clamp(nodes_[p].d.alpha, 0.0f, 1.0f);
 
             const auto& t = description_.textures[size_t(d.texture)];
-            const int fw = t.width / d.hframes, fh = t.height / d.vframes;
+            const int stored = t.width / d.hframes, storedH = t.height / d.vframes;
 
-            if(alpha <= 0 || fw <= 0 || fh <= 0) continue;
+            if(alpha <= 0 || stored <= 0 || storedH <= 0) continue;
 
+            //mirroring appends a flipped copy: the frame on the screen is twice the stored one
+            const int fw = d.mirror_h ? stored * 2 : stored, fh = d.mirror_v ? storedH * 2 : storedH;
             OverlayItem item;
             item.type = NodeType::Sprite2D;
             item.id = d.id;
             item.texture = &t;
             item.tint = d.color;
             item.alpha = uint8_t(std::lround(alpha * 255));
+            item.blend = d.blend_mode;
             const int frame = std::min(int(d.frame), d.hframes * d.vframes - 1);
-            item.frameX = (frame % d.hframes) * fw;
-            item.frameY = (frame / d.hframes) * fh;
+            item.frameX = (frame % d.hframes) * stored;
+            item.frameY = (frame / d.hframes) * storedH;
             item.frameW = fw;
             item.frameH = fh;
             item.flip_h = d.flip_h;
             item.flip_v = d.flip_v;
+            item.mirror_h = d.mirror_h;
+            item.mirror_v = d.mirror_v;
 
             //the frame's corners on the screen: a = (0, 0), b = (fw, 0), c = (0, fh).
             const float left = (d.centered ? -fw * 0.5f : 0) + d.offset[0], top = (d.centered ? -fh * 0.5f : 0) + d.offset[1];
@@ -2305,8 +2367,163 @@ namespace jetstudio{
         }
     }
 
+    // Jet's LensFlare as overlay items, so the boards composite it while sending rows like the 2D nodes: the light's
+    // direction projected through the camera, a glow on it and ghosts along the line to the screen centre and past it.
+    // Like Jet without picking, nothing hides the sun.
+    void Runtime::addLensFlare(){
+        //camera space: x right, y up, the view along -z
+        const Vec3 v = viewBasis_.transposed().xform(sunToward_);
+
+        if(v.z > -0.01f) return;
+
+        const float focal = height_ * 0.5f / std::tan(radians(viewFov_) * 0.5f);
+        const float sx = width_ * 0.5f + v.x / -v.z * focal, sy = height_ * 0.5f - v.y / -v.z * focal;
+        //it fades out as the sun reaches the screen edge, over the glow's radius
+        const float margin = height_ * 0.16f;
+        float fade = std::clamp(std::min({sx, width_ - 1 - sx, sy, height_ - 1 - sy}) / margin, 0.0f, 1.0f);
+
+        if(!(fade > 0)) return;
+
+        //hidden by geometry: Jet's LensFlare fades at 4 per second; the editor shows the result at once
+        const float target = sunHidden() ? 0.0f : 1.0f;
+        const float step = flareDelta_ * 4;
+
+        if(!playing_ || flareVisibility_ < 0) flareVisibility_ = target;
+        else flareVisibility_ = target > flareVisibility_ ? std::min(target, flareVisibility_ + step) : std::max(target, flareVisibility_ - step);
+
+        flareDelta_ = 0;
+        fade *= flareVisibility_;
+
+        if(!(fade > 0)) return;
+
+        //axis 0 = the sun, 1 = the screen centre; size is the radius in screen heights
+        struct Element{ float axis, size; uint8_t alpha; bool ring; uint32_t tint; };
+        static const Element elements[] = {
+            {0, 0.16f, 110, false, 0}, {0, 0.05f, 200, false, 0xffffff}, {0.4f, 0.03f, 70, false, 0x8fd0ff},
+            {0.65f, 0.06f, 60, true, 0xc8a0ff}, {1, 0.02f, 80, false, 0x80ffb0}, {1.35f, 0.08f, 45, false, 0xffc080}};
+
+        for(const auto& e : elements){
+            OverlayItem item;
+            item.type = NodeType::DirectionalLight3D;
+            const int r = std::max(1, int(e.size * height_));
+            const float px = sx + (width_ * 0.5f - sx) * e.axis, py = sy + (height_ * 0.5f - sy) * e.axis;
+            item.x = screenPixel(std::round(px)) - r;
+            item.y = screenPixel(std::round(py)) - r;
+            item.w = item.h = 2 * r;
+            item.color = rgb565(e.tint ? e.tint : flareColor_);
+            item.alpha = uint8_t(e.alpha * fade);
+            item.ring = e.ring;
+
+            if(item.alpha == 0 || item.x >= width_ || item.y >= height_ || item.x + item.w <= 0 || item.y + item.h <= 0) continue;
+
+            overlay_.push_back(std::move(item));
+        }
+    }
+
+    // Jet's LensFlare asks its picking whether the sun's pixel is covered, which the boards compile out. Here a ray from the
+    // camera towards the light is tested against the meshes and sprites: bounding sphere first, then each triangle.
+    // See-through surfaces and Background geometry (sky domes, floors) never hide it; texels with the colour key let it through.
+    bool Runtime::sunHidden() const{
+        const Vec3 dir = sunToward_.normalized();
+
+        for(const auto& n : nodes_){
+            if(n.freed || !n.inTree || !n.worldVisible || !n.object) continue;
+
+            const NodeDesc& d = n.d;
+            const bool seeThrough = d.shading == Shading::Additive || d.shading == Shading::Subtract || d.shading == Shading::Multiply;
+
+            if(seeThrough || d.alpha < 0.99f || d.draw_order == DrawOrder::Background) continue;
+
+            const float radius = n.jetRadius / JetUnits;
+            const Vec3 toCentre = n.world.origin - viewOrigin_;
+            const float along = toCentre.dot(dir);
+
+            if(along < -radius || toCentre.dot(toCentre) - along * along > radius * radius) continue;
+
+            const Renderer::Object& geometry = n.object->instances.empty() ? *n.object : *n.object->instances[0].mesh;
+            //billboards face the camera when drawn
+            const Basis rotation = d.billboard ? viewBasis_ : n.world.basis.orthonormalized();
+            auto world = [&](int i){
+                const auto& p = geometry.vertices[size_t(i)].position;
+                return n.world.origin + rotation.xform(Vec3{p.x / JetUnits, p.y / JetUnits, -p.z / JetUnits});
+            };
+
+            for(const auto& t : geometry.triangles){
+                //Moller-Trumbore, both sides
+                const Vec3 a = world(t.v1), e1 = world(t.v2) - a, e2 = world(t.v3) - a;
+                const Vec3 p = dir.cross(e2);
+                const float det = e1.dot(p);
+
+                if(std::abs(det) < 1e-9f) continue;
+
+                const Vec3 s = viewOrigin_ - a;
+                const float u = s.dot(p) / det;
+
+                if(u < 0 || u > 1) continue;
+
+                const Vec3 q = s.cross(e1);
+                const float v = dir.dot(q) / det;
+
+                if(v < 0 || u + v > 1 || e2.dot(q) / det <= 0.01f) continue;
+
+                if(!n.texture || !n.texture->hasAlpha) return true;
+
+                const auto& uv1 = geometry.vertices[t.v1].uv, uv2 = geometry.vertices[t.v2].uv, uv3 = geometry.vertices[t.v3].uv;
+                const float w = 1 - u - v;
+                const int tu = int(std::lround(uv1.x * w + uv2.x * u + uv3.x * v)), tv = int(std::lround(uv1.y * w + uv2.y * u + uv3.y * v));
+
+                if(n.texture->getPixel(tu, tv) != n.texture->alphaColor) return true;
+            }
+        }
+
+        return false;
+    }
+
+    void Runtime::aimWaterReflections(){
+        //Jet's mirror axis, Scene::prepareFrame's waterlineY
+        int32_t cx, sx, cy, sy, cz, sz;
+        camera_.getRotationMatrix(cx, sx, cy, sy, cz, sz);
+        const int horizon = height_ / 2 + int(float(sx) * camera_.fovFactor / 1024.0f);
+        const Basis toView = viewBasis_.transposed();
+        const float focal = height_ * 0.5f / std::tan(radians(viewFov_) * 0.5f);
+
+        for(auto& n : nodes_){
+            if(n.freed || !n.inTree || !n.worldVisible || !n.object || !n.material || n.d.shading != Shading::Water || !n.d.water_far_edge)
+                continue;
+
+            //the far edge: the highest row of the water's vertices in front of the camera
+            const Renderer::Object& geometry = n.object->instances.empty() ? *n.object : *n.object->instances[0].mesh;
+            const Basis rotation = n.world.basis.orthonormalized();
+            float shore = 1e9f;
+
+            for(const auto& vertex : geometry.vertices){
+                const auto& p = vertex.position;
+                const Vec3 v = toView.xform(n.world.origin + rotation.xform(Vec3{p.x / JetUnits, p.y / JetUnits, -p.z / JetUnits}) - viewOrigin_);
+
+                if(v.z < -0.05f) shore = std::min(shore, height_ * 0.5f - v.y / -v.z * focal);
+            }
+
+            auto& m = *n.material;
+
+            if(shore > 1e8f){
+                m.waterYBias = 0;
+                m.waterReflectionMaxY = -1;
+                continue;
+            }
+
+            //mirrored around the shore instead of the horizon; rows below the shore are water, never reflected
+            const int row = std::clamp(int(std::lround(shore)), 0, height_ - 1);
+            m.waterYBias = uint8_t(std::clamp(2 * (row - horizon), 0, 255));
+            m.waterReflectionMaxY = int16_t(row);
+        }
+    }
+
     void Runtime::prepareOverlay(){
         overlay_.clear();
+
+        //under the 2D nodes and the HUD; not in the editor's 2D view
+        if(flare_ && !canvasOverride()) addLensFlare();
+
         prepareCanvas();
 
         for(const auto& n : nodes_){
@@ -2329,6 +2546,7 @@ namespace jetstudio{
             item.x = screenPixel(std::round(at.x));
             item.y = screenPixel(std::round(at.y));
             item.color = rgb565(d.color);
+            item.blend = d.blend_mode;
             item.tint = d.color;
             item.alpha = uint8_t(std::lround(alpha * 255));
             item.scale = uint8_t(std::max<int>(1, d.more().text_scale));
@@ -2373,12 +2591,41 @@ namespace jetstudio{
     }
 
     void composeOverlayRow(const std::vector<OverlayItem>& items, uint16_t* row, int y, int width, bool swapped){
+        //the item's blend_mode; Add, Subtract and Multiply scale the source by alpha as the 3D shadings do
+        CanvasBlend mode = CanvasBlend::Mix;
         auto put = [&](int x, uint16_t c, uint32_t alpha){
             uint16_t dst = row[x];
 
             if(swapped) dst = uint16_t(dst << 8 | dst >> 8);
 
-            dst = blend565(dst, c, alpha);
+            if(mode == CanvasBlend::Mix){
+                dst = blend565(dst, c, alpha);
+            } else {
+                const int src[3] = {(c >> 11) & 31, (c >> 5) & 63, c & 31}, old[3] = {(dst >> 11) & 31, (dst >> 5) & 63, dst & 31};
+                const int top[3] = {31, 63, 31};
+                int out[3];
+
+                for(int k = 0; k < 3; ++k){
+                    if(mode == CanvasBlend::Add) out[k] = std::min(top[k], old[k] + src[k] * int(alpha) / 255);
+                    else if(mode == CanvasBlend::Subtract) out[k] = std::max(0, old[k] - src[k] * int(alpha) / 255);
+                    else out[k] = old[k] * (top[k] - (top[k] - src[k]) * int(alpha) / 255) / top[k];
+                }
+
+                dst = uint16_t(out[0] << 11 | out[1] << 5 | out[2]);
+            }
+
+            row[x] = swapped ? uint16_t(dst << 8 | dst >> 8) : dst;
+        };
+
+        auto add = [&](int x, uint16_t c, uint32_t amount){
+            uint16_t dst = row[x];
+
+            if(swapped) dst = uint16_t(dst << 8 | dst >> 8);
+
+            const uint32_t r = std::min<uint32_t>(31, (dst >> 11) + ((c >> 11) * amount >> 8));
+            const uint32_t g = std::min<uint32_t>(63, ((dst >> 5) & 63) + (((c >> 5) & 63) * amount >> 8));
+            const uint32_t b = std::min<uint32_t>(31, (dst & 31) + ((c & 31) * amount >> 8));
+            dst = uint16_t(r << 11 | g << 5 | b);
             row[x] = swapped ? uint16_t(dst << 8 | dst >> 8) : dst;
         };
 
@@ -2386,19 +2633,47 @@ namespace jetstudio{
             if(y < it.y || y >= it.y + it.h) continue;
 
             const int x0 = std::max(0, it.x), x1 = std::min(width, it.x + it.w);
+            mode = it.blend;
 
             if(it.type == NodeType::ColorRect){
                 for(int x = x0; x < x1; ++x) put(x, it.color, it.alpha);
+            } else if(it.type == NodeType::DirectionalLight3D){
+                //lens flare: brightness added, falling off with the squared distance (a ring peaks near its edge)
+                const int r = it.w / 2, cx = it.x + r, dy = y - (it.y + r), r2 = r * r;
+                const int32_t scale = (255 << 16) / std::max(r2, 1);
+
+                for(int x = x0; x < x1; ++x){
+                    const int dx = x - cx, d2 = dx * dx + dy * dy;
+
+                    if(d2 >= r2) continue;
+
+                    int k = 255 - int((d2 * scale) >> 16);
+
+                    if(it.ring) k = std::max(0, 255 - std::abs(255 - k - 170) * 4);
+
+                    add(x, it.color, uint32_t(k * it.alpha) / 255);
+                }
             } else if(it.type == NodeType::Sprite2D){
                 const auto& t = *it.texture;
                 const uint8_t* indices = t.palette.empty() ? nullptr : t.indexData();
+                const size_t colors = t.palette.size();
                 auto draw = [&](int x, int u, int v){
                     if(it.flip_h) u = it.frameW - 1 - u;
 
                     if(it.flip_v) v = it.frameH - 1 - v;
 
+                    //the mirrored half reads the stored one backwards, repeating the edge texel at the centre as Jet does
+                    if(it.mirror_h && u >= it.frameW / 2) u = it.frameW - 1 - u;
+
+                    if(it.mirror_v && v >= it.frameH / 2) v = it.frameH - 1 - v;
+
                     const size_t i = size_t(it.frameY + v) * t.width + size_t(it.frameX + u);
-                    uint16_t c = indices ? t.palette[indices[i]] : t.pixels[i];
+                    //palette cycling: the offset is 0 unless the texture animates
+                    size_t entry = indices ? size_t(indices[i]) + t.paletteOffset : 0;
+
+                    if(entry >= colors) entry -= colors;
+
+                    uint16_t c = indices ? t.palette[entry] : t.pixels[i];
 
                     if(t.has_alpha && c == t.alphaColor) return;
 
@@ -2408,10 +2683,12 @@ namespace jetstudio{
                 };
 
                 if(!it.affine){
-                    //64-bit: a sprite scaled up a lot is millions of pixels wide
+                    //64-bit only for a sprite scaled up to millions of pixels: per pixel it is a library call on the boards
                     const int v = int(int64_t(y - it.y) * it.frameH / it.h);
+                    const bool narrow = int64_t(it.w) * it.frameW < INT32_MAX;
 
-                    for(int x = x0; x < x1; ++x) draw(x, int(int64_t(x - it.x) * it.frameW / it.w), v);
+                    for(int x = x0; x < x1; ++x)
+                        draw(x, narrow ? (x - it.x) * it.frameW / it.w : int(int64_t(x - it.x) * it.frameW / it.w), v);
                 } else {
                     int64_t u = int64_t(it.ux) * x0 + int64_t(it.uy) * y + it.u0;
                     int64_t v = int64_t(it.vx) * x0 + int64_t(it.vy) * y + it.v0;
@@ -2425,10 +2702,15 @@ namespace jetstudio{
                 const auto& t = *it.texture;
                 const bool indexed = !t.palette.empty();
                 const size_t ty = size_t(int64_t(y - it.y) * t.height / it.h) * t.width;
+                const bool narrow = int64_t(it.w) * t.width < INT32_MAX;
 
                 for(int x = x0; x < x1; ++x){
-                    const size_t i = ty + size_t(int64_t(x - it.x) * t.width / it.w);
-                    uint16_t c = indexed ? t.palette[t.indexData()[i]] : t.pixels[i];
+                    const size_t i = ty + size_t(narrow ? (x - it.x) * t.width / it.w : int64_t(x - it.x) * t.width / it.w);
+                    size_t entry = indexed ? size_t(t.indexData()[i]) + t.paletteOffset : 0;
+
+                    if(entry >= t.palette.size()) entry -= t.palette.size();
+
+                    uint16_t c = indexed ? t.palette[entry] : t.pixels[i];
 
                     if(t.has_alpha && c == t.alphaColor) continue;
 
@@ -2442,9 +2724,10 @@ namespace jetstudio{
                 const int gyAll = int(int64_t(y - it.y) * rows / it.h);
                 const auto& glyphs = it.lines[size_t(gyAll / font::Height)];
                 const int gy = gyAll % font::Height;
+                const bool narrow = int64_t(it.w) * columns < INT32_MAX;
 
                 for(int x = x0; x < x1; ++x){
-                    const int gxAll = int(int64_t(x - it.x) * columns / it.w);
+                    const int gxAll = narrow ? (x - it.x) * columns / it.w : int(int64_t(x - it.x) * columns / it.w);
                     const size_t g = size_t(gxAll / font::Width);
 
                     if(g < glyphs.size() && (font::Glyphs[glyphs[g]][gy] & (0x40 >> (gxAll % font::Width)))) put(x, it.color, it.alpha);
@@ -2686,6 +2969,89 @@ namespace jetstudio{
         queuesReserved_ = true;
     }
 
+    // Every visible mesh's triangle edges, projected through the view like the camera, in a light tint of its colour.
+    // The vertices have the world scale baked in, so only the node's rotation and position remain.
+    void Runtime::drawWireframe(){
+        uint32_t background = 0x161c28;
+
+        for(const auto& n : nodes_)
+            if(n.d.type == NodeType::WorldEnvironment && !n.freed && n.inTree){ background = n.d.more().background; break; }
+
+        const int stride = bufferWidth();
+        std::fill(target_, target_ + size_t(stride) * bufferRows(), rgb565(background));
+        const Basis toView = viewBasis_.transposed();
+        const float focal = height_ * 0.5f / std::tan(radians(viewFov_) * 0.5f);
+
+        auto project = [&](Vec3 world, float& sx, float& sy){
+            const Vec3 v = toView.xform(world - viewOrigin_);
+
+            if(!(v.z < -0.05f)) return false;
+
+            sx = width_ * 0.5f + v.x / -v.z * focal;
+            sy = height_ * 0.5f - v.y / -v.z * focal;
+            return std::abs(sx) < 1e6f && std::abs(sy) < 1e6f;
+        };
+
+        //Liang-Barsky clipping to the screen, then one pixel per step
+        auto line = [&](float x0, float y0, float x1, float y1, uint16_t c){
+            const float dx = x1 - x0, dy = y1 - y0;
+            float t0 = 0, t1 = 1;
+            const float p[4] = {-dx, dx, -dy, dy}, q[4] = {x0, width_ - 1 - x0, y0, height_ - 1 - y0};
+
+            for(int i = 0; i < 4; ++i){
+                if(p[i] == 0){
+                    if(q[i] < 0) return;
+
+                    continue;
+                }
+
+                const float r = q[i] / p[i];
+
+                if(p[i] < 0) t0 = std::max(t0, r);
+                else t1 = std::min(t1, r);
+            }
+
+            if(t0 > t1) return;
+
+            const float ax = x0 + dx * t0, ay = y0 + dy * t0, bx = x0 + dx * t1, by = y0 + dy * t1;
+            const int steps = int(std::max(std::abs(bx - ax), std::abs(by - ay))) + 1;
+
+            for(int s = 0; s <= steps; ++s){
+                const int x = int(ax + (bx - ax) * s / steps + 0.5f), y = int(ay + (by - ay) * s / steps + 0.5f);
+
+                if(x >= 0 && y >= 0 && x < width_ && y < height_) target_[size_t(y) * stride + size_t(x)] = c;
+            }
+        };
+
+        for(const auto& n : nodes_){
+            if(n.freed || !n.inTree || !n.worldVisible || !n.object) continue;
+
+            const Renderer::Object& geometry = n.object->instances.empty() ? *n.object : *n.object->instances[0].mesh;
+            const Basis rotation = n.world.basis.orthonormalized();
+            //halfway to white, so dark meshes stay visible
+            const uint16_t c = rgb565(((n.d.color >> 1) & 0x7f7f7f) + 0x808080);
+            std::vector<float> xy(geometry.vertices.size() * 2);
+            std::vector<uint8_t> seen(geometry.vertices.size());
+
+            for(size_t i = 0; i < geometry.vertices.size(); ++i){
+                const auto& p = geometry.vertices[i].position;
+                const Vec3 local{p.x / JetUnits, p.y / JetUnits, -p.z / JetUnits};
+                seen[i] = project(n.world.origin + rotation.xform(local), xy[i * 2], xy[i * 2 + 1]);
+            }
+
+            for(const auto& t : geometry.triangles){
+                const int v[3] = {t.v1, t.v2, t.v3};
+
+                if(!seen[size_t(v[0])] || !seen[size_t(v[1])] || !seen[size_t(v[2])]) continue;
+
+                for(int k = 0; k < 3; ++k){
+                    const size_t a = size_t(v[k]) * 2, b = size_t(v[(k + 1) % 3]) * 2;
+                    line(xy[a], xy[a + 1], xy[b], xy[b + 1], c);
+                }
+            }
+        }
+    }
+
     void Runtime::render(){
         if(canvasOverride()){
             //the editor's 2D view: the canvas on the scene's background colour, without the 3D world.
@@ -2700,8 +3066,18 @@ namespace jetstudio{
         }
 
         applyCamera();
+
+        //Jet has no wireframe raster: the editor's wireframe view draws the edges itself
+        if(wireframe_ && editorView_){
+            drawWireframe();
+            drawOverlay();
+            return;
+        }
+
         prepareBackground();
         updateReflections();
+        aimWaterReflections();
+        scene_.getRenderer()->reflectBuffer = const_cast<uint16_t*>(reflect_);
 
         if(!queuesReserved_) reserveTriangleQueues();
 

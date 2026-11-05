@@ -272,6 +272,15 @@ void materialTests(){
     check(renderScene(linear) != texturedFrame, "bilinear filtering changes the magnified texture");
     check(renderScene(affine) != texturedFrame, "affine mapping differs from perspective-correct mapping");
     check(renderScene(tiled) != texturedFrame, "UV scale repeats the texture");
+    {
+        Description clamped = tiled;
+        clamped.nodes[3].repeat = false;
+        Description zero = clamped;
+        zero.nodes[3].black_border = true;
+        const auto edges = renderScene(clamped), black = renderScene(zero);
+        check(std::count(black.begin(), black.end(), 0) > std::count(edges.begin(), edges.end(), 0) + 100,
+              "Outside UV Black leaves the outside of the texture black");
+    }
     const auto red = renderScene(tinted);
     size_t blue = 0;
 
@@ -672,7 +681,7 @@ void modelTests(){
     if(bytes.empty()) std::cerr << "pack: " << error << '\n';
 
     Description back;
-    check(decode_pack(bytes.data(), bytes.size(), back, error), "pack v17 round trips");
+    check(decode_pack(bytes.data(), bytes.size(), back, error), "pack v19 round trips");
     check(back.meshes.size() == 2 && back.meshes[0].vertices.size() == model.meshes[0].vertices.size()
           && back.meshes[0].indices == model.meshes[0].indices, "pack keeps imported meshes");
     const auto& c = back.nodes[back.nodes.size() - 2];
@@ -2099,6 +2108,18 @@ void environmentTests(){
         "\t$Env.fog_enabled = true\n\t$Env.fog_depth_begin = 1.0\n\t$Env.fog_depth_end = 3.0\n", {}});
     check(lit(playScene(fogScript)) == 0, "scripts turn the fog on");
 
+    //the editor's Display Wireframe: edges only, then shaded again
+    {
+        Runtime r;
+        r.load(base, error);
+        r.set_editor_camera({0, 1.5f, 4}, {-0.3f, 0, 0}, 70);
+        const auto shaded = frame(r);
+        r.set_wireframe(true);
+        const auto wires = frame(r);
+        r.set_wireframe(false);
+        check(lit(wires) > 50 && lit(wires) < lit(shaded) / 2 && frame(r) == shaded, "Display Wireframe draws the edges only");
+    }
+
     //the package keeps them
     Description saved = base;
     saved.nodes[3].visibility_begin = 150; saved.nodes[3].visibility_end_margin = 65535; saved.nodes[3].visibility_fade = true;
@@ -2114,6 +2135,365 @@ void environmentTests(){
     badFog.nodes[4].extras().fog_end = 5;
     Runtime r;
     check(!r.load(badFog, error), "fog_depth_end must be beyond fog_depth_begin");
+}
+
+// Palette cycling: the palette is sorted from dark to light and shifts while the game runs, in 3D materials and 2D nodes.
+void paletteTests(){
+    std::string error;
+    //a horizontal gradient of 32 greys
+    std::vector<uint8_t> gradient(32 * 8 * 4);
+
+    for(int y = 0; y < 8; ++y)
+        for(int x = 0; x < 32; ++x){
+            uint8_t* p = &gradient[size_t(y * 32 + x) * 4];
+            p[0] = p[1] = p[2] = uint8_t(x * 8);
+            p[3] = 255;
+        }
+
+    TextureAsset cycling;
+    check(makeTexture("res://lava.png", 32, 8, gradient.data(), cycling, error, PaletteMode::Auto, 10) && cycling.palette_fps == 10
+          && cycling.palette.size() == 32, "a cycling texture gets a palette");
+    bool sorted = true;
+
+    for(size_t i = 1; i < cycling.palette.size(); ++i) sorted = sorted && (cycling.palette[i] >> 11) >= (cycling.palette[i - 1] >> 11);
+
+    check(sorted, "its palette goes from dark to light");
+    TextureAsset refused;
+    check(!makeTexture("res://holes.png", 16, 16, checker(16, 16, 2, true).data(), refused, error, PaletteMode::Auto, 10),
+          "palette cycling refuses transparent pixels");
+    check(!makeTexture("res://rgb.png", 32, 8, gradient.data(), refused, error, PaletteMode::Rgb565, 10), "and the RGB565 mode");
+    TextureAsset many;
+    check(makeTexture("res://many.png", 128, 128, checker(128, 128, 0, false).data(), many, error, PaletteMode::Auto, 5)
+          && !many.palette.empty() && many.palette.size() <= 256, "Auto quantizes a cycling image with more than 256 colours");
+
+    //3D: an unlit cube with the gradient
+    Description d = scene();
+    d.nodes[3].texture = 0;
+    d.nodes[3].shading = Shading::Unlit;
+    d.nodes[3].color = 0xffffff;
+    Description still = d;
+    d.textures.push_back(cycling);
+    TextureAsset plain;
+    makeTexture("res://lava.png", 32, 8, gradient.data(), plain, error);
+    still.textures.push_back(plain);
+    check(playScene(still, 0) == playScene(still, 0.5f), "a still texture does not change");
+    check(playScene(d, 0) != playScene(d, 0.5f), "a cycling texture changes while the game runs");
+    const auto bytes = encode_pack(d, error);
+    Description back;
+    check(decode_pack(bytes.data(), bytes.size(), back, error) && back.textures[0].palette_fps == 10
+          && back.textures[0].palette == cycling.palette, "the package keeps the cycling speed");
+
+    //2D: a Sprite2D with the same texture
+    Description flat;
+    flat.nodes.push_back(node(1, -1, NodeType::Node2D, "World"));
+    auto sprite = node(2, 0, NodeType::Sprite2D, "Lava");
+    sprite.texture = 0; sprite.color = 0xffffff; sprite.position = {100, 80, 0}; sprite.scale = {4, 4, 1};
+    flat.nodes.push_back(sprite);
+    flat.textures.push_back(cycling);
+    check(playScene(flat, 0) != playScene(flat, 0.5f), "a Sprite2D's palette cycles too");
+}
+
+// Jet's lens flare as overlay items: shown when the light's direction is in view, faded at the screen edges.
+void flareTests(){
+    std::string error;
+    //camera at the origin looking along -z, nothing else in the way
+    auto sky = [](float yaw, float pitch, bool flare){
+        Description d;
+        d.nodes.push_back(node(1, -1, NodeType::Node3D, "World"));
+        auto camera = node(2, 0, NodeType::Camera3D, "Camera3D");
+        camera.extras().current = true;
+        d.nodes.push_back(camera);
+        //a light shines along its -z, so with yaw 180 its direction points at the camera's view
+        auto sun = node(3, 0, NodeType::DirectionalLight3D, "Sun");
+        sun.rotation = {pitch, yaw, 0};
+        sun.extras().lens_flare = flare;
+        d.nodes.push_back(sun);
+        return d;
+    };
+
+    auto flareItems = [&](const Description& d, int* alpha = nullptr){
+        Runtime r;
+        std::vector<ScriptDiagnostic> diagnostics;
+
+        if(!r.load(d, error) || !r.start(diagnostics)) return -1;
+
+        r.update(0);
+        r.render();
+        int count = 0;
+
+        for(const auto& it : r.overlay())
+            if(it.type == NodeType::DirectionalLight3D){
+                ++count;
+
+                if(alpha) *alpha = std::max(*alpha, int(it.alpha));
+            }
+
+        return count;
+    };
+
+    int ahead = 0, edge = 0;
+    check(flareItems(sky(180, 0, true), &ahead) > 3, "the flare shows when the sun is in view");
+    check(flareItems(sky(180, 0, false)) == 0, "only with lens_flare on");
+    check(flareItems(sky(0, 0, true)) == 0, "a sun behind the camera has no flare");
+    //43 degrees off the view axis: ~14 px from the left edge of a 75 degree 4:3 view
+    check(flareItems(sky(223, 0, true), &edge) > 0 && edge > 0 && edge < ahead, "the flare fades towards the screen edge");
+    const auto plain = playScene(sky(180, 0, false)), flared = playScene(sky(180, 0, true));
+    const size_t centre = size_t(Height / 2) * Width + Width / 2;
+    check((flared[centre] >> 11) > (plain[centre] >> 11), "it brightens the image around the sun");
+
+    Description scripted = sky(180, 0, false);
+    scripted.nodes[0].script = 0;
+    scripted.scripts.push_back({"res://flare.jet", "extends Node3D\nfunc _ready():\n\t$Sun.lens_flare = true\n", {}});
+    check(playScene(scripted) == flared, "scripts turn the flare on");
+
+    //a box between the camera and the sun hides it; see-through and Background geometry do not
+    auto blocked = [&](auto change){
+        Description d = sky(180, 0, true);
+        auto box = node(4, 0, NodeType::MeshInstance3D, "Block");
+        box.position = {0, 0, -3};
+        change(box);
+        d.nodes.push_back(box);
+        return flareItems(d);
+    };
+    check(blocked([](NodeDesc&){}) == 0, "an opaque mesh in front of the sun hides the flare");
+    check(blocked([](NodeDesc& b){ b.position = {2, 0, -3}; }) > 3, "a mesh beside the line to the sun does not");
+    check(blocked([](NodeDesc& b){ b.alpha = 0.5f; }) > 3 && blocked([](NodeDesc& b){ b.shading = Shading::Additive; }) > 3
+          && blocked([](NodeDesc& b){ b.draw_order = DrawOrder::Background; }) > 3, "see-through and Background meshes do not");
+    //while playing it fades out as Jet's does, at 4 per second
+    {
+        Description d = sky(180, 0, true);
+        auto box = node(4, 0, NodeType::MeshInstance3D, "Block");
+        box.position = {0, 0, -3}; box.visible = false;
+        d.nodes.push_back(box);
+        d.nodes[0].script = 0;
+        d.scripts.push_back({"res://show.jet", "extends Node3D\nvar frames := 0\nfunc _process(delta):\n\tframes += 1\n"
+                             "\tif frames == 2:\n\t\t$Block.visible = true\n", {}});
+        Runtime r;
+        std::vector<ScriptDiagnostic> diagnostics;
+        check(r.load(d, error) && r.start(diagnostics), "the fading flare scene starts");
+        auto strongest = [&]{
+            r.update(0.05f);
+            r.render();
+            int alpha = 0;
+
+            for(const auto& it : r.overlay()) if(it.type == NodeType::DirectionalLight3D) alpha = std::max(alpha, int(it.alpha));
+
+            return alpha;
+        };
+        const int before = strongest(), fading = strongest();
+        int later = fading;
+
+        for(int i = 0; i < 8; ++i) later = strongest();
+
+        check(before > 0 && fading > 0 && fading < before && later == 0, "the flare fades out behind geometry");
+    }
+    const auto bytes = encode_pack(sky(180, 0, true), error);
+    Description back;
+    check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[2].more().lens_flare, "the package keeps lens_flare");
+}
+
+// Jet's PostFX passes, switched per scene by the WorldEnvironment (all compiled in on the PC).
+void postfxTests(){
+    std::string error;
+    const Description base = scene();
+    const auto plain = playScene(base);
+
+    auto with = [&](auto set){
+        Description d = base;
+        auto env = node(9, 0, NodeType::WorldEnvironment, "Env");
+        set(env.extras());
+        d.nodes.push_back(env);
+        return playScene(d);
+    };
+
+    check(with([](NodeExtras&){}) == plain, "a WorldEnvironment without effects changes nothing");
+    const auto crt = with([](NodeExtras& e){ e.crt = true; e.crt_intensity = 128; });
+    check(crt != plain && crt[size_t(1) * Width + 2] < plain[size_t(1) * Width + 2] && crt[2] == plain[2], "CRT darkens every other row");
+    check(with([](NodeExtras& e){ e.cel_shading = true; e.cel_bits = 6; }) != plain, "cel shading bands the lighting");
+    check(with([](NodeExtras& e){ e.fxaa = true; }) != plain, "FXAA smooths the edges");
+    //bloom only spreads bright pixels: a white unlit cube
+    {
+        Description bright = base;
+        bright.nodes[3].shading = Shading::Unlit;
+        bright.nodes[3].color = 0xffffff;
+        const auto white = playScene(bright);
+        auto env = node(9, 0, NodeType::WorldEnvironment, "Env");
+        env.extras().bloom = true;
+        bright.nodes.push_back(env);
+        check(playScene(bright) != white, "bloom makes bright areas glow");
+    }
+    check(with([](NodeExtras& e){ e.pixelate = true; }) != plain, "pixelate makes big pixels");
+    check(with([](NodeExtras& e){ e.chromatic = true; }) != plain, "chromatic aberration shifts the channels");
+    check(with([](NodeExtras& e){ e.motion_blur = true; }) != plain, "motion blur mixes in the previous frame");
+
+    Description scripted = base;
+    scripted.nodes.push_back(node(9, 0, NodeType::WorldEnvironment, "Env"));
+    scripted.nodes[0].script = 0;
+    scripted.scripts.push_back({"res://crt.jet", "extends Node3D\nfunc _ready():\n\t$Env.crt_scanlines = true\n\t$Env.crt_intensity = 128.0 / 255.0\n"
+        "\t$Env.cel_shading_bands = 4\n\tprint($Env.cel_shading_bands)\n", {}});
+    check(playScene(scripted) == crt, "scripts switch the effects");
+
+    Description saved = base;
+    auto env = node(9, 0, NodeType::WorldEnvironment, "Env");
+    env.extras().crt = true; env.extras().motion_blur = true; env.extras().crt_intensity = 77; env.extras().cel_bits = 3;
+    saved.nodes.push_back(env);
+    const auto bytes = encode_pack(saved, error);
+    Description back;
+    check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[4].more().crt && back.nodes[4].more().motion_blur
+          && !back.nodes[4].more().bloom && back.nodes[4].more().crt_intensity == 77 && back.nodes[4].more().cel_bits == 3,
+          "the package keeps the post-processing");
+}
+
+void canvasTests(){
+    std::string error;
+    std::vector<ScriptDiagnostic> diagnostics;
+    //2D blend modes: a ColorRect over a mid grey background
+    Description base;
+    base.nodes.push_back(node(1, -1, NodeType::Node3D, "World"));
+    auto env = node(2, 0, NodeType::WorldEnvironment, "Env");
+    env.extras().background = 0x808080;
+    base.nodes.push_back(env);
+    auto rect = node(3, 0, NodeType::ColorRect, "Rect");
+    rect.position = {10, 10, 0}; rect.extras().size = {40, 40, 0};
+    base.nodes.push_back(rect);
+    auto tinted = [&](CanvasBlend mode, uint32_t color){
+        Description d = base;
+        d.nodes[2].blend_mode = mode; d.nodes[2].color = color;
+        return playScene(d);
+    };
+    const size_t inside = size_t(30) * Width + 30;
+    check(tinted(CanvasBlend::Add, 0x404040)[inside] == rgb565(0xc0c0c0), "blend_mode Add adds to what is behind");
+    check(tinted(CanvasBlend::Subtract, 0x202020)[inside] == rgb565(0x606060), "blend_mode Subtract takes it away");
+    check(tinted(CanvasBlend::Multiply, 0xff0000)[inside] == rgb565(0x800000), "blend_mode Multiply tints it");
+    check(tinted(CanvasBlend::Mix, 0x202020)[inside] == rgb565(0x202020), "Mix draws over it");
+
+    Description scripted = base;
+    scripted.nodes[2].color = 0x404040;
+    scripted.nodes[0].script = 0;
+    scripted.scripts.push_back({"res://add.jet", "extends Node3D\nfunc _ready():\n\t$Rect.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD\n", {}});
+    check(playScene(scripted) == tinted(CanvasBlend::Add, 0x404040), "scripts set blend_mode with Godot's constants");
+
+    //mirroring: frame 0 of the sheet is red then green, twice as wide with the flipped copy
+    const uint32_t red = 0xff0000ff, green = 0xff00ff00, blue = 0xffff0000;
+    const std::vector<uint32_t> rgba = {red, green, blue, blue, red, green, blue, blue};
+    TextureAsset sheet;
+    check(makeTexture("res://sheet.png", 4, 2, reinterpret_cast<const uint8_t*>(rgba.data()), sheet, error), "mirror sheet converts");
+    Description sprites;
+    sprites.nodes.push_back(node(1, -1, NodeType::Node2D, "World"));
+    auto ship = node(2, 0, NodeType::Sprite2D, "Ship");
+    ship.texture = 0; ship.hframes = 2; ship.color = 0xffffff; ship.position = {100, 80, 0}; ship.scale = {10, 10, 1}; ship.mirror_h = true;
+    sprites.nodes.push_back(ship);
+    sprites.textures.push_back(sheet);
+    Runtime r;
+    check(r.load(sprites, error), "a mirrored sprite loads");
+    r.render();
+    auto at = [&](int x, int y){ return r.pixels()[size_t(y) * size_t(r.width()) + size_t(x)]; };
+    const uint16_t r565 = rgb565(0xff0000), g565 = rgb565(0x00ff00);
+    check(at(85, 80) == r565 && at(95, 80) == g565 && at(105, 80) == g565 && at(115, 80) == r565 && at(125, 80) != r565,
+          "Mirror H appends a flipped copy of the frame");
+
+    //Camera3D.unproject_position: fov 90 at z = 5, so 1 m beside the origin is 120 / 5 px from the centre
+    Description view;
+    view.nodes.push_back(node(1, -1, NodeType::Node3D, "World"));
+    auto camera = node(2, 0, NodeType::Camera3D, "Cam");
+    camera.position = {0, 0, 5}; camera.extras().current = true; camera.extras().fov = 90;
+    view.nodes.push_back(camera);
+    view.nodes[0].script = 0;
+    view.scripts.push_back({"res://project.jet", "extends Node3D\nfunc _ready():\n\tvar p = $Cam.unproject_position(Vector3(1, 1, 0))\n"
+        "\tprint(\"at \", round(p.x), \" \", round(p.y))\n\tprint(\"behind \", $Cam.is_position_behind(Vector3(0, 0, 9)), \" \", "
+        "$Cam.is_position_behind(Vector3(0, 0, 0)))\n", {}});
+    Runtime projector;
+    check(projector.load(view, error) && projector.start(diagnostics), "the unproject scene starts");
+    check(hasLog(projector, "at 184.0 96.0", false), "unproject_position gives the screen pixel");
+    Runtime behind;
+    behind.load(view, error);
+    behind.start(diagnostics);
+    check(hasLog(behind, "behind true false", false), "is_position_behind");
+
+    //MeshInstance3D.shading from scripts
+    Description lit = scene();
+    lit.nodes[0].script = 0;
+    lit.scripts.push_back({"res://unlit.jet", "extends Node3D\nfunc _ready():\n\t$Cube.shading = MeshInstance3D.SHADING_UNLIT\n", {}});
+    Description unlit = scene();
+    unlit.nodes[3].shading = Shading::Unlit;
+    check(playScene(lit) == playScene(unlit), "scripts change the shading");
+
+    //the package keeps them
+    Description saved = sprites;
+    saved.nodes[1].mirror_v = true; saved.nodes[1].blend_mode = CanvasBlend::Multiply;
+    saved.nodes.push_back(node(3, 0, NodeType::MeshInstance3D, "Lake"));
+    saved.nodes[2].black_border = true; saved.nodes[2].water_far_edge = true;
+    const auto bytes = encode_pack(saved, error);
+    Description back;
+    check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[1].mirror_h && back.nodes[1].mirror_v
+          && back.nodes[1].blend_mode == CanvasBlend::Multiply && back.nodes[2].black_border && back.nodes[2].water_far_edge
+          && bytes[4] == 20, "the package (v20) keeps blend modes, mirroring, Outside UV and Mirror at Far Edge");
+}
+
+void waterTests(){
+    //a lake below a level camera, a red block standing on its far shore, a gradient sky
+    Description lake;
+    lake.nodes.push_back(node(1, -1, NodeType::Node3D, "World"));
+    auto camera = node(2, 0, NodeType::Camera3D, "Camera3D");
+    camera.position = {0, 1, 6}; camera.extras().current = true;
+    lake.nodes.push_back(camera);
+    auto water = node(3, 0, NodeType::MeshInstance3D, "Water");
+    water.shape = Shape::Plane; water.shading = Shading::Water; water.alpha = 0.7f; water.color = 0x103050; water.scale = {4, 1, 4};
+    lake.nodes.push_back(water);
+    auto block = node(4, 0, NodeType::MeshInstance3D, "Block");
+    block.position = {0, 1, -4.5f}; block.scale = {2, 2, 1}; block.shading = Shading::Unlit; block.color = 0xff0000;
+    lake.nodes.push_back(block);
+    auto env = node(5, 0, NodeType::WorldEnvironment, "Env");
+    env.extras().background_mode = Background::Gradient;
+    lake.nodes.push_back(env);
+    {
+        Description floor = scene();
+        floor.nodes[3].shape = Shape::Plane; floor.nodes[3].scale = {4, 1, 4}; floor.nodes[3].shading = Shading::Unlit; floor.nodes[3].color = 0xffffff;
+        const auto above = playScene(floor);
+        check(std::count(above.begin(), above.end(), rgb565(0xffffff)) > 10000, "a Plane faces up, like Godot's PlaneMesh (back-face culling keeps it)");
+    }
+    Description shore = lake;
+    shore.nodes[2].water_far_edge = true;
+    const auto horizon = playScene(lake), edge = playScene(shore);
+    check(horizon != edge, "Mirror at Far Edge moves the reflections");
+    //the block's reflection reaches down below the shore, its height (the horizon mirrors sky there)
+    auto redRows = [](const std::vector<uint16_t>& image, int first, int last){
+        size_t red = 0;
+
+        for(int y = first; y < last; ++y)
+            for(int x = 140; x < 180; ++x) red += image[size_t(y) * Width + size_t(x)] >> 11;
+
+        return red;
+    };
+    check(redRows(edge, Height / 2 + 25, Height / 2 + 50) > 2 * redRows(horizon, Height / 2 + 25, Height / 2 + 50) + 100,
+          "reflections mirror around the far shore");
+}
+
+void blendTests(){
+    std::string error;
+    Description base = scene();
+    auto env = node(9, 0, NodeType::WorldEnvironment, "Env");
+    env.extras().background = 0x808080;
+    base.nodes.push_back(env);
+    const size_t center = size_t(Height / 2) * Width + Width / 2;
+
+    auto shade = [&](Shading shading, uint32_t color, float alpha){
+        Description d = base;
+        d.nodes[3].shading = shading; d.nodes[3].color = color; d.nodes[3].alpha = alpha;
+        return playScene(d)[center];
+    };
+
+    check(shade(Shading::Subtract, 0x404040, 1) == rgb565(0x404040), "Subtract takes the colour away from what is behind");
+    check(shade(Shading::Multiply, 0xff8000, 1) == uint16_t(16 << 11 | 16 << 5), "Multiply tints what is behind");
+    const uint16_t half = shade(Shading::Multiply, 0x000000, 0.5f);
+    check(((half >> 5) & 63) > 8 && ((half >> 5) & 63) < 24, "a translucent Multiply fades toward white");
+    check(shade(Shading::Subtract, 0x404040, 0) == rgb565(0x808080), "a transparent Subtract leaves the background");
+
+    Description saved = base;
+    saved.nodes[3].shading = Shading::Multiply;
+    const auto bytes = encode_pack(saved, error);
+    Description back;
+    check(decode_pack(bytes.data(), bytes.size(), back, error) && back.nodes[3].shading == Shading::Multiply, "the package keeps the blend shading");
 }
 
 int main(int argc, char** argv){
@@ -2133,6 +2513,12 @@ int main(int argc, char** argv){
     tweenTests();
     animationPlayerTests();
     environmentTests();
+    paletteTests();
+    flareTests();
+    postfxTests();
+    blendTests();
+    canvasTests();
+    waterTests();
     Runtime runtime;
     const Description base = scene();
     check(runtime.load(base, error), "valid scene loads");
@@ -2407,5 +2793,5 @@ int main(int argc, char** argv){
     }
 
     if(failures){ std::cerr << failures << " runtime test(s) failed\n"; return 1; }
-    std::cout << "PASS: hierarchy, Godot transforms, validation, picking, scripts, input, queue_free, errors, bytecode, textures, materials, sky, OBJ import, quantization, Quad/Torus, reflections, 2D nodes, draw order, resolution, physics, particles, input map, scenes, autoloads, Sprite3D, plain Control, slim nodes, RAM estimate, instantiate, 2D nodes, 2D physics, signals, Timer, scene connections, tweens, AnimationPlayer, pack v17\n";
+    std::cout << "PASS: hierarchy, Godot transforms, validation, picking, scripts, input, queue_free, errors, bytecode, textures, materials, sky, OBJ import, quantization, Quad/Torus, reflections, 2D nodes, draw order, resolution, physics, particles, input map, scenes, autoloads, Sprite3D, plain Control, slim nodes, RAM estimate, instantiate, 2D nodes, 2D physics, signals, Timer, scene connections, tweens, AnimationPlayer, fog, visibility range, palette cycling, lens flare, post-processing, pack v19\n";
 }

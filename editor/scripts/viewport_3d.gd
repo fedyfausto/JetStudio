@@ -41,6 +41,8 @@ var tool := Tool.MOVE
 var localSpace := false
 var snap := false
 var show_grid := true
+# Display Wireframe: Jet has none, the runtime draws the edges
+var show_wireframe := false
 var previewCamera := false
 
 # Editor camera ("cursor" like Godot's): orbit pivot, distance and angles.
@@ -191,6 +193,19 @@ func _fillViewMenu():
 	popup.add_separator()
 	popup.add_check_item("Show Grid", 8)
 	popup.set_item_checked(popup.get_item_index(8), show_grid)
+
+	if not mode_2d:
+		popup.add_check_item("Display Wireframe", 10)
+		popup.set_item_checked(popup.get_item_index(10), show_wireframe)
+
+
+func setWireframe(on: bool):
+	show_wireframe = on
+
+	if bridge != null: bridge.set_wireframe(on)
+
+	_fillViewMenu()
+	camera_changed.emit()
 
 
 # The 2D view (Godot's 2D editor) or the 3D one; the editor renders the canvas only while it is 2D.
@@ -437,6 +452,7 @@ func _onViewMenu(id: int):
 			var popup := _viewMenu.get_popup()
 			popup.set_item_checked(popup.get_item_index(8), show_grid)
 			overlay.queue_redraw()
+		10: setWireframe(not show_wireframe)
 
 
 func _setAngles(newYaw: float, newPitch: float):
@@ -1324,6 +1340,8 @@ func _spriteOutline(node: Dictionary) -> PackedVector2Array:
 	if size == Vector2.ZERO: return out
 
 	size /= Vector2(maxi(1, int(node.get("hframes", 1))), maxi(1, int(node.get("vframes", 1))))
+	#mirroring appends a flipped copy
+	size *= Vector2(2 if bool(node.get("mirror_h", false)) else 1, 2 if bool(node.get("mirror_v", false)) else 1)
 	var offset: Array = node.get("offset", [0.0, 0.0])
 	var low := Vector2(float(offset[0]), float(offset[1])) - (size * 0.5 if bool(node.get("centered", true)) else Vector2.ZERO)
 	var t := Document.canvas_transform(root, int(node.id))

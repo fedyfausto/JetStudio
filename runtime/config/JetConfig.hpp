@@ -27,13 +27,14 @@
 #define HALF_WIDTH_BUFFERS 0
 #define FIELD_BUFFERS 0
 #define SSR_FIELD_REFLECT 0
-#define POSTFX_CRT 0
-#define POSTFX_CELLSHADING 0
-#define POSTFX_ANTIALIASING 0
-#define POSTFX_BLOOM 0
-#define POSTFX_MOTION_BLUR 0
-#define POSTFX_CHROMATIC 0
-#define POSTFX_PIXELATE 0
+// Every PostFX pass is compiled in; the WorldEnvironment switches them per scene (tools/patches/Jet-runtime-postfx.patch).
+#define POSTFX_CRT 1
+#define POSTFX_CELLSHADING 1
+#define POSTFX_ANTIALIASING 1
+#define POSTFX_BLOOM 1
+#define POSTFX_MOTION_BLUR 1
+#define POSTFX_CHROMATIC 1
+#define POSTFX_PIXELATE 1
 #define CRT_SCANLINE_INTENSITY 48
 #define MOTION_BLUR_STRENGTH 50
 #define CHROMATIC_OFFSET 2

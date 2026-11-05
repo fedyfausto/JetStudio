@@ -214,7 +214,10 @@ extern "C" void* __wrap_malloc(size_t size){
     if(fields[1]){
         scanout::wait();
 
-        if(runtime) runtime->set_framebuffer(nullptr);
+        if(runtime){
+            runtime->set_framebuffer(nullptr);
+            runtime->set_reflect_buffer(nullptr);
+        }
 
         free(fields[1]);
         fields[1] = nullptr;
@@ -321,6 +324,8 @@ void loop(){
     const uint32_t updated = micros();
     //the second buffer may go while the scene grows (see __wrap_malloc): check it again before each use.
     runtime->set_framebuffer(fields[1] && parity ? fields[1] : nullptr);
+    //two buffers: Water reflects the field being sent, already complete
+    runtime->set_reflect_buffer(fields[1] ? fields[1 - parity] : nullptr);
     //one buffer: the display must have the whole field before it is drawn again.
     if(!fields[1]) scanout::wait();
 

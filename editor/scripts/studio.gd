@@ -20,7 +20,7 @@ const SerialMonitor := preload("res://scripts/serial_monitor.gd")
 const ProjectSettingsDialog := preload("res://scripts/project_settings_dialog.gd")
 const Hardware := preload("res://scripts/hardware.gd")
 const Actions := preload("res://scripts/input_map.gd")
-const VERSION := "0.7.0"
+const VERSION := "0.7.1"
 const SETTINGS := "user://editor.cfg"
 
 enum Screen { VIEW_3D, SCRIPT, GAME, VIEW_2D }
@@ -1616,7 +1616,7 @@ func _textureImage(path: String) -> Image:
 
 		if image == null: return null
 
-		cached = {"stamp": stamp, "image": image, "palette": settings.palette}
+		cached = {"stamp": stamp, "image": image, "palette": settings.palette, "palette_fps": int(settings.get("palette_fps", 0))}
 		_imageCache[file] = cached
 
 	return cached.image
@@ -1935,7 +1935,9 @@ func _sceneAssets(doc: Dictionary) -> Dictionary:
 	for path in Document.texturePaths(doc.root):
 		var image := _textureImage(path)
 
-		if image != null: textures[path] = {"image": image, "palette": _imageCache[project.toAbs(path)].palette}
+		if image != null:
+			var cached: Dictionary = _imageCache[project.toAbs(path)]
+			textures[path] = {"image": image, "palette": cached.palette, "palette_fps": cached.palette_fps}
 
 	var models := {}
 
@@ -3442,6 +3444,18 @@ func _check(condition: bool, message: String):
 	printerr("SMOKE FAIL: " + message)
 
 
+# The LineEdit a Tree edits its cells with (an internal child).
+func _internalLineEdit(node: Node) -> LineEdit:
+	for child in node.get_children(true):
+		if child is LineEdit: return child
+
+		var found := _internalLineEdit(child)
+
+		if found != null: return found
+
+	return null
+
+
 func _frame() -> PackedByteArray:
 	_render()
 	return bridge.frame_bytes()
@@ -3484,6 +3498,11 @@ func _runSmoke():
 	_check(_frame() != before, "inspector edit changes the frame")
 	_undo()
 	_check(_frame() == before, "undo restores the frame")
+	#View > Display Wireframe
+	viewport.setWireframe(true)
+	var wires := _frame()
+	viewport.setWireframe(false)
+	_check(wires != before and _frame() == before, "Display Wireframe draws the edges and switches back")
 	#gizmo drag
 	var steps: int = _tab().undo.size()
 	var t := Document.localTransform(Document.find(_rootNode(), 6))
@@ -3515,6 +3534,19 @@ func _runSmoke():
 	_renameNode(6, "bad/name")
 	_check(str(Document.find(_rootNode(), 6).name) == "Ground2", "invalid names are rejected")
 	errorDialog.hide()
+	#rename in the Scene dock through the Tree's own line editor: the tree is rebuilt only after its signal (Windows crash, PR #2)
+	scene_dock.select(6)
+	scene_dock._beginRename()
+	await get_tree().process_frame
+	var lineEdit := _internalLineEdit(scene_dock.tree)
+
+	if lineEdit != null: lineEdit.text_submitted.emit("Docked")
+
+	_check(lineEdit != null and str(Document.find(_rootNode(), 6).name) == "Ground2", "the Scene dock waits for the Tree's signal to end")
+	await get_tree().process_frame
+	_check(str(Document.find(_rootNode(), 6).name) == "Docked", "renaming from the Scene dock")
+	_undo()
+	_check(str(Document.find(_rootNode(), 6).name) == "Ground2", "undo the Scene dock rename")
 	_duplicateNode(6)
 	_check(Document.count(_rootNode()) == 7 and Document.find(_rootNode(), _tab().selected).name == "Ground3", "duplicate with unique name")
 	_undo()
@@ -3582,7 +3614,7 @@ func _runSmoke():
 	var packPath := _rootDir().path_join(".cache/tests/smoke.jetpack")
 	_check(_exportTo(packPath), "export .jetpack")
 	var bytes := FileAccess.get_file_as_bytes(packPath)
-	_check(bytes.size() > 100 and bytes.slice(0, 5) == PackedByteArray([74, 69, 84, 80, 18]), "package header JETP v18")
+	_check(bytes.size() > 100 and bytes.slice(0, 5) == PackedByteArray([74, 69, 84, 80, 20]), "package header JETP v20")
 	#Visibility Range comes from GeometryInstance3D, as in Godot; Fog is on the WorldEnvironment
 	var inherited := []
 
@@ -4157,5 +4189,5 @@ func _runSmoke():
 		get_tree().quit(1)
 		return
 
-	print("PASS: Godot UI -> GDExtension -> runtime -> Jet; nodes, undo, hierarchy, scripts, play/stop, errors, save, export, 2D, physics, 2D physics, 2D view, 2D gizmos, new scene roots, Change Type, Timer, signals, Signals dock connections, Animation panel, particles, Input Map, scenes, autoloads, boot splash, OBJ import, serial monitor")
+	print("PASS: Godot UI -> GDExtension -> runtime -> Jet; nodes, undo, hierarchy, scripts, play/stop, errors, save, export, 2D, physics, 2D physics, 2D view, 2D gizmos, new scene roots, Change Type, Timer, signals, Signals dock connections, Animation panel, particles, Input Map, scenes, autoloads, boot splash, OBJ import, serial monitor, wireframe view")
 	get_tree().quit()

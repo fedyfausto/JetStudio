@@ -7,7 +7,7 @@
 </p>
 <!-- markdownlint-enable MD033 MD041 -->
 
-# Jet Studio - prototype 0.7.0
+# Jet Studio - prototype 0.7.1
 
 A **Godot**-style 3D desktop editor, built with Godot's UI, with an **independent C++17** game
 runtime, the **Jet** renderer and the **JetScript** scripting language (GDScript syntax). The
@@ -86,17 +86,17 @@ otherwise make the Wayland driver terminate. The interface scale is changed from
 | <img src="editor/icons/MeshInstance3D.png" width="16" height="16" alt=""> `MeshInstance3D` | Box, Sphere, Plane, Pyramid, Cylinder, Capsule, Quad, Torus primitives (Godot's default sizes) or a part of an OBJ model (`File`), and material (see below) |
 | (<img src="editor/icons/GeometryInstance3D.png" width="16" height="16" alt=""> `GeometryInstance3D`) | base of `MeshInstance3D` and `Sprite3D`: Visibility Range (`begin`, `end`, margins, fade mode Self) hides or fades a node by its distance from the camera; outside the range Jet skips it entirely |
 | <img src="editor/icons/Sprite3D.png" width="16" height="16" alt=""> `Sprite3D` | a PNG, or one frame of a sprite sheet (`hframes`, `vframes`, `frame`), as a quad in the world: unlit, double-sided, optional billboard, `flip_h`/`flip_v`, `pixel_size`, `modulate` |
-| <img src="editor/icons/Camera3D.png" width="16" height="16" alt=""> `Camera3D` | vertical FOV, near/far, `current` |
-| <img src="editor/icons/DirectionalLight3D.png" width="16" height="16" alt=""> `DirectionalLight3D` | color and energy; lights along its own −Z |
-| <img src="editor/icons/WorldEnvironment.png" width="16" height="16" alt=""> `WorldEnvironment` | background (color, sky/ground gradient, panorama), ambient light and depth fog (geometry fades into the background between Depth Begin and Depth End) |
+| <img src="editor/icons/Camera3D.png" width="16" height="16" alt=""> `Camera3D` | vertical FOV, near/far, `current`; `unproject_position()` puts 2D halos and labels on 3D points |
+| <img src="editor/icons/DirectionalLight3D.png" width="16" height="16" alt=""> `DirectionalLight3D` | color and energy; lights along its own −Z; optional Jet lens flare (a glow on the sun and reflections towards the screen centre), hidden by the meshes in front of the light |
+| <img src="editor/icons/WorldEnvironment.png" width="16" height="16" alt=""> `WorldEnvironment` | background (color, sky/ground gradient, panorama), ambient light, depth fog (geometry fades into the background between Depth Begin and Depth End) and Jet's post-processing |
 | <img src="editor/icons/StaticBody3D.png" width="16" height="16" alt=""> `StaticBody3D` | collides and does not move on its own (scripts can move it: moving platforms) |
 | <img src="editor/icons/CharacterBody3D.png" width="16" height="16" alt=""> `CharacterBody3D` | character moved by the script with `move_and_slide()` |
 | <img src="editor/icons/RigidBody3D.png" width="16" height="16" alt=""> `RigidBody3D` | body with gravity, mass, bounce, friction and impulses |
 | <img src="editor/icons/Area3D.png" width="16" height="16" alt=""> `Area3D` | reports bodies that enter and exit (coins, triggers, zones) |
 | <img src="editor/icons/CollisionShape3D.png" width="16" height="16" alt=""> `CollisionShape3D` | Box, Sphere or Capsule collision shape, child of a body or an area |
 | <img src="editor/icons/CPUParticles3D.png" width="16" height="16" alt=""> `CPUParticles3D` | particle emitter (sparks, splashes, fountains) using Jet's particle system |
-| <img src="editor/icons/Node2D.png" width="16" height="16" alt=""> `Node2D` | 2D position (canvas pixels, y down), rotation, scale and `z_index`; children follow it |
-| <img src="editor/icons/Sprite2D.png" width="16" height="16" alt=""> `Sprite2D` | a PNG or one frame of a sprite sheet in the 2D world: `centered`, `offset`, flips, `modulate`; rotated and scaled at full resolution |
+| <img src="editor/icons/Node2D.png" width="16" height="16" alt=""> `Node2D` | 2D position (canvas pixels, y down), rotation, scale and `z_index`; children follow it; blend mode Mix, Add, Subtract or Multiply (Godot's CanvasItemMaterial, on Controls too) |
+| <img src="editor/icons/Sprite2D.png" width="16" height="16" alt=""> `Sprite2D` | a PNG or one frame of a sprite sheet in the 2D world: `centered`, `offset`, flips, Jet's mirroring (a symmetric image stored in half), `modulate`; rotated and scaled at full resolution |
 | <img src="editor/icons/AnimatedSprite2D.png" width="16" height="16" alt=""> `AnimatedSprite2D` | a sprite sheet with named animations (`idle 0-3 8, run 4-9 12`): `play()`, `stop()`, autoplay |
 | <img src="editor/icons/Camera2D.png" width="16" height="16" alt=""> `Camera2D` | moves the 2D view (its position at the screen centre), `offset`, `zoom` |
 | <img src="editor/icons/StaticBody2D.png" width="16" height="16" alt=""> `StaticBody2D` | collides and does not move on its own (scripts can move it: moving platforms) |
@@ -253,12 +253,17 @@ again. Only the import settings change, never the PNG files.
   (half the memory, lossless), otherwise RGB565. Transparent pixels use a key color.
   Prefer power-of-2 sides, up to 1024: Jet samples them faster. Import: maximum size, palette
   `Auto` / `Quantize` (reduction to 256 colors with median cut) / `RGB565`, Flip V.
+  Palette FPS cycles the palette (Jet's palette animation) while the game runs: the colors, sorted from
+  dark to light, shift by that many steps per second, so gradients flow (water, lava, neon); opaque images only.
 - **Material**:
   - albedo color, which multiplies the texture as in Godot;
-  - Nearest or Linear (bilinear) filter, repeat, UV scale and offset;
+  - Nearest or Linear (bilinear) filter, repeat (without it, the outside of the texture is its edge or black),
+    UV scale and offset;
   - perspective or affine UVs;
   - Gouraud, Flat, Unlit, Phong (with specular), Additive (neon, beams), Water (sky reflection
-    with ripples) shading;
+    with ripples), Subtract (fake shadows, dark decals) and Multiply (tinted glass, stains) shading, also from
+    scripts (`shading`). Water can mirror around its far edge instead of the horizon (a lake's far shore reflects
+    right below it), and on the boards it reflects the previous field, already complete;
   - diffuse coefficient, transparency, Back/Front/Disabled culling and billboard;
   - **Draw Order**: *Background* (drawn first, in scene order, never covers the rest: room,
     floor, sky), *Default*, *On Top* (always on top);
@@ -267,6 +272,10 @@ again. Only the import settings change, never the PNG files.
 - **Sky** (WorldEnvironment): Color, Gradient (sky and ground, with the horizon following the
   camera's tilt, like ProceduralSkyMaterial) or Panorama (2:1 equirectangular image around the
   scene, like PanoramaSkyMaterial).
+- **Post-processing** (WorldEnvironment): Jet's effects. CRT scanlines (with their intensity) run on the
+  PC and the boards. Cel shading (4 to 32 bands), FXAA, bloom, pixelate, chromatic aberration and
+  motion blur run in the PC player and the editor only: the boards draw half-width fields, and cel
+  shading would slow their raster loop even when off.
 - **From scripts**: `color`, `alpha`, `uv_offset`, `uv_scale`, `perspective_correct`,
   `texture_filter` of the MeshInstance3D.
 
@@ -302,7 +311,7 @@ In the **3D** screen the navigation is Godot's: **middle button** orbits, **Shif
 **wheel** zooms, **Alt+left** emulates the middle button (touchpad), **F** focuses the selection,
 numpad 1/3/7 for front/right/top views. Tools: Q select, W move, E rotate, R scale,
 T local space, Y snap. The editor camera is separate from the game's `Camera3D`; when a camera
-is selected, **Preview** shows its view.
+is selected, **Preview** shows its view. **View > Display Wireframe** draws the meshes' edges only.
 
 ## Scripts (JetScript)
 
@@ -510,7 +519,7 @@ package and the project have the same actions.
   (save them to update the file).
 - `.jet`: JetScript script.
 - `*.import`: import settings of a PNG or OBJ (JSON, next to the file).
-- `.jetpack`: binary package version 18 (resolution, Input Map, every scene of the project with its 3D and 2D nodes, animations and signal connections, autoloads, materials, converted textures, imported meshes, script bytecode, exported values)
+- `.jetpack`: binary package version 20; versions 18 and 19 still load (resolution, Input Map, every scene of the project with its 3D and 2D nodes, animations and signal connections, autoloads, materials, converted textures, imported meshes, script bytecode, exported values)
   read by the runtime. The bytecode has a version, an instruction-set fingerprint and a CRC; on
   load every operand and jump is verified. A package must be re-exported when the JetScript version changes.
 
@@ -613,6 +622,10 @@ python -m pip install platformio
 (or Python from python.org with "Add python.exe to PATH"). Open a new terminal or restart the
 editor afterwards so it finds `python` and `pio`. As on Linux, the first firmware build downloads
 the toolchains and ESP-IDF (a few GB, 15-30 minutes); later builds take a minute or two.
+Flashing STM32 boards also needs ST's ST-LINK USB driver (STSW-LINK009): without it the ST-LINK shows
+up in Device Manager with an error and the upload stops at "OpenOCD init failed". Until then, a Nucleo
+can be flashed by copying `firmware_stm32\.pio\build\<board>\firmware.bin` (made by Build) to its
+`NODE_...` drive.
 
 ## Tests
 

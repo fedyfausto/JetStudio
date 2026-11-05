@@ -24,6 +24,7 @@ class JetBridge : public godot::RefCounted{
         godot::Dictionary texture_info(const godot::Ref<godot::Image>& image, const godot::String& palette) const;
         void set_editor_camera(const godot::Vector3& position, const godot::Vector3& rotation, double fov);
         void use_editor_camera(bool enabled);
+        void set_wireframe(bool enabled);
         void set_editor_canvas(bool enabled, double zoom, const godot::Vector2& origin);
         bool preview_animation(int player, const godot::String& name, double time);
         void update(double delta);
@@ -56,7 +57,7 @@ class JetBridge : public godot::RefCounted{
         jetstudio::Runtime runtime_;
     public:
         // Converted textures by path, valid while the editor passes the same Image instance.
-        struct CachedTexture{ uint64_t image = 0; int mode = -1; jetstudio::TextureAsset asset; };
+        struct CachedTexture{ uint64_t image = 0; int mode = -1; uint32_t paletteFps = 0; jetstudio::TextureAsset asset; };
         // Imported models by path, valid while the source text and options are unchanged.
         struct CachedModel{ int64_t stamp[3] = {0, 0, 0}; std::vector<jetstudio::ObjPart> parts; };
     private:
